@@ -27,7 +27,7 @@ otherwm(void)
 static int
 otherwmerr(Display *dpy, XErrorEvent *ee)
 {
-	errx(0, "sxwm: another window manager is already running, please close it");
+	errx(0, "sxwm: can't start because another window manager is already running");
 	return 0;
 	if (dpy && ee) return 0;
 }
@@ -69,9 +69,9 @@ main(int ac, char **av)
 {
 	if (ac > 1) {
 		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0)
-			errx(0, "%s\n%s\n%s\n", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
+			errx(0, "%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
 		else
-			errx(0, "usage:\n[-v || --version]: See the version of sxwm\n");
+			errx(0, "usage:\n[-v || --version]: See the version of sxwm");
 	}
 	setup();
 	run();
