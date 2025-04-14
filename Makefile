@@ -15,7 +15,7 @@ $(BIN): $(OBJ)
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-x:
+c:
 	rm -f $(SRC_DIR)/*.o $(BIN)
 
 r:

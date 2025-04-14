@@ -1,5 +1,36 @@
+/*  See LICENSE for more info
+
+	sxwm is a user-friendly, easily configurable yet powerful
+	tiling window manager inspired by window managers such as
+	DWM and i3
+
+	The userconfig is designed to be as user-friendly as
+	possible, and I hope it is easy to configure even without
+	knowledge of C or programming, although most people who
+	will use this will probably be programmers :)
+
+*///			(C) Abhinav Prasai 2025
+
 #include "sxwm.h"
-#include "util.h"
+
+static void
+otherwm(void)
+{
+	XSetErrorHandler(otherwmerr);
+	XChangeWindowAttributes(dpy, root, CWEventMask, 
+			&(XSetWindowAttributes){.event_mask = SubstructureRedirectMask});
+	XSync(dpy, False);
+	XSetErrorHandler(xerr);
+	XSync(dpy, False);
+}
+
+static int
+otherwmerr(Display *dpy, XErrorEvent *ee)
+{
+	errx(0, "sxwm: another window manager is already running, please close it");
+	return 0;
+	if (dpy && ee) return 0;
+}
 
 static void
 run(void)
@@ -10,7 +41,7 @@ run(void)
 	}
 }
 
-void
+static void
 setup(void)
 {
 	dpy = XOpenDisplay(NULL);
@@ -24,6 +55,15 @@ setup(void)
 	);
 }
 
+static int
+xerr(Display *dpy, XErrorEvent *ee)
+{
+	fprintf(stderr, "sxwm: fatal error\nrequest code:%d\nerror code:%d",
+			ee->request_code, ee->error_code);
+	return 0;
+	if (dpy && ee) return 0;
+}
+
 int
 main(int ac, char **av)
 {
@@ -33,7 +73,7 @@ main(int ac, char **av)
 		else
 			errx(0, "usage:\n[-v || --version]: See the version of sxwm\n");
 	}
+	setup();
 	run();
-	dpy = XOpenDisplay(NULL);
 	return 0;
 }
