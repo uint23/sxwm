@@ -170,7 +170,11 @@ setup(void)
 	for (int i = 0; i < LASTEvent; ++i)
 		evtable[i] = hdl_dummy;
 
+	evtable[ConfigureRequest] = hdl_config_req;
+	evtable[DestroyNotify] = hdl_destroy_ntf;
 	evtable[KeyPress] = hdl_keypress;
+	evtable[MapRequest] = hdl_map_req;
+	evtable[UnmapNotify] = hdl_unmap_ntf;
 }
 
 static void
