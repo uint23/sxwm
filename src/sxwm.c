@@ -24,7 +24,11 @@
 typedef void (*EventHandler)(XEvent *);
 
 static void hdl_dummy(XEvent *xev);
+static void hdl_config_req(XEvent *xev);
+static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
+static void hdl_map_req(XEvent *xev);
+static void hdl_unmap_ntf(XEvent *xev);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static void quit(void);
@@ -42,7 +46,33 @@ static Window	root;
 #include "usercfg.h"
 
 static void
-hdl_dummy(XEvent *xev){}
+hdl_dummy(XEvent *xev)
+{}
+
+static void
+hdl_config_req(XEvent *xev)
+{
+	XConfigureRequestEvent ev = xev->xconfigurerequest;
+	XWindowChanges wc;
+	wc.y = ev.y;
+	wc.width = ev.width;
+	wc.height = ev.height;
+	wc.border_width = ev.border_width;
+	wc.sibling = ev.above;
+	wc.stack_mode = ev.detail;
+
+	XConfigureWindow(dpy, ev.window, ev.value_mask, &wc);
+	printf("sxwm: window configured: %ld\n", ev.window);
+}
+
+
+static void
+hdl_destroy_ntf(XEvent *xev)
+{
+	XDestroyWindowEvent ev = xev->xdestroywindow;
+	XDestroyWindow(dpy, ev.window);
+	printf("sxwm: window destroyed: %ld\n", ev.window);
+}
 
 static void
 hdl_keypress(XEvent *xev)
@@ -64,6 +94,29 @@ hdl_keypress(XEvent *xev)
 			return;
 		}
 	}
+}
+
+static void
+hdl_map_req(XEvent *xev)
+{
+	XMapRequestEvent ev = xev->xmaprequest;
+	XSetWindowBorder(dpy, ev.window, WhitePixel(dpy, DefaultScreen(dpy)));
+	XSetWindowBorderWidth(dpy, ev.window, BORDERWIDTH);
+	XMapWindow(dpy, ev.window);
+
+	XWindowAttributes wa;
+	if (!XGetWindowAttributes(dpy, ev.window, &wa))
+		return;
+
+	printf("sxwm: window mapped: %ld\n", ev.window);
+}
+
+static void
+hdl_unmap_ntf(XEvent *xev)
+{
+	XUnmapEvent ev = xev->xunmap;
+	XUnmapWindow(dpy, ev.window);
+	printf("sxwm: window unmapped: %ld\n", ev.window);
 }
 
 static void

@@ -4,7 +4,8 @@
 #include <X11/keysym.h>
 #include "defs.h"
 
-#define MOD	ALT
+#define MOD			ALT
+#define BORDERWIDTH	2
 
 static const char *termcmd[] = {"st", NULL};
 
