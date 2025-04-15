@@ -18,7 +18,4 @@ $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 c:
 	rm -f $(SRC_DIR)/*.o $(BIN)
 
-r:
-	x all
-
-.PHONY: all clean rebuild
+.PHONY: all c
