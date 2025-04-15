@@ -31,6 +31,7 @@ static void hdl_map_req(XEvent *xev);
 static void hdl_unmap_ntf(XEvent *xev);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
+static unsigned long parse_col(const char *hex);
 static void quit(void);
 static void run(void);
 static void setup(void);
@@ -42,6 +43,10 @@ static Client clients[MAXCLIENTS] = {0};
 static EventHandler evtable[LASTEvent];
 static Display 	*dpy;
 static Window	root;
+
+static unsigned long border_foc_col;
+static unsigned long border_ufoc_col;
+
 
 #include "usercfg.h"
 
@@ -100,8 +105,8 @@ static void
 hdl_map_req(XEvent *xev)
 {
 	XMapRequestEvent ev = xev->xmaprequest;
-	XSetWindowBorder(dpy, ev.window, WhitePixel(dpy, DefaultScreen(dpy)));
-	XSetWindowBorderWidth(dpy, ev.window, BORDERWIDTH);
+	XSetWindowBorder(dpy, ev.window, border_foc_col);
+	XSetWindowBorderWidth(dpy, ev.window, BORDER_WIDTH);
 	XMapWindow(dpy, ev.window);
 
 	XWindowAttributes wa;
@@ -136,6 +141,25 @@ other_wm_err(Display *dpy, XErrorEvent *ee)
 	errx(0, "sxwm: can't start because another window manager is already running");
 	return 0;
 	if (dpy && ee) return 0;
+}
+
+static unsigned long
+parse_col(const char *hex)
+{
+	XColor col;
+	Colormap cmap = DefaultColormap(dpy, DefaultScreen(dpy));
+
+	if (!XParseColor(dpy, cmap, hex, &col)) {
+		fprintf(stderr, "sxwm: cannot parse color %s\n", hex);
+		return WhitePixel(dpy, DefaultScreen(dpy));
+	}
+
+	if (!XAllocColor(dpy, cmap, &col)) {
+		fprintf(stderr, "sxwm: cannot allocate color %s\n", hex);
+		return WhitePixel(dpy, DefaultScreen(dpy));
+	}
+
+	return col.pixel;
 }
 
 static void
@@ -175,6 +199,9 @@ setup(void)
 	evtable[KeyPress] = hdl_keypress;
 	evtable[MapRequest] = hdl_map_req;
 	evtable[UnmapNotify] = hdl_unmap_ntf;
+
+	border_foc_col = parse_col(BORDER_FOC_COL);
+	border_ufoc_col = parse_col(BORDER_UFOC_COL);
 }
 
 static void
