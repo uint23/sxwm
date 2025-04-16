@@ -4,7 +4,8 @@
 #include <X11/keysym.h>
 #include "defs.h"
 
-#define BORDER_WIDTH	10
+#define GAPS			10
+#define BORDER_WIDTH	1
 #define BORDER_FOC_COL	"#00FF00"
 #define BORDER_UFOC_COL	"#FF0000"
 

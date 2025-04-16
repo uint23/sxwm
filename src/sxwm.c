@@ -1,15 +1,15 @@
 /*  See LICENSE for more info
-
-	sxwm is a user-friendly, easily configurable yet powerful
-	tiling window manager inspired by window managers such as
-	DWM and i3
-
-	The userconfig is designed to be as user-friendly as
-	possible, and I hope it is easy to configure even without
-	knowledge of C or programming, although most people who
-	will use this will probably be programmers :)
-
-*///			(C) Abhinav Prasai 2025
+ *
+ *	sxwm is a user-friendly, easily configurable yet powerful
+ *	tiling window manager inspired by window managers such as
+ *	DWM and i3
+ *
+ *	The userconfig is designed to be as user-friendly as
+ *	possible, and I hope it is easy to configure even without
+ *	knowledge of C or programming, although most people who
+ *	will use this will probably be programmers :)
+ *			(C) Abhinav Prasai 2025
+*/
 
 #include <err.h>
 #include <stdio.h>
@@ -22,91 +22,114 @@
 
 #include "defs.h"
 
-typedef void (*EventHandler)(XEvent *);
-
 static void add_client(Window w);
-static unsigned int clean_mask(unsigned int mask);
+static uint clean_mask(uint mask);
+static void grab_keys(void);
 static void hdl_dummy(XEvent *xev);
-static void hdl_config_req(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
-static void hdl_unmap_ntf(XEvent *xev);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
-static unsigned long parse_col(const char *hex);
+static uint64_t parse_col(const char *hex);
 static void quit(void);
+static void remove_client(Window w);
 static void run(void);
 static void setup(void);
 static void spawn(const char **cmd);
+static void tile(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 
 static Client *clients = NULL;
 static EventHandler evtable[LASTEvent];
-static Display 	*dpy;
-static Window	root;
+static Display *dpy;
+static Window root;
 
-static unsigned long border_foc_col;
-static unsigned long border_ufoc_col;
-static unsigned int scr_width;
-static unsigned int scr_height;
+static uint64_t border_foc_col;
+static uint64_t border_ufoc_col;
+static uint scr_width;
+static uint scr_height;
 
+static uint open_windows = 0;
 #include "usercfg.h"
 
 static void
 add_client(Window w)
 {
+	Client *c = malloc(sizeof(Client));
+	if (!c) {
+		fprintf(stderr, "sxwm: could not alloc memory for client\n");
+		return;
+	}
+	c->win = w;
+	c->next = clients;
+	clients = c;
+	++open_windows;
+
+	XSelectInput(dpy, w, EnterWindowMask | LeaveWindowMask | FocusChangeMask |
+			PropertyChangeMask | StructureNotifyMask);
+
+	XRaiseWindow(dpy, w);
+
 }
 
-static unsigned int
-clean_mask(unsigned int mask)
+static uint
+clean_mask(uint mask)
 {
 	return mask & ~(LockMask | Mod2Mask | Mod3Mask);
 }
 
 static void
-hdl_dummy(XEvent *xev)
-{}
-
-static void
-hdl_config_req(XEvent *xev)
+grab_keys(void)
 {
-	XConfigureRequestEvent ev = xev->xconfigurerequest;
-	XWindowChanges wc;
-	wc.y = ev.y;
-	wc.width = ev.width;
-	wc.height = ev.height;
-	wc.border_width = ev.border_width;
-	wc.sibling = ev.above;
-	wc.stack_mode = ev.detail;
+	KeyCode keycode;
+	uint modifiers[] = { 0, LockMask, Mod2Mask, LockMask|Mod2Mask };
 
-	XConfigureWindow(dpy, ev.window, ev.value_mask, &wc);
-	printf("sxwm: window configured: %ld\n", ev.window);
+	// ungrab all keys
+	XUngrabKey(dpy, AnyKey, AnyModifier, root);
+
+	for (uint i = 0; i < LENGTH(binds); ++i) {
+		if ((keycode = XKeysymToKeycode(dpy, binds[i].keysym))) {
+			for (uint j = 0; j < LENGTH(modifiers); ++j) {
+				XGrabKey(dpy, keycode,
+						binds[i].mods | modifiers[j],
+						root, True, GrabModeAsync, GrabModeAsync);
+			}
+		}
+	}
 }
 
+static void
+hdl_dummy(XEvent *xev)
+{
+	(void) xev;
+}
 
 static void
 hdl_destroy_ntf(XEvent *xev)
 {
-	XDestroyWindowEvent ev = xev->xdestroywindow;
-	XDestroyWindow(dpy, ev.window);
-	printf("sxwm: window destroyed: %ld\n", ev.window);
+	remove_client(xev->xdestroywindow.window);
+	tile();
+}
+
+static void
+hdl_map_req(XEvent *xev)
+{
+	XConfigureRequestEvent *config_req = &xev->xconfigurerequest;
+	add_client(config_req->window);
+	tile();
+	XMapWindow(dpy, config_req->window);
 }
 
 static void
 hdl_keypress(XEvent *xev)
 {
-	KeySym keysym;
-	XKeyEvent *ev = &xev->xkey;
-	unsigned int modifiers;
+	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
+	uint mods = clean_mask(xev->xkey.state);
 
-	keysym = XkbKeycodeToKeysym(dpy, ev->keycode, 0, 0);
-	modifiers = clean_mask(ev->state);
-
-	int lenbindings = sizeof(binds) / sizeof(binds[0]);
-	for (int i = 0; i < lenbindings; ++i) {
-		if (keysym == binds[i].keysym && modifiers == clean_mask(binds[i].mods)) {
+	for (uint i = 0; i < LENGTH(binds); ++i) {
+		if (keysym == binds[i].keysym && mods == clean_mask(binds[i].mods)) {
 			if (binds[i].is_func)
 				binds[i].action.fn();
 			else
@@ -117,29 +140,6 @@ hdl_keypress(XEvent *xev)
 }
 
 static void
-hdl_map_req(XEvent *xev)
-{
-	XMapRequestEvent ev = xev->xmaprequest;
-	XSetWindowBorder(dpy, ev.window, border_foc_col);
-	XSetWindowBorderWidth(dpy, ev.window, BORDER_WIDTH);
-	XMapWindow(dpy, ev.window);
-
-	XWindowAttributes wa;
-	if (!XGetWindowAttributes(dpy, ev.window, &wa))
-		return;
-
-	printf("sxwm: window mapped: %ld\n", ev.window);
-}
-
-static void
-hdl_unmap_ntf(XEvent *xev)
-{
-	XUnmapEvent ev = xev->xunmap;
-	XUnmapWindow(dpy, ev.window);
-	printf("sxwm: window unmapped: %ld\n", ev.window);
-}
-
-static void
 other_wm(void)
 {
 	XSetErrorHandler(other_wm_err);
@@ -147,18 +147,20 @@ other_wm(void)
 			&(XSetWindowAttributes){.event_mask = SubstructureRedirectMask});
 	XSync(dpy, False);
 	XSetErrorHandler(xerr);
+	XChangeWindowAttributes(dpy, root, CWEventMask, 
+			&(XSetWindowAttributes){.event_mask = 0});
 	XSync(dpy, False);
 }
 
 static int
 other_wm_err(Display *dpy, XErrorEvent *ee)
 {
-	errx(0, "sxwm: can't start because another window manager is already running");
+	errx(0, "can't start because another window manager is already running");
 	return 0;
 	if (dpy && ee) return 0;
 }
 
-static unsigned long
+static uint64_t
 parse_col(const char *hex)
 {
 	XColor col;
@@ -180,7 +182,23 @@ parse_col(const char *hex)
 static void
 quit(void)
 {
-	errx(0, "sxwm: quitting...");
+	errx(0, "quitting...");
+}
+
+static void
+remove_client(Window w)
+{
+    Client **curr = &clients; // Current window
+    while (*curr) {
+        if ((*curr)->win == w) {
+            Client *tmp = *curr;
+            *curr = (*curr)->next;
+            free(tmp);
+            open_windows--;
+            break;
+        }
+        curr = &(*curr)->next;
+    }
 }
 
 static void
@@ -196,45 +214,95 @@ run(void)
 static void
 setup(void)
 {
-	dpy = XOpenDisplay(NULL);
-	if (dpy == 0)
-		errx(0, "sxwm: can't open display.");
-
+	if ((dpy = XOpenDisplay(NULL)) == 0)
+		errx(0, "can't open display. quitting...");
 	root = XDefaultRootWindow(dpy);
 	other_wm();
-	XSelectInput(dpy, root,
-			SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
+	grab_keys();
+
+	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
+	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
+	XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
 
 	for (int i = 0; i < LASTEvent; ++i)
 		evtable[i] = hdl_dummy;
 
-	evtable[ConfigureRequest] = hdl_config_req;
 	evtable[DestroyNotify] = hdl_destroy_ntf;
 	evtable[KeyPress] = hdl_keypress;
 	evtable[MapRequest] = hdl_map_req;
-	evtable[UnmapNotify] = hdl_unmap_ntf;
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
-	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
-	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy)); }
+}
 
 static void
 spawn(const char **cmd)
 {
-	if (!cmd) return;
-	printf("sxwm: attempting to spawn: %s\n", cmd[0]);
+	if (!cmd)
+		return;
 
-	pid_t pid = fork();
-	if (pid == 0) {
-		if (dpy)
-			close(ConnectionNumber(dpy));
+	if (fork() == 0) {
 		setsid();
 		execvp(cmd[0], (char *const*)cmd);
 		errx(1, "sxwm: execvp '%s' failed\n", cmd[0]);
-	} else if (pid < 0) {
-		fprintf(stderr, "sxwm: failed to fork process\n");
+	} else {
+		fprintf(stderr, "sxwm: falied to fork proc %s", cmd[0]);
 	}
+}
+
+static void
+tile(void)
+{
+    if (!open_windows)
+        return;
+
+    int masterX = GAPS + BORDER_WIDTH,
+        masterY = GAPS + BORDER_WIDTH,
+        availableH = scr_height - (GAPS * 2),
+        masterW, masterH, stackW = 0, stackWinH = 0,
+        stackCount = open_windows - 1;
+
+    if (open_windows == 1) {
+        masterW = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
+        masterH = availableH - (BORDER_WIDTH * 2);
+    } else {
+        int totalGapsW = GAPS * 4, totalBordersW = BORDER_WIDTH * 4;
+        masterW = (scr_width - totalGapsW - totalBordersW) / 2;
+        stackW = masterW;
+        masterH = availableH - (BORDER_WIDTH * 2);
+
+        int totalGapsH = (stackCount > 0 ? GAPS * (stackCount - 1) : 0),
+            totalBordersH = BORDER_WIDTH * 2 * stackCount,
+            totalStackH = availableH - totalGapsH - totalBordersH;
+        stackWinH = (stackCount > 0 ? totalStackH / stackCount : 0);
+    }
+
+    int stackX = masterX + masterW + GAPS + (BORDER_WIDTH * 2),
+        stackY = GAPS;
+    Client *c = clients;
+    uint i = 0;
+
+    for (; c; c = c->next, ++i) {
+        XWindowChanges changes = { .border_width = BORDER_WIDTH };
+        if (i == 0) {
+            changes.x = masterX;
+            changes.y = masterY;
+            changes.width = masterW;
+            changes.height = masterH;
+        } else {
+            changes.x = stackX;
+            changes.y = stackY + BORDER_WIDTH; // adjust for border
+            changes.width = stackW;
+            changes.height = stackWinH;
+            if (i == open_windows - 1) {
+                int used = stackY - GAPS + stackWinH + (BORDER_WIDTH * 2);
+                changes.height += (availableH - used);
+            }
+            stackY += stackWinH + (BORDER_WIDTH * 2) + GAPS;
+        }
+        XSetWindowBorder(dpy, c->win, border_foc_col);
+        XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes);
+    }
 }
 
 static int

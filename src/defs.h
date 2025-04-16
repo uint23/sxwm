@@ -1,6 +1,7 @@
 #ifndef DEFS_H
 #define DEFS_H
 
+#include <stdint.h>
 #include <X11/Xlib.h>
 
 #define SXWM_VERSION    "sxwm ver. 0.1.0"
@@ -11,14 +12,13 @@
 #define SUPER   Mod4Mask
 #define SHIFT   ShiftMask
 
+#define LENGTH(X) (sizeof X / sizeof X[0])
 #define BIND(mod, key, cmdstr)  { (mod), XK_##key, { cmdstr }, 0 }
 #define CALL(mod, key, fnptr)   { (mod), XK_##key, { .fn = fnptr }, 1 }
 
 #define MAXCLIENTS	64
 
-typedef void
-(*EventHandler)(XEvent *);
-
+typedef void (*EventHandler)(XEvent *);
 typedef union {
     const char **cmd;
     void (*fn)(void);
@@ -32,12 +32,8 @@ typedef struct {
 } Binding;
 
 typedef struct Client{
-    Window id;
-    int x, y;
-    unsigned int w, h;
-    unsigned int bw;
-    Bool isfocused;
-    Bool isfloating;
+	Window win;
+	uint height, width;
 	struct Client *next;
 } Client;
 
