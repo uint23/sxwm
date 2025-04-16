@@ -30,13 +30,13 @@ static void focus_prev(void);
 static void grab_keys(void);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
+static void hdl_enter(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static uint64_t parse_col(const char *hex);
 static void quit(void);
-static void remove_client(Window w);
 static void run(void);
 static void setup(void);
 static void spawn(const char **cmd);
@@ -74,9 +74,10 @@ add_client(Window w)
 		focused = c;
 	++open_windows;
 
-	XSelectInput(dpy, w, EnterWindowMask | LeaveWindowMask | FocusChangeMask |
-			PropertyChangeMask | StructureNotifyMask);
-
+    XSelectInput(dpy, w,
+        EnterWindowMask | LeaveWindowMask |
+        FocusChangeMask | PropertyChangeMask |
+        StructureNotifyMask);
 	XRaiseWindow(dpy, w);
 
 }
@@ -102,12 +103,12 @@ close_focused(void)
 		for (int i = 0; i < n; ++i) {
 			if (protocols[i] == del) {
 				XEvent ev = { 0 };
-				ev.xclient.type         = ClientMessage;
-				ev.xclient.window       = w;
-				ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
-				ev.xclient.format       = 32;
-				ev.xclient.data.l[0]    = del;
-				ev.xclient.data.l[1]    = CurrentTime;
+				ev.xclient.type			= ClientMessage;
+				ev.xclient.window		= w;
+				ev.xclient.message_type	= XInternAtom(dpy, "WM_PROTOCOLS", False);
+				ev.xclient.format		= 32;
+				ev.xclient.data.l[0]	= del;
+				ev.xclient.data.l[1]	= CurrentTime;
 				XSendEvent(dpy, w, False, NoEventMask, &ev);
 				XFree(protocols);
 				return;
@@ -116,30 +117,6 @@ close_focused(void)
 		XFree(protocols);
 	}
 	XKillClient(dpy, w);
-	Client **pp = &clients;
-	while (*pp) {
-		if ((*pp)->win == w) {
-			Client *t = *pp;
-			*pp = t->next;
-			free(t);
-			--open_windows;
-			break;
-		}
-		pp = &(*pp)->next;
-	}
-
-	// pick a new focused: try next in list; else wrap to head; else null
-	if (focused->next)
-		focused = focused->next;
-	else
-		focused = clients;  // might be null
-
-	tile();
-	update_borders();
-	if (focused) {
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		XRaiseWindow(dpy, focused->win);
-	}
 }
 
 static void
@@ -206,8 +183,53 @@ hdl_dummy(XEvent *xev)
 static void
 hdl_destroy_ntf(XEvent *xev)
 {
-	remove_client(xev->xdestroywindow.window);
+	Window w = xev->xdestroywindow.window;
+
+	Client *prev = NULL, *c = clients;
+	while (c && c->win != w) {
+		prev = c;
+		c = c->next;
+	}
+	if (c) {
+		if (focused == c) {
+			if (c->next)
+				focused = c->next;
+			else if (prev)
+				focused = prev;
+			else
+				focused = NULL;
+		}
+		if (!prev)
+			clients = c->next;
+		else
+			prev->next = c->next;
+		free(c);
+		--open_windows;
+	}
+
 	tile();
+	update_borders();
+
+	if (focused) {
+		XSetInputFocus(dpy, focused->win,
+				RevertToPointerRoot, CurrentTime);
+		XRaiseWindow(dpy, focused->win);
+	}
+}
+
+static void
+hdl_enter(XEvent *xev)
+{
+	Window w = xev->xcrossing.window;
+
+	for (Client *c = clients; c; c = c->next) {
+		if (c->win == w) {
+			focused = c;
+			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
+			update_borders();
+			break;
+		}
+	}
 }
 
 static void
@@ -288,22 +310,6 @@ quit(void)
 }
 
 static void
-remove_client(Window w)
-{
-	Client **curr = &clients; // Current window
-	while (*curr) {
-		if ((*curr)->win == w) {
-			Client *tmp = *curr;
-			*curr = (*curr)->next;
-			free(tmp);
-			--open_windows;
-			break;
-		}
-		curr = &(*curr)->next;
-	}
-}
-
-static void
 run(void)
 {
 	XEvent xev;
@@ -330,8 +336,10 @@ setup(void)
 		evtable[i] = hdl_dummy;
 
 	evtable[DestroyNotify] = hdl_destroy_ntf;
+	evtable[EnterNotify] = hdl_enter;
 	evtable[KeyPress] = hdl_keypress;
 	evtable[MapRequest] = hdl_map_req;
+
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
