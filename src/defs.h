@@ -18,7 +18,9 @@
 
 #define MAXCLIENTS	64
 
+enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } drag_mode = DRAG_NONE;
 typedef void (*EventHandler)(XEvent *);
+
 typedef union {
     const char **cmd;
     void (*fn)(void);
@@ -33,7 +35,8 @@ typedef struct {
 
 typedef struct Client{
 	Window win;
-	uint height, width;
+	uint x, y, h, w;
+	Bool floating;
 	struct Client *next;
 } Client;
 

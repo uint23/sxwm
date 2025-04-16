@@ -28,11 +28,14 @@ static void close_focused(void);
 static void focus_next(void);
 static void focus_prev(void);
 static void grab_keys(void);
+static void hdl_button(XEvent *);
+static void hdl_button_release(XEvent *);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_enter(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
+static void hdl_motion(XEvent *);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static uint64_t parse_col(const char *hex);
@@ -41,11 +44,13 @@ static void run(void);
 static void setup(void);
 static void spawn(const char **cmd);
 static void tile(void);
+static void toggle_floating(void);
 static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 
 static Client *clients = NULL;
+static Client *drag_client = NULL;
 static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];
 static Display *dpy;
@@ -55,6 +60,8 @@ static uint64_t border_foc_col;
 static uint64_t border_ufoc_col;
 static uint scr_width;
 static uint scr_height;
+static int drag_start_x, drag_start_y;
+static int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
 static uint open_windows = 0;
 #include "usercfg.h"
@@ -74,12 +81,20 @@ add_client(Window w)
 		focused = c;
 	++open_windows;
 
-    XSelectInput(dpy, w,
-        EnterWindowMask | LeaveWindowMask |
-        FocusChangeMask | PropertyChangeMask |
-        StructureNotifyMask);
-	XRaiseWindow(dpy, w);
+	XSelectInput(dpy, w,
+			EnterWindowMask | LeaveWindowMask |
+			FocusChangeMask | PropertyChangeMask |
+			StructureNotifyMask);
 
+	XWindowAttributes wa;
+	XGetWindowAttributes(dpy, w, &wa);
+	c->x = wa.x;
+	c->y = wa.y;
+	c->w = wa.width;
+	c->h = wa.height;
+	c->floating = 0;
+
+	XRaiseWindow(dpy, w);
 }
 
 static uint
@@ -175,6 +190,41 @@ grab_keys(void)
 }
 
 static void
+hdl_button(XEvent *xev)
+{
+	XButtonEvent *e = &xev->xbutton;
+	Window w = e->subwindow;
+	if (!w) return;
+
+	// find the Client*
+	for (Client *c = clients; c; c = c->next) {
+		if (c->win == w && c->floating) {
+			drag_client		= c;
+			drag_start_x	= e->x_root;
+			drag_start_y	= e->y_root;
+			drag_orig_x		= c->x;
+			drag_orig_y		= c->y;
+			drag_orig_w		= c->w;
+			drag_orig_h		= c->h;
+			drag_mode = (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
+			focused = c;
+			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
+			update_borders();
+			return;
+		}
+	}
+}
+
+static void
+hdl_button_release(XEvent *xev)
+{
+	(void)xev;
+	drag_mode = DRAG_NONE;
+	drag_client = NULL;
+}
+
+
+static void
 hdl_dummy(XEvent *xev)
 {
 	(void) xev;
@@ -233,6 +283,23 @@ hdl_enter(XEvent *xev)
 }
 
 static void
+hdl_keypress(XEvent *xev)
+{
+	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
+	uint mods = clean_mask(xev->xkey.state);
+
+	for (uint i = 0; i < LENGTH(binds); ++i) {
+		if (keysym == binds[i].keysym && mods == clean_mask(binds[i].mods)) {
+			if (binds[i].is_func)
+				binds[i].action.fn();
+			else
+				spawn(binds[i].action.cmd);
+			return;
+		}
+	}
+}
+
+static void
 hdl_map_req(XEvent *xev)
 {
 	if (open_windows == MAXCLIENTS)
@@ -247,19 +314,27 @@ hdl_map_req(XEvent *xev)
 }
 
 static void
-hdl_keypress(XEvent *xev)
+hdl_motion(XEvent *xe)
 {
-	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
-	uint mods = clean_mask(xev->xkey.state);
+	if (drag_mode == DRAG_NONE || !drag_client) return;
+	XMotionEvent *e = &xe->xmotion;
+	int dx = e->x_root - drag_start_x;
+	int dy = e->y_root - drag_start_y;
 
-	for (uint i = 0; i < LENGTH(binds); ++i) {
-		if (keysym == binds[i].keysym && mods == clean_mask(binds[i].mods)) {
-			if (binds[i].is_func)
-				binds[i].action.fn();
-			else
-				spawn(binds[i].action.cmd);
-			return;
-		}
+	if (drag_mode == DRAG_MOVE) {
+		drag_client->x = drag_orig_x + dx;
+		drag_client->y = drag_orig_y + dy;
+		XMoveWindow(dpy, drag_client->win,
+				drag_client->x, drag_client->y);
+	} else { // drag resize
+		int nw = drag_orig_w + dx;
+		int nh = drag_orig_h + dy;
+		if (nw < 20) nw = 20;
+		if (nh < 20) nh = 20;
+		drag_client->w = nw;
+		drag_client->h = nh;
+		XResizeWindow(dpy, drag_client->win,
+				drag_client->w, drag_client->h);
 	}
 }
 
@@ -306,6 +381,12 @@ parse_col(const char *hex)
 static void
 quit(void)
 {
+	for (Client *c = clients; c; c = c->next) {
+		XUnmapWindow(dpy, c->win);
+		XKillClient(dpy, c->win);
+	}
+	XSync(dpy, False);
+	XCloseDisplay(dpy);
 	errx(0, "quitting...");
 }
 
@@ -331,15 +412,23 @@ setup(void)
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
 	XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
+	XGrabButton(dpy, Button1, MOD, root,
+			True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
+			GrabModeAsync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button3, MOD, root,
+			True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
+			GrabModeAsync, GrabModeAsync, None, None);
 
 	for (int i = 0; i < LASTEvent; ++i)
 		evtable[i] = hdl_dummy;
 
-	evtable[DestroyNotify] = hdl_destroy_ntf;
-	evtable[EnterNotify] = hdl_enter;
-	evtable[KeyPress] = hdl_keypress;
-	evtable[MapRequest] = hdl_map_req;
-
+	evtable[ButtonPress]	= hdl_button;
+	evtable[ButtonRelease]	= hdl_button_release;
+	evtable[DestroyNotify]	= hdl_destroy_ntf;
+	evtable[EnterNotify] 	= hdl_enter;
+	evtable[KeyPress]		= hdl_keypress;
+	evtable[MapRequest]		= hdl_map_req;
+	evtable[MotionNotify]	= hdl_motion;
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
@@ -396,6 +485,9 @@ tile(void)
 	uint i = 0;
 
 	for (; c; c = c->next, ++i) {
+		if (c->floating)
+			continue;
+
 		XWindowChanges changes = { .border_width = BORDER_WIDTH };
 		if (i == 0) {
 			changes.x = masterx;
@@ -421,6 +513,41 @@ tile(void)
 }
 
 static void
+toggle_floating(void)
+{
+	if (!focused) return;
+	focused->floating = !focused->floating;
+
+	if (focused->floating) {
+		XWindowAttributes wa;
+		XGetWindowAttributes(dpy, focused->win, &wa);
+		focused->x = wa.x;
+		focused->y = wa.y;
+		focused->w = wa.width;
+		focused->h = wa.height;
+
+		XConfigureWindow(dpy, focused->win,
+				CWX|CWY|CWWidth|CWHeight,
+				&(XWindowChanges){
+				.x = focused->x,
+				.y = focused->y,
+				.width  = focused->w,
+				.height = focused->h
+				});
+	}
+
+	tile();
+	update_borders();
+
+	// floating windows are on top
+	if (focused->floating) {
+		XRaiseWindow(dpy, focused->win);
+		XSetInputFocus(dpy, focused->win,
+				RevertToPointerRoot, CurrentTime);
+	}
+}
+
+static void
 update_borders(void)
 {
 	for (Client *c = clients; c; c = c->next) {
@@ -433,7 +560,7 @@ update_borders(void)
 static int
 xerr(Display *dpy, XErrorEvent *ee)
 {
-	fprintf(stderr, "sxwm: fatal error\nrequest code:%d\nerror code:%d",
+	fprintf(stderr, "sxwm: fatal error\nrequest code:%d\nerror code:%d\n",
 			ee->request_code, ee->error_code);
 	return 0;
 	if (dpy && ee) return 0;
