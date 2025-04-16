@@ -24,6 +24,7 @@
 
 typedef void (*EventHandler)(XEvent *);
 
+static void add_client(Window w);
 static unsigned int clean_mask(unsigned int mask);
 static void hdl_dummy(XEvent *xev);
 static void hdl_config_req(XEvent *xev);
@@ -41,7 +42,7 @@ static void spawn(const char **cmd);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 
-static Client clients[MAXCLIENTS] = {0};
+static Client *clients = NULL;
 static EventHandler evtable[LASTEvent];
 static Display 	*dpy;
 static Window	root;
@@ -52,6 +53,11 @@ static unsigned int scr_width;
 static unsigned int scr_height;
 
 #include "usercfg.h"
+
+static void
+add_client(Window w)
+{
+}
 
 static unsigned int
 clean_mask(unsigned int mask)
