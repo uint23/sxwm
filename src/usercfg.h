@@ -4,10 +4,11 @@
 #include <X11/keysym.h>
 #include "defs.h"
 
-#define GAPS			10
 #define BORDER_WIDTH	1
-#define BORDER_FOC_COL	"#00FF00"
-#define BORDER_UFOC_COL	"#FF0000"
+#define BORDER_FOC_COL	"#AAFFFA" // the border color when focused
+#define BORDER_UFOC_COL	"#FF4439" // the border color when unfocused
+#define GAPS			10 // how many pixels wide the border is
+#define MASTER_WIDTH	0.6	// how much of the screen the master window takes up (0.0-1.0)
 
 static const char *termcmd[] = {"st", NULL};
 
@@ -15,6 +16,9 @@ static const char *termcmd[] = {"st", NULL};
 static const Binding binds[] = {
 	BIND(MOD, 			Return,		termcmd),
 	CALL(MOD|SHIFT,		q,			quit),
+	CALL(MOD, 			k, 			focus_next),
+	CALL(MOD, 			j, 			focus_prev),
+	CALL(MOD,			c,			close_focused),
 };
 
 #endif

@@ -24,6 +24,9 @@
 
 static void add_client(Window w);
 static uint clean_mask(uint mask);
+static void close_focused(void);
+static void focus_next(void);
+static void focus_prev(void);
 static void grab_keys(void);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
@@ -38,10 +41,12 @@ static void run(void);
 static void setup(void);
 static void spawn(const char **cmd);
 static void tile(void);
+static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 
 static Client *clients = NULL;
+static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];
 static Display *dpy;
 static Window root;
@@ -65,6 +70,8 @@ add_client(Window w)
 	c->win = w;
 	c->next = clients;
 	clients = c;
+	if (!focused)
+		focused = c;
 	++open_windows;
 
 	XSelectInput(dpy, w, EnterWindowMask | LeaveWindowMask | FocusChangeMask |
@@ -79,6 +86,96 @@ clean_mask(uint mask)
 {
 	return mask & ~(LockMask | Mod2Mask | Mod3Mask);
 }
+
+static void
+close_focused(void)
+{
+	if (!clients)
+		return;
+
+	// ICCCM first ;)
+	Window w = focused->win;
+	Atom *protocols;
+	int n;
+	if (XGetWMProtocols(dpy, w, &protocols, &n)) {
+		Atom del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+		for (int i = 0; i < n; ++i) {
+			if (protocols[i] == del) {
+				XEvent ev = { 0 };
+				ev.xclient.type         = ClientMessage;
+				ev.xclient.window       = w;
+				ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
+				ev.xclient.format       = 32;
+				ev.xclient.data.l[0]    = del;
+				ev.xclient.data.l[1]    = CurrentTime;
+				XSendEvent(dpy, w, False, NoEventMask, &ev);
+				XFree(protocols);
+				return;
+			}
+		}
+		XFree(protocols);
+	}
+	XKillClient(dpy, w);
+	Client **pp = &clients;
+	while (*pp) {
+		if ((*pp)->win == w) {
+			Client *t = *pp;
+			*pp = t->next;
+			free(t);
+			--open_windows;
+			break;
+		}
+		pp = &(*pp)->next;
+	}
+
+	// pick a new focused: try next in list; else wrap to head; else null
+	if (focused->next)
+		focused = focused->next;
+	else
+		focused = clients;  // might be null
+
+	tile();
+	update_borders();
+	if (focused) {
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		XRaiseWindow(dpy, focused->win);
+	}
+}
+
+static void
+focus_next(void)
+{
+	if (!focused)
+		return;
+
+	focused = (focused->next ? focused->next : clients);
+	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+	XRaiseWindow(dpy, focused->win);
+	update_borders();
+}
+
+static void
+focus_prev(void)
+{
+	if (!focused)
+		return;
+
+	Client *p = clients, *prev = NULL;
+	while (p && p != focused) {
+		prev = p;
+		p = p->next;
+	}
+
+	if (!prev) {
+		while (p->next) p = p->next;
+		focused = p;
+	} else {
+		focused = prev;
+	}
+
+	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+	XRaiseWindow(dpy, focused->win);
+	update_borders();}
 
 static void
 grab_keys(void)
@@ -116,10 +213,15 @@ hdl_destroy_ntf(XEvent *xev)
 static void
 hdl_map_req(XEvent *xev)
 {
-	XConfigureRequestEvent *config_req = &xev->xconfigurerequest;
-	add_client(config_req->window);
+	if (open_windows == MAXCLIENTS)
+		return;
+
+	XConfigureRequestEvent *cr = &xev->xconfigurerequest;
+	add_client(cr->window);
+	XMapWindow(dpy, cr->window);
+
 	tile();
-	XMapWindow(dpy, config_req->window);
+	update_borders();
 }
 
 static void
@@ -194,7 +296,7 @@ remove_client(Window w)
             Client *tmp = *curr;
             *curr = (*curr)->next;
             free(tmp);
-            open_windows--;
+            --open_windows;
             break;
         }
         curr = &(*curr)->next;
@@ -238,15 +340,18 @@ setup(void)
 static void
 spawn(const char **cmd)
 {
-	if (!cmd)
+	pid_t pid;
+
+	if (!cmd || !cmd[0])
 		return;
 
-	if (fork() == 0) {
+	pid = fork();
+	if (pid < 0) {
+		errx(1, "sxwm: fork failed");
+	} else if (pid == 0) {
 		setsid();
-		execvp(cmd[0], (char *const*)cmd);
-		errx(1, "sxwm: execvp '%s' failed\n", cmd[0]);
-	} else {
-		fprintf(stderr, "sxwm: falied to fork proc %s", cmd[0]);
+		execvp(cmd[0], (char *const *)cmd);
+		errx(1, "sxwm: execvp '%s' failed", cmd[0]);
 	}
 }
 
@@ -256,53 +361,65 @@ tile(void)
     if (!open_windows)
         return;
 
-    int masterX = GAPS + BORDER_WIDTH,
-        masterY = GAPS + BORDER_WIDTH,
-        availableH = scr_height - (GAPS * 2),
-        masterW, masterH, stackW = 0, stackWinH = 0,
-        stackCount = open_windows - 1;
+    int masterx = GAPS + BORDER_WIDTH,
+        mastery = GAPS + BORDER_WIDTH,
+        availableh = scr_height - (GAPS * 2),
+        masterw, masterh, stackw = 0, stackwinh = 0,
+        stack_count = open_windows - 1;
 
     if (open_windows == 1) {
-        masterW = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
-        masterH = availableH - (BORDER_WIDTH * 2);
+        masterw = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
+        masterh = availableh - (BORDER_WIDTH * 2);
     } else {
-        int totalGapsW = GAPS * 4, totalBordersW = BORDER_WIDTH * 4;
-        masterW = (scr_width - totalGapsW - totalBordersW) / 2;
-        stackW = masterW;
-        masterH = availableH - (BORDER_WIDTH * 2);
+        int total_gapsw = GAPS * 4, total_bordersw = BORDER_WIDTH * 4;
+        masterw = (scr_width - total_gapsw - total_bordersw) / 2;
+        stackw = masterw;
+        masterh = availableh - (BORDER_WIDTH * 2);
 
-        int totalGapsH = (stackCount > 0 ? GAPS * (stackCount - 1) : 0),
-            totalBordersH = BORDER_WIDTH * 2 * stackCount,
-            totalStackH = availableH - totalGapsH - totalBordersH;
-        stackWinH = (stackCount > 0 ? totalStackH / stackCount : 0);
+        int total_gapsh = (stack_count > 0 ? GAPS * (stack_count - 1) : 0),
+            total_bordersh = BORDER_WIDTH * 2 * stack_count,
+            total_stackh = availableh - total_gapsh - total_bordersh;
+        stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
     }
 
-    int stackX = masterX + masterW + GAPS + (BORDER_WIDTH * 2),
-        stackY = GAPS;
+    int stackx = masterx + masterw + GAPS + (BORDER_WIDTH * 2),
+        stacky = GAPS;
     Client *c = clients;
     uint i = 0;
 
     for (; c; c = c->next, ++i) {
         XWindowChanges changes = { .border_width = BORDER_WIDTH };
         if (i == 0) {
-            changes.x = masterX;
-            changes.y = masterY;
-            changes.width = masterW;
-            changes.height = masterH;
+            changes.x = masterx;
+            changes.y = mastery;
+            changes.width = masterw;
+            changes.height = masterh;
         } else {
-            changes.x = stackX;
-            changes.y = stackY + BORDER_WIDTH; // adjust for border
-            changes.width = stackW;
-            changes.height = stackWinH;
+            changes.x = stackx;
+            changes.y = stacky + BORDER_WIDTH; // adjust for border
+            changes.width = stackw;
+            changes.height = stackwinh;
             if (i == open_windows - 1) {
-                int used = stackY - GAPS + stackWinH + (BORDER_WIDTH * 2);
-                changes.height += (availableH - used);
+                int used = stacky - GAPS + stackwinh + (BORDER_WIDTH * 2);
+                changes.height += (availableh - used);
             }
-            stackY += stackWinH + (BORDER_WIDTH * 2) + GAPS;
+            stacky += stackwinh + (BORDER_WIDTH * 2) + GAPS;
         }
-        XSetWindowBorder(dpy, c->win, border_foc_col);
+        XSetWindowBorder(dpy, c->win,
+				i == 0 ? border_foc_col : border_ufoc_col);
+
         XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes);
     }
+}
+
+static void
+update_borders(void)
+{
+	for (Client *c = clients; c; c = c->next) {
+		XSetWindowBorder(dpy, c->win,
+				(c == focused ? border_foc_col : border_ufoc_col));
+	}
+	XSync(dpy, False);
 }
 
 static int
