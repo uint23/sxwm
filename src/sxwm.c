@@ -290,17 +290,17 @@ quit(void)
 static void
 remove_client(Window w)
 {
-    Client **curr = &clients; // Current window
-    while (*curr) {
-        if ((*curr)->win == w) {
-            Client *tmp = *curr;
-            *curr = (*curr)->next;
-            free(tmp);
-            --open_windows;
-            break;
-        }
-        curr = &(*curr)->next;
-    }
+	Client **curr = &clients; // Current window
+	while (*curr) {
+		if ((*curr)->win == w) {
+			Client *tmp = *curr;
+			*curr = (*curr)->next;
+			free(tmp);
+			--open_windows;
+			break;
+		}
+		curr = &(*curr)->next;
+	}
 }
 
 static void
@@ -358,58 +358,58 @@ spawn(const char **cmd)
 static void
 tile(void)
 {
-    if (!open_windows)
-        return;
+	if (!open_windows)
+		return;
 
-    int masterx = GAPS + BORDER_WIDTH,
-        mastery = GAPS + BORDER_WIDTH,
-        availableh = scr_height - (GAPS * 2),
-        masterw, masterh, stackw = 0, stackwinh = 0,
-        stack_count = open_windows - 1;
+	int masterx = GAPS + BORDER_WIDTH,
+		mastery = GAPS + BORDER_WIDTH,
+		availableh = scr_height - (GAPS * 2),
+		masterw, masterh, stackw = 0, stackwinh = 0,
+		stack_count = open_windows - 1;
 
-    if (open_windows == 1) {
-        masterw = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
-        masterh = availableh - (BORDER_WIDTH * 2);
-    } else {
-        int total_gapsw = GAPS * 4, total_bordersw = BORDER_WIDTH * 4;
-        masterw = (scr_width - total_gapsw - total_bordersw) / 2;
-        stackw = masterw;
-        masterh = availableh - (BORDER_WIDTH * 2);
+	if (open_windows == 1) {
+		masterw = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
+		masterh = availableh - (BORDER_WIDTH * 2);
+	} else {
+		int total_gapsw = GAPS * 4, total_bordersw = BORDER_WIDTH * 4;
+		masterw = (scr_width - total_gapsw - total_bordersw) / 2;
+		stackw = masterw;
+		masterh = availableh - (BORDER_WIDTH * 2);
 
-        int total_gapsh = (stack_count > 0 ? GAPS * (stack_count - 1) : 0),
-            total_bordersh = BORDER_WIDTH * 2 * stack_count,
-            total_stackh = availableh - total_gapsh - total_bordersh;
-        stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
-    }
+		int total_gapsh = (stack_count > 0 ? GAPS * (stack_count - 1) : 0),
+			total_bordersh = BORDER_WIDTH * 2 * stack_count,
+			total_stackh = availableh - total_gapsh - total_bordersh;
+		stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
+	}
 
-    int stackx = masterx + masterw + GAPS + (BORDER_WIDTH * 2),
-        stacky = GAPS;
-    Client *c = clients;
-    uint i = 0;
+	int stackx = masterx + masterw + GAPS + (BORDER_WIDTH * 2),
+		stacky = GAPS;
+	Client *c = clients;
+	uint i = 0;
 
-    for (; c; c = c->next, ++i) {
-        XWindowChanges changes = { .border_width = BORDER_WIDTH };
-        if (i == 0) {
-            changes.x = masterx;
-            changes.y = mastery;
-            changes.width = masterw;
-            changes.height = masterh;
-        } else {
-            changes.x = stackx;
-            changes.y = stacky + BORDER_WIDTH; // adjust for border
-            changes.width = stackw;
-            changes.height = stackwinh;
-            if (i == open_windows - 1) {
-                int used = stacky - GAPS + stackwinh + (BORDER_WIDTH * 2);
-                changes.height += (availableh - used);
-            }
-            stacky += stackwinh + (BORDER_WIDTH * 2) + GAPS;
-        }
-        XSetWindowBorder(dpy, c->win,
+	for (; c; c = c->next, ++i) {
+		XWindowChanges changes = { .border_width = BORDER_WIDTH };
+		if (i == 0) {
+			changes.x = masterx;
+			changes.y = mastery;
+			changes.width = masterw;
+			changes.height = masterh;
+		} else {
+			changes.x = stackx;
+			changes.y = stacky + BORDER_WIDTH; // adjust for border
+			changes.width = stackw;
+			changes.height = stackwinh;
+			if (i == open_windows - 1) {
+				int used = stacky - GAPS + stackwinh + (BORDER_WIDTH * 2);
+				changes.height += (availableh - used);
+			}
+			stacky += stackwinh + (BORDER_WIDTH * 2) + GAPS;
+		}
+		XSetWindowBorder(dpy, c->win,
 				i == 0 ? border_foc_col : border_ufoc_col);
 
-        XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes);
-    }
+		XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes);
+	}
 }
 
 static void
