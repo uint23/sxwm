@@ -13,6 +13,7 @@
 
 #include <err.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -23,6 +24,7 @@
 
 typedef void (*EventHandler)(XEvent *);
 
+static unsigned int clean_mask(unsigned int mask);
 static void hdl_dummy(XEvent *xev);
 static void hdl_config_req(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
@@ -46,9 +48,16 @@ static Window	root;
 
 static unsigned long border_foc_col;
 static unsigned long border_ufoc_col;
-
+static unsigned int scr_width;
+static unsigned int scr_height;
 
 #include "usercfg.h"
+
+static unsigned int
+clean_mask(unsigned int mask)
+{
+	return mask & ~(LockMask | Mod2Mask | Mod3Mask);
+}
 
 static void
 hdl_dummy(XEvent *xev)
@@ -86,12 +95,12 @@ hdl_keypress(XEvent *xev)
 	XKeyEvent *ev = &xev->xkey;
 	unsigned int modifiers;
 
-	modifiers = ev->state;
 	keysym = XkbKeycodeToKeysym(dpy, ev->keycode, 0, 0);
+	modifiers = clean_mask(ev->state);
 
 	int lenbindings = sizeof(binds) / sizeof(binds[0]);
 	for (int i = 0; i < lenbindings; ++i) {
-		if (keysym == binds[i].keysym && modifiers == binds[i].mods) {
+		if (keysym == binds[i].keysym && modifiers == clean_mask(binds[i].mods)) {
 			if (binds[i].is_func)
 				binds[i].action.fn();
 			else
@@ -188,8 +197,7 @@ setup(void)
 	root = XDefaultRootWindow(dpy);
 	other_wm();
 	XSelectInput(dpy, root,
-		SubstructureRedirectMask | KeyPressMask | KeyReleaseMask
-	);
+			SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
 
 	for (int i = 0; i < LASTEvent; ++i)
 		evtable[i] = hdl_dummy;
@@ -202,7 +210,8 @@ setup(void)
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
-}
+	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
+	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy)); }
 
 static void
 spawn(const char **cmd)

@@ -31,13 +31,14 @@ typedef struct {
     int is_func;
 } Binding;
 
-typedef struct {
+typedef struct Client{
     Window id;
     int x, y;
     unsigned int w, h;
     unsigned int bw;
     Bool isfocused;
     Bool isfloating;
+	struct Client *next;
 } Client;
 
 #endif
