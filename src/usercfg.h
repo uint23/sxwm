@@ -4,13 +4,13 @@
 #include <X11/keysym.h>
 #include "defs.h"
 
-#define BORDER_WIDTH	1
+#define BORDER_WIDTH	5
 #define BORDER_FOC_COL	"#AAFFFA" // the border color when focused
 #define BORDER_UFOC_COL	"#FF4439" // the border color when unfocused
 #define GAPS			10 // how many pixels wide the border is
 #define MASTER_WIDTH	0.6	// how much of the screen the master window takes up (0.0-1.0)
 #define MOTION_THROTTLE	144 // set this to your screen refreshrate
-#define SNAP_DISTANCE	5	// snap distance
+#define SNAP_DISTANCE	10	// snap distance
 
 static const char *termcmd[] = {"st", NULL};
 
@@ -24,6 +24,7 @@ static const Binding binds[] = {
 	CALL(MOD,			f,			toggle_floating),
 	CALL(MOD,			equal,		inc_gaps),
 	CALL(MOD,			minus,		dec_gaps),
+	CALL(MOD,			space,		toggle_floating_global),
 };
 
 #endif

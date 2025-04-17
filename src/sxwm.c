@@ -53,6 +53,7 @@ static void setup(void);
 static void spawn(const char **cmd);
 static void tile(void);
 static void toggle_floating(void);
+static void toggle_floating_global(void);
 static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
@@ -606,6 +607,43 @@ toggle_floating(void)
 }
 
 static void
+toggle_floating_global(void)
+{
+	Bool any_tiled = False;
+	for (Client *c = clients; c; c = c->next) {
+		if (!c->floating) {
+			any_tiled = True;
+			break;
+		}
+	}
+
+	for (Client *c = clients; c; c = c->next) {
+		c->floating = any_tiled;
+		if (c->floating) {
+			XWindowAttributes wa;
+			XGetWindowAttributes(dpy, c->win, &wa);
+			c->x = wa.x;
+			c->y = wa.y;
+			c->w = wa.width;
+			c->h = wa.height;
+
+			XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight,
+					&(XWindowChanges){
+					.x		= c->x,
+					.y		= c->y,
+					.width	= c->w,
+					.height	= c->h
+					}
+					);
+			XRaiseWindow(dpy, c->win);
+		}
+	}
+
+	tile();
+	update_borders();
+}
+
+static void
 update_borders(void)
 {
 	for (Client *c = clients; c; c = c->next) {
@@ -627,13 +665,13 @@ xerr(Display *dpy, XErrorEvent *ee)
 	XGetErrorText(dpy, ee->error_code, buf, sizeof(buf));
 	fprintf(stderr,
 			"sxwm: X error:\n"
-			"    request code: %d\n"
-			"    error code:   %d (%s)\n"
-			"    resource id:  0x%lx\n",
+			"\trequest code: %d\n"
+			"\terror code:	 %d (%s)\n"
+			"\tresource id:	 0x%lx\n",
 			ee->request_code,
 			ee->error_code, buf,
-			ee->resourceid
-		   );	return 0;
+			ee->resourceid);
+	return 0;
 	if (dpy && ee) return 0;
 }
 
