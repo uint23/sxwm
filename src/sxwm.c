@@ -44,6 +44,8 @@ static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
 static void hdl_motion(XEvent *xev);
 static void inc_gaps(void);
+static void move_master_next(void);
+static void move_master_prev(void);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static uint64_t parse_col(const char *hex);
@@ -66,6 +68,7 @@ static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];
 static Display *dpy;
 static Window root;
+static Bool global_floating = False;
 
 static uint64_t last_motion_time = 0;
 static uint64_t border_foc_col;
@@ -106,6 +109,10 @@ add_client(Window w)
 	c->h = wa.height;
 	c->floating = 0;
 
+	if (global_floating) {
+		XSetWindowBorder(dpy, c->win, border_foc_col);
+		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
+	}
 	XRaiseWindow(dpy, w);
 }
 
@@ -216,15 +223,15 @@ hdl_button(XEvent *xev)
 				GrabModeAsync, GrabModeAsync,
 				None, cur, CurrentTime);
 
-		drag_client   = c;
-		drag_start_x  = e->x_root;
-		drag_start_y  = e->y_root;
-		drag_orig_x	  = c->x;
-		drag_orig_y   = c->y;
-		drag_orig_w   = c->w;
-		drag_orig_h   = c->h;
-		drag_mode	  = (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
-		focused		  = c;
+		drag_client		= c;
+		drag_start_x	= e->x_root;
+		drag_start_y	= e->y_root;
+		drag_orig_x		= c->x;
+		drag_orig_y		= c->y;
+		drag_orig_w		= c->w;
+		drag_orig_h		= c->h;
+		drag_mode		= (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
+		focused			= c;
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		update_borders();
 		XRaiseWindow(dpy, c->win);
@@ -326,7 +333,8 @@ hdl_map_req(XEvent *xev)
 	add_client(cr->window);
 	XMapWindow(dpy, cr->window);
 
-	tile();
+	if (!global_floating)
+		tile();
 	update_borders();
 }
 
@@ -378,6 +386,39 @@ inc_gaps(void)
 		tile();
 		update_borders();
 	}
+}
+
+static void
+move_master_next(void)
+{
+	if (!clients || !clients->next)
+		return;
+	Client *first = clients;
+	clients = first->next;
+	first->next = NULL;
+	Client *tail = clients;
+	while (tail->next)
+		tail = tail->next;
+	tail->next = first;
+	tile();
+	update_borders();
+}
+
+static void
+move_master_prev(void)
+{
+	if (!clients || !clients->next)
+		return;
+	Client *prev = NULL, *cur = clients;
+	while (cur->next) {
+		prev = cur;
+		cur	 = cur->next;
+	}
+	prev->next	= NULL;
+	cur->next	= clients;
+	clients		= cur;
+	tile();
+	update_borders();
 }
 
 static void
@@ -609,6 +650,7 @@ toggle_floating(void)
 static void
 toggle_floating_global(void)
 {
+	global_floating = !global_floating;
 	Bool any_tiled = False;
 	for (Client *c = clients; c; c = c->next) {
 		if (!c->floating) {

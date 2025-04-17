@@ -20,6 +20,8 @@ static const Binding binds[] = {
 	CALL(MOD|SHIFT,		e,			quit),
 	CALL(MOD, 			j, 			focus_next),
 	CALL(MOD, 			k, 			focus_prev),
+	CALL(MOD|SHIFT, 	j, 			move_master_next),
+	CALL(MOD|SHIFT, 	k, 			move_master_prev),
 	CALL(MOD|SHIFT,		q,			close_focused),
 	CALL(MOD,			f,			toggle_floating),
 	CALL(MOD,			equal,		inc_gaps),
