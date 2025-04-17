@@ -21,7 +21,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xproto.h>
 #include <X11/XKBlib.h>
 
 #include "defs.h"
@@ -635,9 +637,23 @@ update_borders(void)
 static int
 xerr(Display *dpy, XErrorEvent *ee)
 {
-	fprintf(stderr, "sxwm: fatal error\nrequest code:%d\nerror code:%d\n",
-			ee->request_code, ee->error_code);
-	return 0;
+	if (ee->error_code == BadWindow
+			|| ee->error_code == BadDrawable
+			|| (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
+			|| (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch))
+		return 0;
+
+	char buf[256];
+	XGetErrorText(dpy, ee->error_code, buf, sizeof(buf));
+	fprintf(stderr,
+			"sxwm: X error:\n"
+			"    request code: %d\n"
+			"    error code:   %d (%s)\n"
+			"    resource id:  0x%lx\n",
+			ee->request_code,
+			ee->error_code, buf,
+			ee->resourceid
+		   );	return 0;
 	if (dpy && ee) return 0;
 }
 
