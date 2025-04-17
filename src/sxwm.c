@@ -120,28 +120,7 @@ close_focused(void)
 	if (!clients)
 		return;
 
-	// ICCCM first ;)
 	Window w = focused->win;
-	Atom *protocols;
-	int n;
-	if (XGetWMProtocols(dpy, w, &protocols, &n)) {
-		Atom del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-		for (int i = 0; i < n; ++i) {
-			if (protocols[i] == del) {
-				XEvent ev = { 0 };
-				ev.xclient.type			= ClientMessage;
-				ev.xclient.window		= w;
-				ev.xclient.message_type	= XInternAtom(dpy, "WM_PROTOCOLS", False);
-				ev.xclient.format		= 32;
-				ev.xclient.data.l[0]	= del;
-				ev.xclient.data.l[1]	= CurrentTime;
-				XSendEvent(dpy, w, False, NoEventMask, &ev);
-				XFree(protocols);
-				return;
-			}
-		}
-		XFree(protocols);
-	}
 	XKillClient(dpy, w);
 }
 
@@ -221,7 +200,8 @@ hdl_button(XEvent *xev)
 		if (c->win != w)
 			continue;
 
-		if ((e->state & MOD) && e->button == Button1 && !c->floating) {
+		if (((e->state & MOD) && e->button == Button1 && !c->floating) ||
+			((e->state & MOD) && e->button == Button3 && !c->floating)) {
 			focused = c;
 			toggle_floating();
 		}
@@ -485,6 +465,7 @@ setup(void)
 	XGrabButton(dpy, Button3, MOD, root,
 			True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
 			GrabModeAsync, GrabModeAsync, None, None);
+	XSync(dpy, False);
 
 	for (int i = 0; i < LASTEvent; ++i)
 		evtable[i] = hdl_dummy;
@@ -631,7 +612,6 @@ update_borders(void)
 		XSetWindowBorder(dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
 	}
-	XSync(dpy, False);
 }
 
 static int

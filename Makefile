@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O3 -g -Isrc
+CFLAGS = -Wall -Wextra -O3 -g -Isrc -march=native -flto -s
 LDFLAGS = -lX11
 
 SRC_DIR = src
