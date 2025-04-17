@@ -1,8 +1,9 @@
 /*  See LICENSE for more info
  *
+ * 	simple xorg window manager
  *	sxwm is a user-friendly, easily configurable yet powerful
  *	tiling window manager inspired by window managers such as
- *	DWM and i3
+ *	DWM and i3.
  *
  *	The userconfig is designed to be as user-friendly as
  *	possible, and I hope it is easy to configure even without
@@ -230,9 +231,9 @@ hdl_button(XEvent *xev)
 static void
 hdl_button_release(XEvent *xev)
 {
-    (void)xev;
+	(void)xev;
 	XUngrabPointer(dpy, CurrentTime);
-	drag_mode   = DRAG_NONE;
+	drag_mode	= DRAG_NONE;
 	drag_client = NULL;
 }
 
@@ -550,7 +551,7 @@ toggle_floating(void)
 				&(XWindowChanges){
 				.x = focused->x,
 				.y = focused->y,
-				.width  = focused->w,
+				.width	= focused->w,
 				.height = focused->h
 				});
 	}
