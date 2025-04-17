@@ -221,6 +221,7 @@ hdl_button(XEvent *xev)
 			focused = c;
 			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 			update_borders();
+			XRaiseWindow(dpy, c->win);
 			return;
 		}
 	}
