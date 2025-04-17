@@ -16,6 +16,15 @@
 #define BIND(mod, key, cmdstr)  { (mod), XK_##key, { cmdstr }, 0 }
 #define CALL(mod, key, fnptr)   { (mod), XK_##key, { .fn = fnptr }, 1 }
 
+#define UDIST(a,b) abs((int)(a) - (int)(b))
+#define SNAP_EDGE(pos, size, bound)                           \
+	do {                                                      \
+		if (UDIST(pos, 0) < SNAP_DISTANCE)                    \
+		pos = 0;                                          \
+		else if (UDIST(pos, (bound) - (size)) < SNAP_DISTANCE)\
+		pos = (bound) - (size);                           \
+	} while (0)
+
 #define MAXCLIENTS	64
 
 enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } drag_mode = DRAG_NONE;

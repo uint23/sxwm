@@ -30,14 +30,14 @@ static void close_focused(void);
 static void focus_next(void);
 static void focus_prev(void);
 static void grab_keys(void);
-static void hdl_button(XEvent *);
-static void hdl_button_release(XEvent *);
+static void hdl_button(XEvent *xev);
+static void hdl_button_release(XEvent *xev);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_enter(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
-static void hdl_motion(XEvent *);
+static void hdl_motion(XEvent *xev);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static uint64_t parse_col(const char *hex);
@@ -59,6 +59,7 @@ static EventHandler evtable[LASTEvent];
 static Display *dpy;
 static Window root;
 
+static uint64_t last_motion_time = 0;
 static uint64_t border_foc_col;
 static uint64_t border_ufoc_col;
 static uint scr_width;
@@ -199,7 +200,7 @@ hdl_button(XEvent *xev)
 	Window w = e->subwindow;
 	if (!w) return;
 
-	// find the Client*
+	// find the client
 	for (Client *c = clients; c; c = c->next) {
 		if (c->win == w && c->floating) {
 
@@ -236,7 +237,6 @@ hdl_button_release(XEvent *xev)
 	drag_mode	= DRAG_NONE;
 	drag_client = NULL;
 }
-
 
 static void
 hdl_dummy(XEvent *xev)
@@ -328,25 +328,40 @@ hdl_map_req(XEvent *xev)
 }
 
 static void
-hdl_motion(XEvent *xe)
+hdl_motion(XEvent *xev)
 {
-	if (drag_mode == DRAG_NONE || !drag_client) return;
-	XMotionEvent *e = &xe->xmotion;
+	if (drag_mode == DRAG_NONE || !drag_client)
+		return;
+
+	XMotionEvent *e = &xev->xmotion;
+	if (e->time - last_motion_time <= (1000 / MOTION_THROTTLE))
+		return;
+	last_motion_time = e->time;
+
 	int dx = e->x_root - drag_start_x;
 	int dy = e->y_root - drag_start_y;
+	int nx = drag_orig_x + dx;
+	int ny = drag_orig_y + dy;
 
 	if (drag_mode == DRAG_MOVE) {
-		drag_client->x = drag_orig_x + dx;
-		drag_client->y = drag_orig_y + dy;
-		XMoveWindow(dpy, drag_client->win,
-				drag_client->x, drag_client->y);
-	} else { // drag resize
+		SNAP_EDGE(nx, drag_client->w, scr_width);
+		SNAP_EDGE(ny, drag_client->h, scr_height);
+
+		if (!drag_client->floating &&
+				(UDIST(nx, drag_client->x) > SNAP_DISTANCE ||
+				 UDIST(ny, drag_client->y) > SNAP_DISTANCE))
+			toggle_floating();
+
+		XMoveWindow(dpy, drag_client->win, nx, ny);
+		drag_client->x = nx;
+		drag_client->y = ny;
+	}
+	else {
+		// resize clamp is 20px
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
-		if (nw < 20) nw = 20;
-		if (nh < 20) nh = 20;
-		drag_client->w = nw;
-		drag_client->h = nh;
+		drag_client->w = nw < 20 ? 20 : nw;
+		drag_client->h = nh < 20 ? 20 : nh;
 		XResizeWindow(dpy, drag_client->win,
 				drag_client->w, drag_client->h);
 	}

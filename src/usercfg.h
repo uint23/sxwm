@@ -9,6 +9,8 @@
 #define BORDER_UFOC_COL	"#FF4439" // the border color when unfocused
 #define GAPS			10 // how many pixels wide the border is
 #define MASTER_WIDTH	0.6	// how much of the screen the master window takes up (0.0-1.0)
+#define MOTION_THROTTLE	144 // set this to your screen refreshrate
+#define SNAP_DISTANCE	5	// snap distance
 
 static const char *termcmd[] = {"st", NULL};
 
