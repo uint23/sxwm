@@ -1,15 +1,17 @@
-/*  See LICENSE for more info
+/*
+ *	  See LICENSE for more info
+ *	  
+ *	  simple xorg window manager
+ *	  sxwm is a user-friendly, easily configurable yet powerful
+ *	  tiling window manager inspired by window managers such as
+ *	  DWM and i3.
+ *	  
+ *	  The userconfig is designed to be as user-friendly as
+ *	  possible, and I hope it is easy to configure even without
+ *	  knowledge of C or programming, although most people who
+ *	  will use this will probably be programmers :)
  *
- * 	simple xorg window manager
- *	sxwm is a user-friendly, easily configurable yet powerful
- *	tiling window manager inspired by window managers such as
- *	DWM and i3.
- *
- *	The userconfig is designed to be as user-friendly as
- *	possible, and I hope it is easy to configure even without
- *	knowledge of C or programming, although most people who
- *	will use this will probably be programmers :)
- *			(C) Abhinav Prasai 2025
+ *	  (C) Abhinav Prasai 2025
 */
 
 #include <X11/cursorfont.h>
@@ -27,6 +29,7 @@
 static void add_client(Window w);
 static uint clean_mask(uint mask);
 static void close_focused(void);
+static void dec_gaps(void);
 static void focus_next(void);
 static void focus_prev(void);
 static void grab_keys(void);
@@ -38,6 +41,7 @@ static void hdl_enter(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
 static void hdl_motion(XEvent *xev);
+static void inc_gaps(void);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static uint64_t parse_col(const char *hex);
@@ -50,6 +54,7 @@ static void toggle_floating(void);
 static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
+#include "usercfg.h"
 
 static Cursor c_normal, c_move, c_resize;
 static Client *clients = NULL;
@@ -62,13 +67,13 @@ static Window root;
 static uint64_t last_motion_time = 0;
 static uint64_t border_foc_col;
 static uint64_t border_ufoc_col;
+static uint gaps = GAPS;
 static uint scr_width;
 static uint scr_height;
+static uint open_windows = 0;
 static int drag_start_x, drag_start_y;
 static int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
-static uint open_windows = 0;
-#include "usercfg.h"
 
 static void
 add_client(Window w)
@@ -139,6 +144,16 @@ close_focused(void)
 }
 
 static void
+dec_gaps(void)
+{
+	if (gaps > 0) {
+		--gaps;
+		tile();
+		update_borders();
+	}
+}
+
+static void
 focus_next(void)
 {
 	if (!focused)
@@ -200,32 +215,37 @@ hdl_button(XEvent *xev)
 	Window w = e->subwindow;
 	if (!w) return;
 
-	// find the client
 	for (Client *c = clients; c; c = c->next) {
-		if (c->win == w && c->floating) {
+		if (c->win != w)
+			continue;
 
-			Cursor cur = (e->button == Button1) ? c_move : c_resize;
-			XGrabPointer(dpy, root, True,
-					ButtonReleaseMask|PointerMotionMask,
-					GrabModeAsync, GrabModeAsync,
-					None,
-					cur,
-					CurrentTime);
-			
-			drag_client		= c;
-			drag_start_x	= e->x_root;
-			drag_start_y	= e->y_root;
-			drag_orig_x		= c->x;
-			drag_orig_y		= c->y;
-			drag_orig_w		= c->w;
-			drag_orig_h		= c->h;
-			drag_mode = (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
+		if ((e->state & MOD) && e->button == Button1 && !c->floating) {
 			focused = c;
-			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
-			update_borders();
-			XRaiseWindow(dpy, c->win);
-			return;
+			toggle_floating();
 		}
+
+		if (!c->floating)
+			return;
+
+		Cursor cur = (e->button == Button1) ? c_move : c_resize;
+		XGrabPointer(dpy, root, True,
+				ButtonReleaseMask|PointerMotionMask,
+				GrabModeAsync, GrabModeAsync,
+				None, cur, CurrentTime);
+
+		drag_client   = c;
+		drag_start_x  = e->x_root;
+		drag_start_y  = e->y_root;
+		drag_orig_x	  = c->x;
+		drag_orig_y   = c->y;
+		drag_orig_w   = c->w;
+		drag_orig_h   = c->h;
+		drag_mode	  = (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
+		focused		  = c;
+		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
+		update_borders();
+		XRaiseWindow(dpy, c->win);
+		return;
 	}
 }
 
@@ -368,6 +388,16 @@ hdl_motion(XEvent *xev)
 }
 
 static void
+inc_gaps(void)
+{
+	if (gaps < MAXGAPS) {
+		++gaps;
+		tile();
+		update_borders();
+	}
+}
+
+static void
 other_wm(void)
 {
 	XSetErrorHandler(other_wm_err);
@@ -490,60 +520,70 @@ spawn(const char **cmd)
 static void
 tile(void)
 {
-	if (!open_windows)
+	int n = 0;
+	for (Client *c = clients; c; c = c->next)
+		if (!c->floating)
+			++n;
+	if (n == 0)
 		return;
 
-	int masterx = GAPS + BORDER_WIDTH,
-		mastery = GAPS + BORDER_WIDTH,
-		availableh = scr_height - (GAPS * 2),
-		masterw, masterh, stackw = 0, stackwinh = 0,
-		stack_count = open_windows - 1;
+	int masterx	= gaps + BORDER_WIDTH;
+	int mastery = gaps + BORDER_WIDTH;
+	int availableh = scr_height - (gaps * 2);
+	int masterw, masterh;
+	int stackw = 0, stackwinh = 0;
+	int stack_count = n - 1;
 
-	if (open_windows == 1) {
-		masterw = scr_width - (GAPS * 2 + BORDER_WIDTH * 2);
+	if (n == 1) {
+		masterw = scr_width - (gaps * 2 + BORDER_WIDTH * 2);
 		masterh = availableh - (BORDER_WIDTH * 2);
 	} else {
-		int total_gapsw = GAPS * 4, total_bordersw = BORDER_WIDTH * 4;
+		int total_gapsw = gaps * 4;
+		int total_bordersw = BORDER_WIDTH * 4;
 		masterw = (scr_width - total_gapsw - total_bordersw) / 2;
-		stackw = masterw;
 		masterh = availableh - (BORDER_WIDTH * 2);
 
-		int total_gapsh = (stack_count > 0 ? GAPS * (stack_count - 1) : 0),
-			total_bordersh = BORDER_WIDTH * 2 * stack_count,
-			total_stackh = availableh - total_gapsh - total_bordersh;
-		stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
+		stackw = masterw;
+		int total_gapsh = (stack_count - 1) * gaps;
+		int total_bordersh = stack_count * BORDER_WIDTH * 2;
+		int total_stackh = availableh - total_gapsh - total_bordersh;
+		stackwinh = total_stackh / stack_count;
 	}
 
-	int stackx = masterx + masterw + GAPS + (BORDER_WIDTH * 2),
-		stacky = GAPS;
-	Client *c = clients;
-	uint i = 0;
+	int stackx = masterx + masterw + gaps + (BORDER_WIDTH * 2);
+	int stacky = gaps;
+	int i = 0;
 
-	for (; c; c = c->next, ++i) {
+	for (Client *c = clients; c; c = c->next) {
 		if (c->floating)
 			continue;
 
 		XWindowChanges changes = { .border_width = BORDER_WIDTH };
 		if (i == 0) {
-			changes.x = masterx;
-			changes.y = mastery;
-			changes.width = masterw;
-			changes.height = masterh;
+			// master
+			changes.x		= masterx;
+			changes.y		= mastery;
+			changes.width	= masterw;
+			changes.height	= masterh;
 		} else {
-			changes.x = stackx;
-			changes.y = stacky + BORDER_WIDTH; // adjust for border
-			changes.width = stackw;
-			changes.height = stackwinh;
-			if (i == open_windows - 1) {
-				int used = stacky - GAPS + stackwinh + (BORDER_WIDTH * 2);
+			// stack
+			changes.x		= stackx;
+			changes.y		= stacky + BORDER_WIDTH;
+			changes.width	= stackw;
+			changes.height	= stackwinh;
+			if (i == n - 1) {
+				int used = stacky - gaps + stackwinh + (BORDER_WIDTH * 2);
 				changes.height += (availableh - used);
 			}
-			stacky += stackwinh + (BORDER_WIDTH * 2) + GAPS;
+			stacky += stackwinh + (BORDER_WIDTH * 2) + gaps;
 		}
-		XSetWindowBorder(dpy, c->win,
-				i == 0 ? border_foc_col : border_ufoc_col);
 
-		XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes);
+		XSetWindowBorder(dpy, c->win,
+				(i == 0 ? border_foc_col : border_ufoc_col));
+		XConfigureWindow(dpy, c->win,
+				CWX|CWY|CWWidth|CWHeight|CWBorderWidth,
+				&changes);
+		++i;
 	}
 }
 

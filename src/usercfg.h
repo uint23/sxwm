@@ -17,11 +17,13 @@ static const char *termcmd[] = {"st", NULL};
 #define MOD				ALT
 static const Binding binds[] = {
 	BIND(MOD, 			Return,		termcmd),
-	CALL(MOD|SHIFT,		q,			quit),
-	CALL(MOD, 			k, 			focus_next),
-	CALL(MOD, 			j, 			focus_prev),
-	CALL(MOD,			c,			close_focused),
+	CALL(MOD|SHIFT,		e,			quit),
+	CALL(MOD, 			j, 			focus_next),
+	CALL(MOD, 			k, 			focus_prev),
+	CALL(MOD|SHIFT,		q,			close_focused),
 	CALL(MOD,			f,			toggle_floating),
+	CALL(MOD,			equal,		inc_gaps),
+	CALL(MOD,			minus,		dec_gaps),
 };
 
 #endif
