@@ -11,6 +11,7 @@
  *			(C) Abhinav Prasai 2025
 */
 
+#include <X11/cursorfont.h>
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,6 +50,7 @@ static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 
+static Cursor c_normal, c_move, c_resize;
 static Client *clients = NULL;
 static Client *drag_client = NULL;
 static Client *focused = NULL;
@@ -199,6 +201,15 @@ hdl_button(XEvent *xev)
 	// find the Client*
 	for (Client *c = clients; c; c = c->next) {
 		if (c->win == w && c->floating) {
+
+			Cursor cur = (e->button == Button1) ? c_move : c_resize;
+			XGrabPointer(dpy, root, True,
+					ButtonReleaseMask|PointerMotionMask,
+					GrabModeAsync, GrabModeAsync,
+					None,
+					cur,
+					CurrentTime);
+			
 			drag_client		= c;
 			drag_start_x	= e->x_root;
 			drag_start_y	= e->y_root;
@@ -218,8 +229,9 @@ hdl_button(XEvent *xev)
 static void
 hdl_button_release(XEvent *xev)
 {
-	(void)xev;
-	drag_mode = DRAG_NONE;
+    (void)xev;
+	XUngrabPointer(dpy, CurrentTime);
+	drag_mode   = DRAG_NONE;
 	drag_client = NULL;
 }
 
@@ -406,6 +418,12 @@ setup(void)
 	if ((dpy = XOpenDisplay(NULL)) == 0)
 		errx(0, "can't open display. quitting...");
 	root = XDefaultRootWindow(dpy);
+
+	c_normal = XCreateFontCursor(dpy, XC_left_ptr);
+	c_move	 = XCreateFontCursor(dpy, XC_fleur);
+	c_resize = XCreateFontCursor(dpy, XC_bottom_right_corner);
+	XDefineCursor(dpy, root, c_normal);
+
 	other_wm();
 	grab_keys();
 
