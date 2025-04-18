@@ -40,13 +40,15 @@
  * ———————————————————————————————————————————*
 */
 
-#define GAPS			10
-#define BORDER_WIDTH	5
-#define BORDER_FOC_COL	"#AAFFFA"
-#define BORDER_UFOC_COL	"#FF4439"
-#define MASTER_WIDTH	0.6
-#define MOTION_THROTTLE	144
-#define SNAP_DISTANCE	10
+#define GAPS				10
+
+#define BORDER_WIDTH		5
+#define BORDER_FOC_COL		"#AAFFFA"
+#define BORDER_UFOC_COL		"#FF4439"
+
+#define MASTER_WIDTH		0.6
+#define MOTION_THROTTLE		144
+#define SNAP_DISTANCE		10
 
 /*
  * ———————————< Keys & Bindins >————————————— *

@@ -183,7 +183,7 @@ grab_keys(void)
 	KeyCode keycode;
 	uint modifiers[] = { 0, LockMask, Mod2Mask, LockMask|Mod2Mask };
 
-	// ungrab all keys
+	/* ungrab all keys */
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (uint i = 0; i < LENGTH(binds); ++i) {
@@ -354,25 +354,21 @@ hdl_motion(XEvent *xev)
 	int nx = drag_orig_x + dx;
 	int ny = drag_orig_y + dy;
 
-/* after computing nx = drag_orig_x + dx, ny = drag_orig_y + dy: */
-
-/* after computing nx = drag_orig_x + dx, ny = drag_orig_y + dy: */
-
 	if (drag_mode == DRAG_MOVE) {
-		int outerw = drag_client->w + 2 * BORDER_WIDTH;
-		int outerh = drag_client->h + 2 * BORDER_WIDTH;
+		int outer_w = drag_client->w + 2 * BORDER_WIDTH;
+		int outer_h = drag_client->h + 2 * BORDER_WIDTH;
 
 		if (UDIST(nx, 0) <= SNAP_DISTANCE) {
 			nx = 0;
-		} else if (UDIST(nx + outerw, scr_width) <= SNAP_DISTANCE) {
-			nx = scr_width - outerw;
+		} else if (UDIST(nx + outer_w, scr_width) <= SNAP_DISTANCE) {
+			nx = scr_width - outer_w;
 		}
 
-		// snap y
+		/* snap y */
 		if (UDIST(ny, 0) <= SNAP_DISTANCE) {
 			ny = 0;
-		} else if (UDIST(ny + outerh, scr_height) <= SNAP_DISTANCE) {
-			ny = scr_height - outerh;
+		} else if (UDIST(ny + outer_h, scr_height) <= SNAP_DISTANCE) {
+			ny = scr_height - outer_h;
 		}
 
 		if (!drag_client->floating &&
@@ -583,18 +579,21 @@ tile(void)
 		masterw = scr_width - (gaps * 2 + BORDER_WIDTH * 2);
 		masterh = availableh - (BORDER_WIDTH * 2);
 	} else {
-		int total_gapsw = gaps * 4;
+		int total_gapsw    = gaps * 4;
 		int total_bordersw = BORDER_WIDTH * 4;
-		masterw = (scr_width - total_gapsw - total_bordersw) / 2;
+		int total_space    = scr_width - total_gapsw - total_bordersw;
+
+		/* use MASTER_WIDTH here: */
+		masterw = (int)(total_space * MASTER_WIDTH);
+		stackw  = total_space - masterw;
 		masterh = availableh - (BORDER_WIDTH * 2);
 
-		stackw = masterw;
-		int total_gapsh = (stack_count - 1) * gaps;
-		int total_bordersh = stack_count * BORDER_WIDTH * 2;
-		int total_stackh = availableh - total_gapsh - total_bordersh;
-		stackwinh = total_stackh / stack_count;
+		/* compute stack height as before… */
+		int total_gapsh    = (stack_count > 0 ? gaps * (stack_count - 1) : 0);
+		int total_bordersh = BORDER_WIDTH * 2 * stack_count;
+		int total_stackh   = availableh - total_gapsh - total_bordersh;
+		stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
 	}
-
 	int stackx = masterx + masterw + gaps + (BORDER_WIDTH * 2);
 	int stacky = gaps;
 	int i = 0;
@@ -605,13 +604,13 @@ tile(void)
 
 		XWindowChanges changes = { .border_width = BORDER_WIDTH };
 		if (i == 0) {
-			// master
+			/* master */
 			changes.x		= masterx;
 			changes.y		= mastery;
 			changes.width	= masterw;
 			changes.height	= masterh;
 		} else {
-			// stack
+			/* stack */
 			changes.x		= stackx;
 			changes.y		= stacky + BORDER_WIDTH;
 			changes.width	= stackw;
@@ -659,7 +658,7 @@ toggle_floating(void)
 	tile();
 	update_borders();
 
-	// floating windows are on top
+	/* floating windows are on top */
 	if (focused->floating) {
 		XRaiseWindow(dpy, focused->win);
 		XSetInputFocus(dpy, focused->win,
