@@ -354,21 +354,41 @@ hdl_motion(XEvent *xev)
 	int nx = drag_orig_x + dx;
 	int ny = drag_orig_y + dy;
 
+/* after computing nx = drag_orig_x + dx, ny = drag_orig_y + dy: */
+
+/* after computing nx = drag_orig_x + dx, ny = drag_orig_y + dy: */
+
 	if (drag_mode == DRAG_MOVE) {
-		SNAP_EDGE(nx, drag_client->w, scr_width);
-		SNAP_EDGE(ny, drag_client->h, scr_height);
+		int outerw = drag_client->w + 2 * BORDER_WIDTH;
+		int outerh = drag_client->h + 2 * BORDER_WIDTH;
+
+		if (UDIST(nx, 0) <= SNAP_DISTANCE) {
+			nx = 0;
+		} else if (UDIST(nx + outerw, scr_width) <= SNAP_DISTANCE) {
+			nx = scr_width - outerw;
+		}
+
+		// snap y
+		if (UDIST(ny, 0) <= SNAP_DISTANCE) {
+			ny = 0;
+		} else if (UDIST(ny + outerh, scr_height) <= SNAP_DISTANCE) {
+			ny = scr_height - outerh;
+		}
 
 		if (!drag_client->floating &&
 				(UDIST(nx, drag_client->x) > SNAP_DISTANCE ||
-				 UDIST(ny, drag_client->y) > SNAP_DISTANCE))
+				 UDIST(ny, drag_client->y) > SNAP_DISTANCE)) {
 			toggle_floating();
+		}
 
 		XMoveWindow(dpy, drag_client->win, nx, ny);
 		drag_client->x = nx;
 		drag_client->y = ny;
 	}
+
+
 	else {
-		// resize clamp is 20px
+		/* resize clamp is 20px */
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
 		drag_client->w = nw < 20 ? 20 : nw;

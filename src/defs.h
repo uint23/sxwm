@@ -13,18 +13,12 @@
 #define SHIFT	ShiftMask
 
 #define LENGTH(X) (sizeof X / sizeof X[0])
-#define BIND(mod, key, cmdstr)  { (mod), XK_##key, { cmdstr }, 0 }
+#define BIND(mod, key, cmdstr)	{ (mod), XK_##key, { cmdstr }, 0 }
 #define CALL(mod, key, fnptr)	{ (mod), XK_##key, { .fn = fnptr }, 1 }
+#define CMD(name, ...) \
+	static const char *name[] = { __VA_ARGS__, NULL }
 
 #define UDIST(a,b) abs((int)(a) - (int)(b))
-#define SNAP_EDGE(pos, size, bound)								\
-	do {														\
-		if (UDIST(pos, 0) < SNAP_DISTANCE)						\
-		pos = 0;												\
-		else if (UDIST(pos, (bound) - (size)) < SNAP_DISTANCE)	\
-		pos = (bound) - (size);									\
-	} while (0)
-
 #define MAXCLIENTS	64
 #define MAXGAPS		100
 

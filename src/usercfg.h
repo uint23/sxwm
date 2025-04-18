@@ -52,46 +52,25 @@
  * ———————————< Keys & Bindins >————————————— *
  *
  *	   This is where you set your keybinds to
- *	   open apps, kill apps, perform in-built
- *	   functions.
+ *	   execute apps. You can use the CMD macro
+ *	   to make new variables.
  *
- *	   How to make a command to run an app:
+ *	   How do you make a command to run an app
+ *	   It's simple! Just do this:
  *
- *	   1) Just write this:
- *	      'static const char *'
- *	   	  you don't have to understand this,
- *	   	  this is just how you make a string
- *	   	  in C
+ *	   CALL(appcallname, "app", "arg2", ...);
  *
- *	   2) Call it what the app is called or
- *	      anything you want really, eg. the
- *	      command to open a terminal is
- *	      termcmd. Also append a '[]' at the
- *	      end to show its an array. This is
- *	      for use of arguments eg 'ls -lah'.
- *
- *	   3) Construct the command by putting '='
- *	      then after that open '{' then put
- *	      the first arg in "arg0",. Repeat for
- *	      all your args and end it with NULL.
- *	      Strings in C are ended with a NULL
- *	      'terminator' which tells the program
- *	      that that is the end of the string.
- *
- *	   4) Finally, close the '}', then add
- *	   	  a semi-colon at the end.
- *
- *	   After doing all that, you should have
- *	   something like this:
- *
- *	   static const char *app = { "app", NULL };
+ *	   What is appcallname? This is just the
+ *	   variable name given to this string of
+ *	   commands given to execvp, the function
+ *	   that executes these programs.
  *
  * ——————————— —————————————————————————————— *
  *
 */
 
-static const char *termcmd[] = 		{ "st", NULL };
-static const char *browsercmd[] = 	{ "firefox", NULL };
+CMD(terminal, 	"st");
+CMD(browser, 	"firefox");
 
 /*< This is your modifier key (MOD/SUPER) >*/
 #define MOD	ALT
@@ -102,13 +81,54 @@ static const char *browsercmd[] = 	{ "firefox", NULL };
  *     This is where you assign keybinds to
  *     perform some actions.
  *
+ *     How do you bind keys? In sxwm, there is
+ *     two ways to bind keys to perform tasks,
+ *     BIND, or CALL. CALL, calls a function
+ *     whereas BIND, executes a specified
+ *     program.
+ *
+ *     USEAGE:
+ *     	 BIND(MODIFIERS, KEY, FUNCTION)
+ *
+ *     	 MODIFIERS:
+ *     	 The mod keys you want held down
+ *     	 for the task to execute. I have
+ *     	 also defined SHIFT as a substitute
+ *     	 for ShiftMask.
+ *
+ *     	 KEY:
+ *     	 The key to press in combination
+ *     	 with the MODIFERS to run the task.
+ *
+ *     	 FUNCTION:
+ *     	 The task to execute. Depending on
+ *     	 whether you're calling CALL or
+ *     	 BIND, this will execute a program
+ *     	 or call a function.
+ *
+ *     	 If you're
+ *     	 calling a function, just put the
+ *     	 name of the funtion.
+ *
+ *     	 Otherwise, put the program you
+ *     	 either defined with the CMD above
+ *     	 or you can skip that step and just
+ *     	 do something like this to create a
+ *     	 "string" in the bindings array:
+ *
+ *     	 { "program", "arg1", NULL }
+ *
+ *     End the line with a comma, as this is
+ *     an array.
  *
  * ——————————— —————————————————————————————— *
 */
 
 static const Binding binds[] =
 {
-/*		 Modifier(s)	Key			Function	*/
+/*——< MODIFIER(S) >———  < KEY >—————< FUNCTION >——*/
+
+/*———  ——< Here are your functions calls > ———— — */
 	CALL(MOD|SHIFT,		e,			quit),
 	CALL(MOD|SHIFT,		q,			close_focused),
 
@@ -124,7 +144,7 @@ static const Binding binds[] =
 	CALL(MOD,			f,			toggle_floating),
 	CALL(MOD,			space,		toggle_floating_global),
 
-/*		Here are your executable functions 		*/
-	BIND(MOD, 			Return,		termcmd),
-	BIND(MOD,			b,			browsercmd),
+/*—————< Here are your executable functions >—————*/
+	BIND(MOD, 			Return,		terminal),
+	BIND(MOD,			b,			browser),
 };
