@@ -21,7 +21,7 @@
 	static const char *name[] = { __VA_ARGS__, NULL }
 
 #define UDIST(a,b) abs((int)(a) - (int)(b))
-#define MAXCLIENTS	64
+#define MAXCLIENTS	99
 #define MAXGAPS		100
 
 enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } drag_mode = DRAG_NONE;

@@ -26,6 +26,7 @@
  *	   MASTER_WIDTH (float):
  *	   % of the screen the master window
  *	   should take as a decimal value 0-1
+ *	   eg. 0.5 is 50%
  *
  *	   MOTION_THROTTLE (int):
  *	   Usually you should set this to your
@@ -46,8 +47,8 @@
 #define BORDER_FOC_COL		"#005577"
 #define BORDER_UFOC_COL		"#444444"
 
-#define MASTER_WIDTH		0.6
-#define MOTION_THROTTLE		144
+#define MASTER_WIDTH		0.5
+#define MOTION_THROTTLE		60
 #define SNAP_DISTANCE		5
 
 /*

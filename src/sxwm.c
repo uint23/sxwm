@@ -48,10 +48,11 @@ static void move_master_next(void);
 static void move_master_prev(void);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
-static uint64_t parse_col(const char *hex);
+static ulong parse_col(const char *hex);
 static void quit(void);
 static void run(void);
 static void setup(void);
+static void setup_atoms(void);
 static void spawn(const char **cmd);
 static void tile(void);
 static void toggle_floating(void);
@@ -60,6 +61,12 @@ static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 #include "usercfg.h"
+
+static Atom atom_net_supported;
+static Atom atom_wm_strut_partial;
+static Atom atom_wm_window_type;
+static Atom atom_net_wm_window_type_dock;
+static Atom atom_net_workarea;
 
 static Cursor c_normal, c_move, c_resize;
 static Client *clients = NULL;
@@ -70,9 +77,9 @@ static Display *dpy;
 static Window root;
 static Bool global_floating = False;
 
-static uint64_t last_motion_time = 0;
-static uint64_t border_foc_col;
-static uint64_t border_ufoc_col;
+static ulong last_motion_time = 0;
+static ulong border_foc_col;
+static ulong border_ufoc_col;
 static uint gaps = GAPS;
 static uint scr_width;
 static uint scr_height;
@@ -80,6 +87,10 @@ static uint open_windows = 0;
 static int drag_start_x, drag_start_y;
 static int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
+static uint reserve_left = 0;
+static uint reserve_right = 0;
+static uint reserve_top = 0;
+static uint reserve_bottom = 0;
 
 static void
 add_client(Window w)
@@ -326,13 +337,57 @@ hdl_keypress(XEvent *xev)
 static void
 hdl_map_req(XEvent *xev)
 {
+	XConfigureRequestEvent *cr = &xev->xconfigurerequest;
+
+	Atom type;
+	int format;
+	ulong nitems, bytes_after;
+	Atom *types = NULL;
+
+	if (XGetWindowProperty(dpy, cr->window,
+				atom_wm_window_type, 0, 1, False,
+				XA_ATOM, &type, &format,
+				&nitems, &bytes_after,
+				(unsigned char**)&types) == Success && types)
+	{
+		if (nitems > 0 && types[0] == atom_net_wm_window_type_dock) {
+			XFree(types);
+
+			XMapWindow(dpy, cr->window);
+			ulong *strut = NULL;
+			if (XGetWindowProperty(dpy, cr->window,
+						atom_wm_strut_partial, 0, 12, False,
+						XA_CARDINAL, &type, &format,
+						&nitems, &bytes_after,
+						(unsigned char**)&strut) == Success && strut)
+			{
+				if (nitems >= 4) {
+					reserve_left	= strut[0];
+					reserve_right	= strut[1];
+					reserve_top		= strut[2];
+					reserve_bottom	= strut[3];
+				}
+				XFree(strut);
+			}
+
+			ulong workarea[4] = {
+				reserve_left,
+				reserve_top,
+				scr_width  - reserve_left	- reserve_right,
+				scr_height - reserve_top	- reserve_bottom
+			};
+			XChangeProperty(dpy, root,
+					atom_net_workarea, XA_CARDINAL, 32,
+					PropModeReplace, (unsigned char*)workarea, 4);
+			return;
+		}
+		XFree(types);
+	}
+
 	if (open_windows == MAXCLIENTS)
 		return;
-
-	XConfigureRequestEvent *cr = &xev->xconfigurerequest;
 	add_client(cr->window);
 	XMapWindow(dpy, cr->window);
-
 	if (!global_floating)
 		tile();
 	update_borders();
@@ -458,7 +513,7 @@ other_wm_err(Display *dpy, XErrorEvent *ee)
 	if (dpy && ee) return 0;
 }
 
-static uint64_t
+static ulong
 parse_col(const char *hex)
 {
 	XColor col;
@@ -506,13 +561,14 @@ setup(void)
 		errx(0, "can't open display. quitting...");
 	root = XDefaultRootWindow(dpy);
 
+	setup_atoms();
+	other_wm();
+	grab_keys();
+
 	c_normal = XCreateFontCursor(dpy, XC_left_ptr);
 	c_move	 = XCreateFontCursor(dpy, XC_fleur);
 	c_resize = XCreateFontCursor(dpy, XC_bottom_right_corner);
 	XDefineCursor(dpy, root, c_normal);
-
-	other_wm();
-	grab_keys();
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
@@ -541,6 +597,32 @@ setup(void)
 }
 
 static void
+setup_atoms(void)
+{
+	/* intern the atoms we need */
+	atom_net_supported				= XInternAtom(dpy, "_NET_SUPPORTED",			False);
+	atom_wm_strut_partial			= XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL",		False);
+	atom_wm_window_type				= XInternAtom(dpy, "_NET_WM_WINDOW_TYPE",		False);
+	atom_net_wm_window_type_dock	= XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK",	False);
+	atom_net_workarea				= XInternAtom(dpy, "_NET_WORKAREA",				False);
+
+	/* advertise which EWMH hints we support on the root window */
+	Atom support_list[] = {
+		XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL",	False),
+		XInternAtom(dpy, "_NET_WM_WINDOW_TYPE",		False),
+		XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK",False),
+		XInternAtom(dpy, "_NET_WORKAREA",			False),
+		/* you can add more here as you implement them: */
+		/* _NET_CLIENT_LIST, _NET_ACTIVE_WINDOW, etc. */
+	};
+	XChangeProperty(dpy, root,
+			atom_net_supported,
+			XA_ATOM, 32, PropModeReplace,
+			(unsigned char*)support_list,
+			sizeof(support_list)/sizeof(Atom));
+}
+
+static void
 spawn(const char **cmd)
 {
 	pid_t pid;
@@ -561,68 +643,75 @@ spawn(const char **cmd)
 static void
 tile(void)
 {
-	int n = 0;
+	uint total_windows = 0;
 	for (Client *c = clients; c; c = c->next)
 		if (!c->floating)
-			++n;
-	if (n == 0) return;
+			++total_windows;
+	if (total_windows == 0)
+		return;
 
-	int stack_count = n - 1;
+	uint stack_count = total_windows - 1;
 
-	int outer_x0 = gaps;
-	int outer_y0 = gaps;
-	int outer_w  = scr_width  - 2*gaps;
-	int outer_h  = scr_height - 2*gaps;
+	uint left	= reserve_left + gaps;
+	uint top	= reserve_top + gaps;
+	uint right	= reserve_right + gaps;
+	uint bottom	= reserve_bottom + gaps;
 
-	int inter_x		= (stack_count > 0 ? gaps : 0);
-	int master_ow	= (stack_count > 0)
-		? (int)(outer_w * MASTER_WIDTH)
-		: outer_w;
-	int stack_ow  = (stack_count > 0)
-		? (outer_w - master_ow - inter_x)
+	uint workarea_width  = scr_width  - left - right;
+	uint workarea_height = scr_height - top  - bottom;
+
+	uint column_gap	= (stack_count > 0 ? gaps : 0);
+	uint master_width = (stack_count > 0)
+		? (int)(workarea_width * MASTER_WIDTH)
+		: workarea_width;
+	uint stack_width = (stack_count > 0)
+		? (workarea_width - master_width - column_gap)
 		: 0;
 
-	int master_x0 = outer_x0;
-	int stack_x0  = outer_x0 + master_ow + inter_x;
+	uint master_x = left;
+	uint stack_x  = left + master_width + column_gap;
 
-	int inter_y_total	= (stack_count > 1 ? gaps * (stack_count - 1) : 0);
-	int each_oh			= (stack_count > 0)
-		? (outer_h - inter_y_total) / stack_count
+	uint total_row_gaps	= (stack_count > 1 ? gaps * (stack_count - 1) : 0);
+	uint row_height	= (stack_count > 0)
+		? (workarea_height - total_row_gaps) / stack_count
 		: 0;
+	uint used_height = row_height * (stack_count > 0 ? stack_count - 1 : 0)
+		+ total_row_gaps;
+	uint last_row_height = (stack_count > 0)
+		? (workarea_height - used_height)
+		: workarea_height;
 
-	int used_h = each_oh * (stack_count > 0 ? stack_count - 1 : 0)
-		+ inter_y_total;
-	int last_oh = (stack_count > 0)
-		? (outer_h - used_h)
-		: outer_h;
-
-	int i = 0;
+	uint index = 0;
 	for (Client *c = clients; c; c = c->next) {
-		if (c->floating) continue;
-		XWindowChanges ch = { .border_width = BORDER_WIDTH };
+		if (c->floating)
+			continue;
 
-		if (i == 0) {
-			ch.x	= master_x0;
-			ch.y	= outer_y0;
-			ch.width	= master_ow - 2*BORDER_WIDTH;
-			ch.height	= outer_h	- 2*BORDER_WIDTH;
+		XWindowChanges changes = { .border_width = BORDER_WIDTH };
+
+		if (index == 0) {
+			changes.x		= master_x;
+			changes.y		= top;
+			changes.width	= master_width  - 2*BORDER_WIDTH;
+			changes.height	= workarea_height - 2*BORDER_WIDTH;
 		} else {
-			int row = i - 1;
-			int outer_y = outer_y0 + row * (each_oh + gaps);
-			int outer_hh = (row < stack_count - 1 ? each_oh : last_oh);
+			uint row	= index - 1;
+			uint y_pos	= top + row * (row_height + gaps);
+			uint height	= (row < stack_count - 1)
+				? row_height
+				: last_row_height;
 
-			ch.x		= stack_x0;
-			ch.y		= outer_y;
-			ch.width	= stack_ow - 2*BORDER_WIDTH;
-			ch.height	= outer_hh - 2*BORDER_WIDTH;
+			changes.x		= stack_x;
+			changes.y		= y_pos;
+			changes.width	= stack_width - 2*BORDER_WIDTH;
+			changes.height	= height - 2*BORDER_WIDTH;
 		}
 
 		XSetWindowBorder(dpy, c->win,
-				(i == 0 ? border_foc_col : border_ufoc_col));
+				(index == 0 ? border_foc_col : border_ufoc_col));
 		XConfigureWindow(dpy, c->win,
 				CWX|CWY|CWWidth|CWHeight|CWBorderWidth,
-				&ch);
-		++i;
+				&changes);
+		++index;
 	}
 }
 
