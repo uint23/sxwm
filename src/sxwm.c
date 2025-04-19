@@ -69,7 +69,9 @@ static Atom atom_net_wm_window_type_dock;
 static Atom atom_net_workarea;
 
 static Cursor c_normal, c_move, c_resize;
-static Client *clients = NULL;
+static Client *workspaces[NUM_WORKSPACES] = { NULL };
+static uint current_ws = 0;
+static Client *clients = NULL; // TO BE REMOVED TODO
 static Client *drag_client = NULL;
 static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];

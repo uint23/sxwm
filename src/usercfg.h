@@ -38,6 +38,11 @@
  *	   How many pixels away from the screen
  *	   until the window *snaps* to the edge
  *
+ *	   NUM_WORKSPACES (int):
+ *	   This is how many workspaces you want
+ *	   in this window manager. Best to leave
+ *	   it default (9).
+ *
  * ———————————————————————————————————————————*
 */
 
@@ -50,6 +55,8 @@
 #define MASTER_WIDTH		0.5
 #define MOTION_THROTTLE		60
 #define SNAP_DISTANCE		5
+
+#define NUM_WORKSPACES		9
 
 /*
  * ————————————< Keys & Bindins >—————————————*
