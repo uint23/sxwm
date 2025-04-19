@@ -565,68 +565,63 @@ tile(void)
 	for (Client *c = clients; c; c = c->next)
 		if (!c->floating)
 			++n;
-	if (n == 0)
-		return;
+	if (n == 0) return;
 
-	int masterx	= gaps + BORDER_WIDTH;
-	int mastery = gaps + BORDER_WIDTH;
-	int availableh = scr_height - (gaps * 2);
-	int masterw, masterh;
-	int stackw = 0, stackwinh = 0;
 	int stack_count = n - 1;
 
-	if (n == 1) {
-		masterw = scr_width - (gaps * 2 + BORDER_WIDTH * 2);
-		masterh = availableh - (BORDER_WIDTH * 2);
-	} else {
-		int total_gapsw    = gaps * 4;
-		int total_bordersw = BORDER_WIDTH * 4;
-		int total_space    = scr_width - total_gapsw - total_bordersw;
+	int outer_x0 = gaps;
+	int outer_y0 = gaps;
+	int outer_w  = scr_width  - 2*gaps;
+	int outer_h  = scr_height - 2*gaps;
 
-		/* use MASTER_WIDTH here: */
-		masterw = (int)(total_space * MASTER_WIDTH);
-		stackw  = total_space - masterw;
-		masterh = availableh - (BORDER_WIDTH * 2);
+	int inter_x		= (stack_count > 0 ? gaps : 0);
+	int master_ow	= (stack_count > 0)
+		? (int)(outer_w * MASTER_WIDTH)
+		: outer_w;
+	int stack_ow  = (stack_count > 0)
+		? (outer_w - master_ow - inter_x)
+		: 0;
 
-		/* compute stack height as before… */
-		int total_gapsh    = (stack_count > 0 ? gaps * (stack_count - 1) : 0);
-		int total_bordersh = BORDER_WIDTH * 2 * stack_count;
-		int total_stackh   = availableh - total_gapsh - total_bordersh;
-		stackwinh = (stack_count > 0 ? total_stackh / stack_count : 0);
-	}
-	int stackx = masterx + masterw + gaps + (BORDER_WIDTH * 2);
-	int stacky = gaps;
+	int master_x0 = outer_x0;
+	int stack_x0  = outer_x0 + master_ow + inter_x;
+
+	int inter_y_total	= (stack_count > 1 ? gaps * (stack_count - 1) : 0);
+	int each_oh			= (stack_count > 0)
+		? (outer_h - inter_y_total) / stack_count
+		: 0;
+
+	int used_h = each_oh * (stack_count > 0 ? stack_count - 1 : 0)
+		+ inter_y_total;
+	int last_oh = (stack_count > 0)
+		? (outer_h - used_h)
+		: outer_h;
+
 	int i = 0;
-
 	for (Client *c = clients; c; c = c->next) {
-		if (c->floating)
-			continue;
+		if (c->floating) continue;
+		XWindowChanges ch = { .border_width = BORDER_WIDTH };
 
-		XWindowChanges changes = { .border_width = BORDER_WIDTH };
 		if (i == 0) {
-			/* master */
-			changes.x		= masterx;
-			changes.y		= mastery;
-			changes.width	= masterw;
-			changes.height	= masterh;
+			ch.x	= master_x0;
+			ch.y	= outer_y0;
+			ch.width	= master_ow - 2*BORDER_WIDTH;
+			ch.height	= outer_h	- 2*BORDER_WIDTH;
 		} else {
-			/* stack */
-			changes.x		= stackx;
-			changes.y		= stacky + BORDER_WIDTH;
-			changes.width	= stackw;
-			changes.height	= stackwinh;
-			if (i == n - 1) {
-				int used = stacky - gaps + stackwinh + (BORDER_WIDTH * 2);
-				changes.height += (availableh - used);
-			}
-			stacky += stackwinh + (BORDER_WIDTH * 2) + gaps;
+			int row = i - 1;
+			int outer_y = outer_y0 + row * (each_oh + gaps);
+			int outer_hh = (row < stack_count - 1 ? each_oh : last_oh);
+
+			ch.x		= stack_x0;
+			ch.y		= outer_y;
+			ch.width	= stack_ow - 2*BORDER_WIDTH;
+			ch.height	= outer_hh - 2*BORDER_WIDTH;
 		}
 
 		XSetWindowBorder(dpy, c->win,
 				(i == 0 ? border_foc_col : border_ufoc_col));
 		XConfigureWindow(dpy, c->win,
 				CWX|CWY|CWWidth|CWHeight|CWBorderWidth,
-				&changes);
+				&ch);
 		++i;
 	}
 }

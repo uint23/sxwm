@@ -42,16 +42,16 @@
 
 #define GAPS				10
 
-#define BORDER_WIDTH		5
-#define BORDER_FOC_COL		"#AAFFFA"
-#define BORDER_UFOC_COL		"#FF4439"
+#define BORDER_WIDTH		1
+#define BORDER_FOC_COL		"#005577"
+#define BORDER_UFOC_COL		"#444444"
 
 #define MASTER_WIDTH		0.6
 #define MOTION_THROTTLE		144
-#define SNAP_DISTANCE		10
+#define SNAP_DISTANCE		5
 
 /*
- * ———————————< Keys & Bindins >————————————— *
+ * ————————————< Keys & Bindins >—————————————*
  *
  *	   This is where you set your keybinds to
  *	   execute apps. You can use the CMD macro
@@ -67,14 +67,14 @@
  *	   commands given to execvp, the function
  *	   that executes these programs.
  *
- * ——————————— —————————————————————————————— *
+ * ———————————————————————————————————————————*
  *
 */
 
 CMD(terminal, 	"st");
 CMD(browser, 	"firefox");
 
-/*< This is your modifier key (MOD/SUPER) >*/
+/*< This is your modifier key (ALT/SUPER) >*/
 #define MOD	ALT
 
 /*
@@ -123,14 +123,14 @@ CMD(browser, 	"firefox");
  *     End the line with a comma, as this is
  *     an array.
  *
- * ——————————— —————————————————————————————— *
+ * ———————————————————————————————————————————*
 */
 
 static const Binding binds[] =
 {
-/*——< MODIFIER(S) >———  < KEY >—————< FUNCTION >——*/
+/*——< MODIFIER(S) >—————< KEY >—————< FUNCTION >——*/
 
-/*———  ——< Here are your functions calls > ———— — */
+/*———————< Here are your functions calls >————— — */
 	CALL(MOD|SHIFT,		e,			quit),
 	CALL(MOD|SHIFT,		q,			close_focused),
 
@@ -143,8 +143,8 @@ static const Binding binds[] =
 	CALL(MOD,			equal,		inc_gaps),
 	CALL(MOD,			minus,		dec_gaps),
 
-	CALL(MOD,			f,			toggle_floating),
-	CALL(MOD,			space,		toggle_floating_global),
+	CALL(MOD,			space,		toggle_floating),
+	CALL(MOD|SHIFT,		space,		toggle_floating_global),
 
 /*—————< Here are your executable functions >—————*/
 	BIND(MOD, 			Return,		terminal),
