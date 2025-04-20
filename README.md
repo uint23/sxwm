@@ -10,7 +10,7 @@ Here we have a **minimal**, **tiling**, and **configurable** window manager.
 - **Bars work too**: BAR BAR BAR?! Why not try [sxbar](https://github.com/uint23/sxbar)
 - **Lightweight**: Single C file plus a small header and config.
 - **Easy Config**: All settings in `config`.
-- **SUPER Fast**: Sometimes **0.2M** sometimes **0.3M**, idk ~~~but still destroys DWM~~~ (this is a lie because dwm also has font rendering but still :] )
+- **SUPER Fast**: Sometimes **0.2M** sometimes **0.3M**, idk ~~but still destroys DWM~~ (this is a lie because dwm also has font rendering but still :] )
 - **BEST WM**: Basically DWM on roids (and without the elitism).
 
 <br>
