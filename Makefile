@@ -6,6 +6,7 @@ SRC_DIR = src
 SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJ = $(SRC:.c=.o)
 BIN = sxwm
+PREFIX = /usr/local
 
 all: $(BIN)
 
@@ -15,7 +16,20 @@ $(BIN): $(OBJ)
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-c:
+clean:
 	rm -f $(SRC_DIR)/*.o $(BIN)
 
-.PHONY: all c
+install: all
+	@echo "Installing $(BIN) to $(DESTDIR)$(PREFIX)/bin..."
+	@mkdir -p $(DESTDIR)$(PREFIX)/bin
+	@install -m 755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	@echo "Installation complete."
+
+uninstall:
+	@echo "Uninstalling $(BIN) from $(DESTDIR)$(PREFIX)/bin..."
+	@rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	@echo "Uninstallation complete."
+
+clean-install: clean install
+
+.PHONY: all clean install uninstall clean-install

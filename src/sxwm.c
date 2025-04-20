@@ -59,6 +59,7 @@ static void spawn(const char **cmd);
 static void tile(void);
 static void toggle_floating(void);
 static void toggle_floating_global(void);
+static void toggle_fullscreen(void);
 static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
@@ -122,7 +123,8 @@ add_client(Window w)
 	c->y = wa.y;
 	c->w = wa.width;
 	c->h = wa.height;
-	c->floating = 0;
+	c->floating = False;
+	c->fullscreen = False;
 
 	if (global_floating) {
 		XSetWindowBorder(dpy, c->win, border_foc_col);
@@ -504,6 +506,12 @@ move_to_workspace(uint ws)
 	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws)
 		return;
 
+	if (focused->fullscreen) {
+		focused->fullscreen = False;
+		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
+		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+	}
+
 	/* remove from current list */
 	Client **pp = &workspaces[current_ws];
 	while (*pp && *pp != focused) pp = &(*pp)->next;
@@ -702,9 +710,13 @@ tile(void)
 {
 	uint total_windows = 0;
 	Client *head = workspaces[current_ws];
-	for (Client *c = head; c; c = c->next)
+	for (Client *c = head; c; c = c->next) {
+		if (c->fullscreen)
+			return;
+
 		if (!c->floating)
 			++total_windows;
+	}
 	if (total_windows == 0)
 		return;
 
@@ -777,7 +789,13 @@ static void
 toggle_floating(void)
 {
 	if (!focused) return;
+
 	focused->floating = !focused->floating;
+	if (focused->fullscreen) {
+		focused->fullscreen = False;
+		tile();
+		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+	}
 
 	if (focused->floating) {
 		XWindowAttributes wa;
@@ -847,6 +865,41 @@ toggle_floating_global(void)
 }
 
 static void
+toggle_fullscreen(void)
+{
+	if (!focused)
+		return;
+
+	if (focused->floating)
+		focused->floating = False;
+
+	focused->fullscreen = !focused->fullscreen;
+
+	if (focused->fullscreen) {
+		XWindowAttributes wa;
+		XGetWindowAttributes(dpy, focused->win, &wa);
+		focused->orig_x = wa.x;
+		focused->orig_y = wa.y;
+		focused->orig_w = wa.width;
+		focused->orig_h = wa.height;
+
+		uint fs_x = 0;
+		uint fs_y = 0;
+		uint fs_w = scr_width;
+		uint fs_h = scr_height;
+
+		XSetWindowBorderWidth(dpy, focused->win, 0);
+		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
+		XRaiseWindow(dpy, focused->win); // Ensure it's on top
+	} else {
+		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
+		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+		tile();
+		update_borders();
+	}
+}
+
+static void
 update_borders(void)
 {
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -889,6 +942,7 @@ change_workspace(uint ws)
 static int
 xerr(Display *dpy, XErrorEvent *ee)
 {
+	/* TODO MAKE IT BETTER */
 	if (ee->error_code == BadWindow
 			|| ee->error_code == BadDrawable
 			|| (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)

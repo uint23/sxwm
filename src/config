@@ -98,7 +98,6 @@
 CMD(terminal,	"st");
 CMD(browser,	"firefox");
 
-
 /*
  * ———————————————< Bindings >————————————————*
  *
@@ -179,6 +178,8 @@ static const Binding binds[] =
 	CALL(MOD,			space,		toggle_floating),
 	CALL(MOD|SHIFT,		space,		toggle_floating_global),
 
+	CALL(MOD|SHIFT,		f,			toggle_fullscreen),
+
 /*—————< Here are your executable functions >—————*/
 
 	BIND(MOD, 			Return,		terminal),
@@ -212,4 +213,5 @@ static const Binding binds[] =
 
 	CALL(MOD,			9,			change_ws9),
 	CALL(MOD|SHIFT,		9,			moveto_ws9),
+
 };

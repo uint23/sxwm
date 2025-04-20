@@ -3,8 +3,11 @@
 #ifndef DEFS_H
 #define DEFS_H
 
-#include <stdint.h>
 #include <X11/Xlib.h>
+
+#define uint unsigned int
+#define ulong unsigned long
+#define u_char unsigned char
 
 #define SXWM_VERSION	"sxwm ver. 0.1.5"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
@@ -83,7 +86,9 @@ typedef struct {
 typedef struct Client{
 	Window win;
 	uint x, y, h, w;
+	uint orig_x, orig_y, orig_w, orig_h;
 	Bool floating;
+	Bool fullscreen;
 	struct Client *next;
 } Client;
 

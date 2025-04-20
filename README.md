@@ -1,21 +1,161 @@
-MIT License
+# sxwm (*The (truly) Simple Xorg Window Manager*)
+Performance greater than DWM, and easier to config than i3wm
 
-Copyright (c) Abhinav Prasai 2025
+<a href="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg"><img src="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg" width="45%" align="right"></a>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Here we have a **minimal**, **tiling**, and **configurable** window manager.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+- **Tiling & Floating**: Seamlessly switch between layouts.
+- **Workspaces**: Workspaces work with your bar.
+- **Bars work too**: BAR BAR BAR?! Why not try [sxbar](https://github.com/uint23/sxbar)
+- **Lightweight**: Single C file plus a small header and config.
+- **Easy Config**: All settings in `config`.
+- **SUPER Fast**: Sometimes **2M** sometimes **4M**, idk but still destroys DWM
+- **BEST WM**: Basically DWM on roids (and without the elitism).
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+<br>
+
+<a href="TODO"><img src="TODO" width="45%" align="right"></a>
+
+- **Master-Stack**: Use the DWM native and super productive layout.
+- **Keyboard-driven**: Full coverage via `MOD` + keys.
+- **Mouse Support**: Focus under cursor, move & resize with modifiers.
+- **Zero Dependencies**: Only requires `libX11`.
+- **Compiles on a Toaster**: As long as it has a decently modern compiler.
+
+<br clear="right">
+
+---
+
+## Default Configuration
+
+All options reside in `config` (which is just a header-file) with clear comments.
+Keybindings are also easy to understand and quick to implement.
+No more bindsym or... *\*shudders\** C code...
+```c
+CMD(terminal,  "st");
+CMD(browser,   "firefox");
+
+static const Binding binds[] =
+{
+/*————< MODIFIER(S) >< KEY >—————< FUNCTION >——*/
+
+/*———————< Here are your functions calls >————— — */
+
+	CALL(MOD|SHIFT,		e,			quit),
+	CALL(MOD|SHIFT,		q,			close_focused),
+
+	CALL(MOD, 			j, 			focus_next),
+	CALL(MOD, 			k, 			focus_prev),
+
+	CALL(MOD|SHIFT, 	j, 			move_master_next),
+	CALL(MOD|SHIFT, 	k, 			move_master_prev),
+
+	CALL(MOD,			equal,		inc_gaps),
+	CALL(MOD,			minus,		dec_gaps),
+
+	CALL(MOD,			space,		toggle_floating),
+	CALL(MOD|SHIFT,		space,		toggle_floating_global),
+   .....
+```
+
+---
+
+## Default Keybindings
+
+**Window Management**
+
+| Combo                        | Action                    |
+| ---------------------------- | ------------------------- |
+| `Mouse`                      | Focus under cursor        |
+| `MOD` + `Left Mouse`         | Move window by mouse      |
+| `MOD` + `Right Mouse`        | Resize window by mouse    |
+| `MOD` + `j` / `k`            | Focus next / previous     |
+| `MOD` + `Shift` + `j` / `k`  | Move in master stack      |
+| `MOD` + `Space`              | Toggle floating           |
+| `MOD` + `Shift` + `Space`    | Toggle all floating       |
+| `MOD` + `=` / `-`            | Inc/Dec gaps              |
+| `MOD` + `f`                  | Fullscreen toggle         |
+| `MOD` + `c`                  | Center window             |
+| `MOD` + `q`                  | Close focused window      |
+| `MOD` + `1-9`                | Switch workspace 1–9      |
+| `MOD` + `Shift` + `1-9`      | Move window to WS 1–9     |
+
+**Programs**
+
+| Combo                | Action     | Programs (by default)   |
+| -------------------- | ---------- | --------- |
+| `MOD` + `Return`     | Terminal   | `st`      |
+| `MOD` + `b`          | Browser    | `firefox` |
+
+---
+
+## 📦 Dependencies
+
+- `libX11` (Xorg client library)
+- GCC / Clang & Make
+
+---
+
+## 🧰 Makefile Targets
+
+Below are the available `make` targets for streamlining common tasks:
+
+| Target           | Description                                                         |
+| ---------------- | ------------------------------------------------------------------- |
+| `make` or `make all` | Compile the source files into the `sxwm` binary.                |
+| `make clean`     | Remove object files (`*.o`) and build artifacts.                    |
+| `make install`   | Install `sxwm` to `$(PREFIX)/bin` (default `/usr/local/bin`).       |
+| `make uninstall` | Remove the installed binary from `$(PREFIX)/bin`.                   |
+| `make clean-install` | Runs `make clean` then `make install`.                          |
+
+> You can override the install directory by specifying `PREFIX` or `DESTDIR`, for example:
+> ```sh
+> make install PREFIX=$HOME/.local
+> ```
+
+---
+
+## 🚀 Installation
+
+1. **Clone repository**
+
+   ```bash
+   git clone https://github.com/username/sxwm.git
+   cd sxwm
+   ```
+
+2. **Build**
+
+   ```bash
+   make
+   ```
+
+3. **Install** (optional)
+
+   ```bash
+   sudo make install PREFIX=/usr/local
+   ```
+
+4. **Run**
+
+   Add to `~/.xinitrc`:
+   ```sh
+   exec sxwm
+   ```
+
+---
+
+## 🙏 Thanks & Inspiration
+
+- [dwm](https://dwm.suckless.org)
+- [i3](https://i3wm.org)
+- [sowm](https://github.com/dylanaraps/sowm)
+- [2bwm](https://github.com/venam/2bwm)
+- [tinywm](http://incise.org/tinywm.html)
+
+---
+
+<p align="center">
+  <em>Contributions welcome! Open issues or submit PRs.</em>
+</p>
