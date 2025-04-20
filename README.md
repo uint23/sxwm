@@ -90,14 +90,14 @@ static const Binding binds[] =
 
 ---
 
-## 📦 Dependencies
+## Dependencies
 
 - `libX11` (Xorg client library)
 - GCC / Clang & Make
 
 ---
 
-## 🧰 Makefile Targets
+## Makefile Targets
 
 Below are the available `make` targets for streamlining common tasks:
 
@@ -116,12 +116,12 @@ Below are the available `make` targets for streamlining common tasks:
 
 ---
 
-## 🚀 Installation
+## Installation
 
 1. **Clone repository**
 
    ```bash
-   git clone https://github.com/username/sxwm.git
+   git clone https://github.com/uint23/sxwm.git
    cd sxwm
    ```
 
@@ -131,10 +131,10 @@ Below are the available `make` targets for streamlining common tasks:
    make
    ```
 
-3. **Install** (optional)
+3. **Install**
 
    ```bash
-   sudo make install PREFIX=/usr/local
+   sudo make clean-install
    ```
 
 4. **Run**
@@ -146,13 +146,12 @@ Below are the available `make` targets for streamlining common tasks:
 
 ---
 
-## 🙏 Thanks & Inspiration
+## Thanks & Inspiration
 
-- [dwm](https://dwm.suckless.org)
-- [i3](https://i3wm.org)
-- [sowm](https://github.com/dylanaraps/sowm)
-- [2bwm](https://github.com/venam/2bwm)
-- [tinywm](http://incise.org/tinywm.html)
+- [dwm](https://dwm.suckless.org) - Tiling & source code
+- [i3](https://i3wm.org) - Making configuring easy
+- [sowm](https://github.com/dylanaraps/sowm) - README inspo :)
+- [tinywm](http://incise.org/tinywm.html) - idk, just cool to see how a wm works
 
 ---
 
