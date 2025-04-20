@@ -1,10 +1,12 @@
+/* See LICENSE for more information on use */
+
 #ifndef DEFS_H
 #define DEFS_H
 
 #include <stdint.h>
 #include <X11/Xlib.h>
 
-#define SXWM_VERSION	"sxwm ver. 0.1.3"
+#define SXWM_VERSION	"sxwm ver. 0.1.5"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 

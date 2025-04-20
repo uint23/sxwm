@@ -1,5 +1,4 @@
-/*< You can ignore this >*/
-#include <X11/keysym.h>
+/* See LICENSE for more information on use */
 
 /*
  * ——————————————< Appearance >—————————————— *
@@ -96,11 +95,9 @@
  *
 */
 
-CMD(terminal, 	"st");
-CMD(browser, 	"firefox");
+CMD(terminal,	"st");
+CMD(browser,	"firefox");
 
-/*< This is your modifier key (ALT/SUPER) >*/
-#define MOD	ALT
 
 /*
  * ———————————————< Bindings >————————————————*
@@ -157,6 +154,10 @@ CMD(browser, 	"firefox");
  * ———————————————————————————————————————————*
 */
 
+/*< This is your modifier key (ALT/SUPER) >*/
+#define MOD	ALT
+
+#include <X11/keysym.h>
 static const Binding binds[] =
 {
 /*————< MODIFIER(S) >< KEY >—————< FUNCTION >——*/
