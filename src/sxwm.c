@@ -62,7 +62,7 @@ static void toggle_floating_global(void);
 static void update_borders(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
-#include "usercfg.h"
+#include "config"
 
 static Atom atom_net_supported;
 static Atom atom_wm_strut_partial;

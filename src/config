@@ -54,7 +54,7 @@
 
 #define GAPS				10
 
-#define BORDER_WIDTH		1
+#define BORDER_WIDTH		5
 #define BORDER_FOC_COL		"#005577"
 #define BORDER_UFOC_COL		"#444444"
 
