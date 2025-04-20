@@ -1,23 +1,28 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -O3 -g -Isrc -march=native -flto -s -Os
-LDFLAGS = -lX11
+CC		?= gcc
+CFLAGS	?= -Wall -Wextra -O2 -Isrc
+LDFLAGS ?= -lX11
 
-SRC_DIR = src
-SRC = $(wildcard $(SRC_DIR)/*.c)
-OBJ = $(SRC:.c=.o)
-BIN = sxwm
-PREFIX = /usr/local
+PREFIX	?= /usr/local
+BIN		?= sxwm
+SRC_DIR := src
+OBJ_DIR := build
+
+SRC		:= $(wildcard $(SRC_DIR)/*.c)
+OBJ		:= $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
 
 all: $(BIN)
 
 $(BIN): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
+
 clean:
-	rm -f $(SRC_DIR)/*.o $(BIN)
+	rm -rf $(OBJ_DIR) $(BIN)
 
 install: all
 	@echo "Installing $(BIN) to $(DESTDIR)$(PREFIX)/bin..."
