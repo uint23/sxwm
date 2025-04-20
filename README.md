@@ -12,7 +12,7 @@ Here we have a **minimal**, **tiling**, and **configurable** window manager.
 - **Easy Config**: All settings in `config`.
 - **SUPER Fast**: Sometimes **0.2M** sometimes **0.3M**, idk ~~but still destroys DWM~~ (this is a lie because dwm also has font rendering but still :] )
 - **BEST WM**: Basically DWM on roids (and without the elitism).
-
+- **Minimal Codebase**: ~1000 LOC
 <br>
 
 <a href="TODO"><img src="TODO" width="45%" align="right"></a>
