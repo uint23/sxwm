@@ -53,6 +53,8 @@ static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static ulong parse_col(const char *hex);
 static void quit(void);
+static void resize_master_add(void);
+static void resize_master_sub(void);
 static void run(void);
 static void setup(void);
 static void setup_atoms(void);
@@ -65,7 +67,7 @@ static void update_borders(void);
 static void update_net_client_list(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
-#include "config"
+#include "config.h"
 
 static Atom atom_net_supported;
 static Atom atom_wm_strut_partial;
@@ -88,6 +90,7 @@ static Bool global_floating = False;
 static ulong last_motion_time = 0;
 static ulong border_foc_col;
 static ulong border_ufoc_col;
+static float master_frac = MASTER_WIDTH;
 static uint gaps = GAPS;
 static uint scr_width;
 static uint scr_height;
@@ -619,6 +622,24 @@ quit(void)
 }
 
 static void
+resize_master_add(void)
+{
+	if (master_frac < MF_MAX - 0.001f)
+		master_frac += ((float) RESIZE_MASTER_AMT / 100);
+	tile();
+	update_borders();
+}
+
+static void
+resize_master_sub(void)
+{
+	if (master_frac > MF_MIN + 0.001f)
+		master_frac -= ((float) RESIZE_MASTER_AMT / 100);
+	tile();
+	update_borders();
+}
+
+static void
 run(void)
 {
 	XEvent xev;
@@ -769,9 +790,9 @@ tile(void)
 
 	uint column_gap	= (stack_count > 0 ? gaps : 0);
 	uint master_width = (stack_count > 0)
-		? (int)(workarea_width * MASTER_WIDTH)
+		? workarea_width * master_frac
 		: workarea_width;
-	uint stack_width = (stack_count > 0)
+	uint stack_width  = (stack_count > 0)
 		? (workarea_width - master_width - column_gap)
 		: 0;
 

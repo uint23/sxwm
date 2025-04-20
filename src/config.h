@@ -25,6 +25,10 @@
  *	   % of the screen the master window
  *	   should take as a decimal value 0-1
  *	   eg. 0.5 is 50%
+ *	   
+ *	   RESIZE_MASTER_AMT (%):
+ *	   % of the master width you want to
+ *	   increment by
  *
  *	   MOTION_THROTTLE (int):
  *	   Usually you should set this to your
@@ -54,11 +58,12 @@
 
 #define GAPS				10
 
-#define BORDER_WIDTH		5
+#define BORDER_WIDTH		1
 #define BORDER_FOC_COL		"#005577"
 #define BORDER_UFOC_COL		"#444444"
 
-#define MASTER_WIDTH		0.5
+#define MASTER_WIDTH		0.6
+#define RESIZE_MASTER_AMT	1
 #define MOTION_THROTTLE		60
 #define SNAP_DISTANCE		5
 
@@ -171,6 +176,9 @@ static const Binding binds[] =
 
 	CALL(MOD|SHIFT, 	j, 			move_master_next),
 	CALL(MOD|SHIFT, 	k, 			move_master_prev),
+
+	CALL(MOD, 			l, 			resize_master_add),
+	CALL(MOD,		 	h, 			resize_master_sub),
 
 	CALL(MOD,			equal,		inc_gaps),
 	CALL(MOD,			minus,		dec_gaps),

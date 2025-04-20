@@ -19,6 +19,8 @@
 
 #define MARGIN (gaps + BORDER_WIDTH)
 #define OUT_IN (2 * BORDER_WIDTH)
+#define MF_MIN 0.05f
+#define MF_MAX 0.95f
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
 #define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }
