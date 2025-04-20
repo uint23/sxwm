@@ -1,4 +1,4 @@
-# sxwm (*The (truly) Simple Xorg Window Manager*)
+# sxwm - *The (truly) Simple Xorg Window Manager*
 Performance greater than DWM, and easier to config than i3wm
 
 <a href="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg"><img src="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg" width="45%" align="right"></a>
