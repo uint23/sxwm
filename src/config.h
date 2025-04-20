@@ -59,8 +59,8 @@
 #define GAPS				10
 
 #define BORDER_WIDTH		1
-#define BORDER_FOC_COL		"#005577"
-#define BORDER_UFOC_COL		"#444444"
+#define BORDER_FOC_COL		"#c0cbff"
+#define BORDER_UFOC_COL		"#555555"
 
 #define MASTER_WIDTH		0.6
 #define RESIZE_MASTER_AMT	1
