@@ -56,6 +56,8 @@
  * ———————————————————————————————————————————*
 */
 
+#define XINERAMA_SUPPORT	0
+
 #define GAPS				10
 
 #define BORDER_WIDTH		1

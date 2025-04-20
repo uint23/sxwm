@@ -1,14 +1,13 @@
 CC		?= gcc
-CFLAGS	?= -Wall -Wextra -O2 -Isrc
-LDFLAGS ?= -lX11
+CFLAGS	?= -Wall -Wextra -O3 -Isrc
+LDFLAGS	?= -lX11 -lXinerama
 
 PREFIX	?= /usr/local
 BIN		?= sxwm
-SRC_DIR := src
-OBJ_DIR := build
-
+SRC_DIR	:= src
+OBJ_DIR	:= build
 SRC		:= $(wildcard $(SRC_DIR)/*.c)
-OBJ		:= $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
+OBJ		:= $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC))
 
 all: $(BIN)
 

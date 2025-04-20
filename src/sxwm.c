@@ -36,10 +36,12 @@ static void close_focused(void);
 static void dec_gaps(void);
 static void focus_next(void);
 static void focus_prev(void);
+static int get_monitor_for(Client *c);
 static void grab_keys(void);
 static void hdl_button(XEvent *xev);
 static void hdl_button_release(XEvent *xev);
 static void hdl_client_msg(XEvent *xev);
+static void hdl_config_ntf(XEvent *xev);
 static void hdl_config_req(XEvent *xev);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
@@ -67,10 +69,14 @@ static void toggle_floating(void);
 static void toggle_floating_global(void);
 static void toggle_fullscreen(void);
 static void update_borders(void);
+static void update_monitors(void);
 static void update_net_client_list(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 #include "config.h"
+#ifdef XINERAMA_SUPPORT
+#include <X11/extensions/Xinerama.h>
+#endif
 
 static Atom atom_wm_delete;
 static Atom atom_wm_strut_partial;
@@ -89,6 +95,8 @@ static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];
 static Display *dpy;
 static Window root;
+static Monitor *mons = NULL;
+static int monsn = 0;
 static Bool global_floating = False;
 
 static ulong last_motion_time = 0;
@@ -136,6 +144,13 @@ add_client(Window w)
 	c->y = wa.y;
 	c->w = wa.width;
 	c->h = wa.height;
+
+	if (focused)
+		c->mon = focused->mon;
+	else
+		c->mon = get_monitor_for(c);
+
+	c->mon = get_monitor_for(c);
 	c->fixed = False;
 	c->floating = False;
 	c->fullscreen = False;
@@ -144,6 +159,8 @@ add_client(Window w)
 		XSetWindowBorder(dpy, c->win, border_foc_col);
 		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
 	}
+	tile();
+	update_borders();
 	XRaiseWindow(dpy, w);
 }
 
@@ -226,6 +243,18 @@ focus_prev(void)
 	update_borders();
 }
 
+static int
+get_monitor_for(Client *c)
+{
+	uint cx = c->x + c->w/2, cy = c->y + c->h/2;
+	for (int i = 0; i < monsn; ++i) {
+		if (cx >= (uint)mons[i].x && cx < mons[i].x + mons[i].w &&
+				cy >= (uint)mons[i].y && cy < mons[i].y + mons[i].h)
+			return i;
+	}
+	return 0; 
+}
+
 static void
 grab_keys(void)
 {
@@ -306,7 +335,7 @@ hdl_client_msg(XEvent *xev)
 {
 	if (xev->xclient.message_type == atom_net_wm_state) {
 		long action = xev->xclient.data.l[0];
-		Atom  target = xev->xclient.data.l[1];
+		Atom target = xev->xclient.data.l[1];
 		if (target == atom_net_wm_state_fullscreen) {
 			if (action == 1 || action == 2)
 				toggle_fullscreen();
@@ -314,6 +343,16 @@ hdl_client_msg(XEvent *xev)
 				toggle_fullscreen();
 		}
 		return;
+	}
+}
+
+static void
+hdl_config_ntf(XEvent *xev)
+{
+	if (xev->xconfigure.window == root) {
+		update_monitors();
+		tile();
+		update_borders();
 	}
 }
 
@@ -331,7 +370,7 @@ hdl_config_req(XEvent *xev)
 	if (!c || c->floating || c->fullscreen) {
 		/* allow the client to configure itself */
 		XWindowChanges wc = { .x = e->x, .y = e->y,
-			.width  = e->width,  .height = e->height,
+			.width = e->width, .height = e->height,
 			.border_width = e->border_width,
 			.sibling = e->above, .stack_mode = e->detail };
 		XConfigureWindow(dpy, e->window, e->value_mask, &wc);
@@ -466,7 +505,7 @@ hdl_map_req(XEvent *xev)
 			ulong workarea[4] = {
 				reserve_left,
 				reserve_top,
-				scr_width  - reserve_left	- reserve_right,
+				scr_width - reserve_left	- reserve_right,
 				scr_height - reserve_top	- reserve_bottom
 			};
 			XChangeProperty(dpy, root,
@@ -495,7 +534,7 @@ hdl_map_req(XEvent *xev)
 		c->fixed = True;
 
 		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
-		XSetWindowBorder      (dpy, c->win,
+		XSetWindowBorder (dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
 	}
 
@@ -511,7 +550,7 @@ hdl_map_req(XEvent *xev)
 			if (c->w < 64 || c->h < 64) {
 				int w = (c->w < 64 ? 640 : c->w);
 				int h = (c->h < 64 ? 480 : c->h);
-				int x = (scr_width  - w) / 2;
+				int x = (scr_width - w) / 2;
 				int y = (scr_height - h) / 2;
 				XMoveResizeWindow(dpy, c->win, x, y, w, h);
 			}
@@ -746,7 +785,7 @@ scan_existing_windows(void)
 	uint nchildren;
 
 	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &nchildren)) {
-		for (uint i = 0; i < nchildren; i++) {
+		for (uint i = 0; i < nchildren; ++i) {
 			XWindowAttributes wa;
 			if (!XGetWindowAttributes(dpy, children[i], &wa) || wa.override_redirect || wa.map_state != IsViewable)
 				continue;
@@ -779,12 +818,15 @@ setup(void)
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
-	XSelectInput(dpy, root, SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask);
+	update_monitors();
+
+	XSelectInput(dpy, root, StructureNotifyMask | SubstructureRedirectMask |
+			SubstructureNotifyMask | KeyPressMask);
 	XGrabButton(dpy, Button1, MOD, root,
-			True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
+			True, ButtonPressMask | ButtonReleaseMask|PointerMotionMask,
 			GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button3, MOD, root,
-			True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask,
+			True, ButtonPressMask | ButtonReleaseMask|PointerMotionMask,
 			GrabModeAsync, GrabModeAsync, None, None);
 	XSync(dpy, False);
 
@@ -794,6 +836,7 @@ setup(void)
 	evtable[ButtonPress]	= hdl_button;
 	evtable[ButtonRelease]	= hdl_button_release;
 	evtable[ClientMessage]	= hdl_client_msg;
+	evtable[ConfigureNotify] = hdl_config_ntf;
 	evtable[ConfigureRequest] = hdl_config_req;
 	evtable[DestroyNotify]	= hdl_destroy_ntf;
 	evtable[EnterNotify] 	= hdl_enter;
@@ -834,7 +877,7 @@ setup_atoms(void)
 	Atom a_num = XInternAtom(dpy, 	"_NET_NUMBER_OF_DESKTOPS",	False);
 	Atom a_names= XInternAtom(dpy, 	"_NET_DESKTOP_NAMES",		False);
 
-	long  num = NUM_WORKSPACES;
+	long num = NUM_WORKSPACES;
 	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32,
 			PropModeReplace, (u_char*)&num, 1);
 
@@ -889,45 +932,94 @@ tile(void)
 	for (Client *c = head; c; c = c->next) {
 		if (c->fullscreen)
 			return;
-
 		if (!c->floating)
 			++total_windows;
+
+		c->mon = get_monitor_for(c);
 	}
 	if (total_windows == 0)
 		return;
 
+#ifdef XINERAMA_SUPPORT
+	for (int m = 0; m < monsn; ++m) {
+		Client *c;
+		int count = 0;
+		for (c = workspaces[current_ws]; c; c = c->next)
+			if (!c->floating && c->mon == m) ++count;
+
+		if (count == 0) continue;
+
+		int master = (count > 0 ? 1 : 0);
+		int stack = count - master;
+		int mx = mons[m].x + gaps;
+		int my = mons[m].y + gaps;
+		int mw = (stack > 0)
+			? (mons[m].w - 2 * gaps) * master_frac
+			: (mons[m].w - 2 * gaps);
+		int sw = (stack > 0)
+			? (mons[m].w - 2 * gaps - mw - gaps)
+			: 0;
+		int sh = (stack > 0)
+			? (mons[m].h - 2 * gaps - (stack - 1) * gaps) / stack
+			: 0;
+
+		int i = 0, sx = mx + mw + gaps;
+		for (c = workspaces[current_ws]; c; c = c->next) {
+			if (c->floating || c->mon != m) continue;
+			XWindowChanges wc = { .border_width = BORDER_WIDTH };
+			if (i == 0) {
+				wc.x = mx;
+				wc.y = my;
+				wc.width = mw - 2 * BORDER_WIDTH;
+				wc.height = (mons[m].h - 2 * gaps) - 2 * BORDER_WIDTH;
+			} else {
+				int y = my + (i - 1) * (sh + gaps);
+				wc.x = sx;
+				wc.y = y;
+				wc.width = sw - 2 * BORDER_WIDTH;
+				wc.height = sh - 2 * BORDER_WIDTH;
+			}
+			XConfigureWindow(dpy, c->win,
+				CWX | CWY | CWWidth | CWHeight | CWBorderWidth,
+				&wc);
+			++i;
+		}
+	}
+#else
 	uint stack_count = total_windows - 1;
+	uint top = reserve_top + gaps;
+	uint bottom = reserve_bottom + gaps;
+	uint left = reserve_left + gaps;
+	uint right = reserve_right + gaps;
 
-	uint left	= reserve_left + gaps;
-	uint top	= reserve_top + gaps;
-	uint right	= reserve_right + gaps;
-	uint bottom	= reserve_bottom + gaps;
+	uint workarea_height = scr_height - top - bottom;
+	uint total_row_gaps = (stack_count > 1 ? gaps * (stack_count - 1) : 0);
+	uint row_height = (stack_count > 0)
+		? (workarea_height - total_row_gaps) / stack_count
+		: 0;
 
-	uint workarea_width  = scr_width  - left - right;
-	uint workarea_height = scr_height - top  - bottom;
+	uint index = 0;
+	uint column_gap = (stack_count > 0 ? gaps : 0);
+	uint workarea_width = scr_width - left - right;
 
-	uint column_gap	= (stack_count > 0 ? gaps : 0);
 	uint master_width = (stack_count > 0)
 		? workarea_width * master_frac
 		: workarea_width;
-	uint stack_width  = (stack_count > 0)
+
+	uint stack_width = (stack_count > 0)
 		? (workarea_width - master_width - column_gap)
 		: 0;
 
-	uint master_x = left;
-	uint stack_x  = left + master_width + column_gap;
-
-	uint total_row_gaps	= (stack_count > 1 ? gaps * (stack_count - 1) : 0);
-	uint row_height	= (stack_count > 0)
-		? (workarea_height - total_row_gaps) / stack_count
-		: 0;
 	uint used_height = row_height * (stack_count > 0 ? stack_count - 1 : 0)
 		+ total_row_gaps;
+
 	uint last_row_height = (stack_count > 0)
 		? (workarea_height - used_height)
 		: workarea_height;
 
-	uint index = 0;
+	uint master_x = left;
+	uint stack_x = left + master_width + column_gap;
+
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->floating)
 			continue;
@@ -937,8 +1029,8 @@ tile(void)
 		if (index == 0) {
 			changes.x		= master_x;
 			changes.y		= top;
-			changes.width	= master_width  - 2*BORDER_WIDTH;
-			changes.height	= workarea_height - 2*BORDER_WIDTH;
+			changes.width	= master_width - 2 * BORDER_WIDTH;
+			changes.height	= workarea_height - 2 * BORDER_WIDTH;
 		} else {
 			uint row	= index - 1;
 			uint y_pos	= top + row * (row_height + gaps);
@@ -948,17 +1040,18 @@ tile(void)
 
 			changes.x		= stack_x;
 			changes.y		= y_pos;
-			changes.width	= stack_width - 2*BORDER_WIDTH;
-			changes.height	= height - 2*BORDER_WIDTH;
+			changes.width	= stack_width - 2 * BORDER_WIDTH;
+			changes.height	= height - 2 * BORDER_WIDTH;
 		}
 
 		XSetWindowBorder(dpy, c->win,
 				(index == 0 ? border_foc_col : border_ufoc_col));
 		XConfigureWindow(dpy, c->win,
-				CWX|CWY|CWWidth|CWHeight|CWBorderWidth,
+				CWX | CWY | CWWidth | CWHeight | CWBorderWidth,
 				&changes);
 		++index;
 	}
+#endif
 }
 
 static void
@@ -1059,10 +1152,11 @@ toggle_fullscreen(void)
 		focused->orig_w = wa.width;
 		focused->orig_h = wa.height;
 
-		uint fs_x = 0;
-		uint fs_y = 0;
-		uint fs_w = scr_width;
-		uint fs_h = scr_height;
+		int m = focused->mon;
+		uint fs_x = mons[m].x;
+		uint fs_y = mons[m].y;
+		uint fs_w = mons[m].w;
+		uint fs_h = mons[m].h;
 
 		XSetWindowBorderWidth(dpy, focused->win, 0);
 		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
@@ -1082,6 +1176,45 @@ update_borders(void)
 		XSetWindowBorder(dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
 	}
+}
+
+static void
+update_monitors(void)
+{
+	XineramaScreenInfo *info;
+	Monitor *old = mons;
+
+	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
+	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
+
+	for (int s = 0; s < ScreenCount(dpy); ++s) {
+		Window scr_root = RootWindow(dpy, s);
+		XDefineCursor(dpy, scr_root, c_normal);
+	}
+
+#ifdef XINERAMA_SUPPORT
+	if (XineramaIsActive(dpy)) {
+		info = XineramaQueryScreens(dpy, &monsn);
+		mons = malloc(sizeof *mons * monsn);
+		for (int i = 0; i < monsn; ++i) {
+			mons[i].x = info[i].x_org;
+			mons[i].y = info[i].y_org;
+			mons[i].w = info[i].width;
+			mons[i].h = info[i].height;
+		}
+		XFree(info);
+	} else
+#endif
+	{
+		monsn = 1;
+		mons = malloc(sizeof *mons);
+		mons[0].x = 0;
+		mons[0].y = 0;
+		mons[0].w = scr_width;
+		mons[0].h = scr_height;
+	}
+
+	free(old);
 }
 
 static void
@@ -1145,7 +1278,7 @@ xerr(Display *dpy, XErrorEvent *ee)
 	};
 
 	for (size_t i = 0; i < sizeof(ignore)/sizeof(ignore[0]); ++i)
-		if ((ignore[i].req == 0 || ignore[i].req  == ee->request_code) &&
+		if ((ignore[i].req == 0 || ignore[i].req == ee->request_code) &&
 				(ignore[i].code == ee->error_code))
 			return 0;
 
