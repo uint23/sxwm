@@ -69,9 +69,10 @@ static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 #include "config.h"
 
-static Atom atom_net_supported;
+static Atom atom_wm_delete;
 static Atom atom_wm_strut_partial;
 static Atom atom_wm_window_type;
+static Atom atom_net_supported;
 static Atom atom_net_wm_state;
 static Atom atom_net_wm_state_fullscreen;
 static Atom atom_net_wm_window_type_dock;
@@ -123,6 +124,8 @@ add_client(Window w)
 			EnterWindowMask | LeaveWindowMask |
 			FocusChangeMask | PropertyChangeMask |
 			StructureNotifyMask);
+	Atom protos[] = { atom_wm_delete };
+	XSetWMProtocols(dpy, w, protos, 1);
 
 	XWindowAttributes wa;
 	XGetWindowAttributes(dpy, w, &wa);
@@ -149,11 +152,28 @@ clean_mask(uint mask)
 static void
 close_focused(void)
 {
-	if (!workspaces[current_ws])
-		return;
+	if (!focused) return;
 
-	Window w = focused->win;
-	XKillClient(dpy, w);
+	Atom *protos;
+	int n;
+	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
+		for (int i = 0; i < n ; ++i)
+			if (protos[i] == atom_wm_delete) {
+				XEvent ev = { .xclient = {
+					.type = ClientMessage,
+					.window = focused->win,
+					.message_type = XInternAtom(dpy,"WM_PROTOCOLS",False),
+					.format = 32
+				}};
+				ev.xclient.data.l[0] = atom_wm_delete;
+				ev.xclient.data.l[1] = CurrentTime;
+				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
+				XFree(protos);
+				return;
+			}
+		XFree(protos);
+	}
+	XKillClient(dpy, focused->win);
 }
 
 static void
@@ -743,6 +763,9 @@ setup_atoms(void)
 	/* fullscreen atoms */
 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
 	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+
+	/* delete atoms */
+	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 }
 
 static void
