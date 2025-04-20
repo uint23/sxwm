@@ -22,9 +22,10 @@
 #include <unistd.h>
 
 #include <X11/Xatom.h>
+#include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
-#include <X11/XKBlib.h>
+#include <X11/Xutil.h>
 
 #include "defs.h"
 
@@ -39,6 +40,7 @@ static void grab_keys(void);
 static void hdl_button(XEvent *xev);
 static void hdl_button_release(XEvent *xev);
 static void hdl_client_msg(XEvent *xev);
+static void hdl_config_req(XEvent *xev);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_enter(XEvent *xev);
@@ -311,6 +313,29 @@ hdl_client_msg(XEvent *xev)
 }
 
 static void
+hdl_config_req(XEvent *xev)
+{
+	XConfigureRequestEvent *e = &xev->xconfigurerequest;
+	Client *c = NULL;
+
+	for (uint ws = 0; ws < NUM_WORKSPACES && !c; ++ws)
+		for (c = workspaces[ws]; c; c = c->next)
+			if (c->win == e->window) break;
+
+	if (!c || c->floating || c->fullscreen) {
+		XWindowChanges wc = {
+			.x = e->x, .y = e->y,
+			.width			= e->width,
+			.height			= e->height,
+			.border_width	= e->border_width,
+			.sibling		= e->above,
+			.stack_mode		= e->detail
+		};
+		XConfigureWindow(dpy, e->window, e->value_mask, &wc);
+	}
+}
+
+static void
 hdl_dummy(XEvent *xev)
 {
 	(void) xev;
@@ -391,6 +416,13 @@ static void
 hdl_map_req(XEvent *xev)
 {
 	XConfigureRequestEvent *cr = &xev->xconfigurerequest;
+	XWindowAttributes wa;
+	XGetWindowAttributes(dpy, cr->window, &wa);
+
+	if (wa.override_redirect) {
+		XMapWindow(dpy, cr->window);
+		return;
+	}
 
 	Atom type;
 	int format;
@@ -440,12 +472,37 @@ hdl_map_req(XEvent *xev)
 	if (open_windows == MAXCLIENTS)
 		return;
 	add_client(cr->window);
+	Client *c = workspaces[current_ws];
+	Window trans;
+
+	if (XGetTransientForHint(dpy, c->win, &trans))
+		c->floating = True;
+
+	XSizeHints sh;
+	long supplied;
+	if (XGetWMNormalHints(dpy, c->win, &sh, &supplied) &&
+			(sh.flags & PMinSize) && (sh.flags & PMaxSize) &&
+			sh.min_width  == sh.max_width &&
+			sh.min_height == sh.max_height) {
+		c->floating = True;
+	}
 
 	{
 		Window transient;
 		if (XGetTransientForHint(dpy, cr->window, &transient)) {
 			Client *c = workspaces[current_ws];
 			c->floating = True;
+			XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
+			XSetWindowBorder (dpy, c->win,
+					(c == focused ? border_foc_col : border_ufoc_col));
+
+			if (c->w < 64 || c->h < 64) {
+				int w = (c->w < 64 ? 640 : c->w);
+				int h = (c->h < 64 ? 480 : c->h);
+				int x = (scr_width  - w) / 2;
+				int y = (scr_height - h) / 2;
+				XMoveResizeWindow(dpy, c->win, x, y, w, h);
+			}
 		}
 	}
 
@@ -702,6 +759,7 @@ setup(void)
 	evtable[ButtonPress]	= hdl_button;
 	evtable[ButtonRelease]	= hdl_button_release;
 	evtable[ClientMessage]	= hdl_client_msg;
+	evtable[ConfigureRequest] = hdl_config_req;
 	evtable[DestroyNotify]	= hdl_destroy_ntf;
 	evtable[EnterNotify] 	= hdl_enter;
 	evtable[KeyPress]		= hdl_keypress;

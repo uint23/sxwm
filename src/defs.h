@@ -9,7 +9,7 @@
 #define ulong unsigned long
 #define u_char unsigned char
 
-#define SXWM_VERSION	"sxwm ver. 0.1.5"
+#define SXWM_VERSION	"sxwm ver. 0.1.6"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
