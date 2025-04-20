@@ -89,6 +89,7 @@ typedef struct Client{
 	Window win;
 	uint x, y, h, w;
 	uint orig_x, orig_y, orig_w, orig_h;
+	Bool fixed;
 	Bool floating;
 	Bool fullscreen;
 	struct Client *next;

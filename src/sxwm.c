@@ -135,6 +135,7 @@ add_client(Window w)
 	c->y = wa.y;
 	c->w = wa.width;
 	c->h = wa.height;
+	c->fixed = False;
 	c->floating = False;
 	c->fullscreen = False;
 
@@ -265,6 +266,9 @@ hdl_button(XEvent *xev)
 		if (!c->floating)
 			return;
 
+		if (c->fixed && e->button == Button3)
+			return;
+
 		Cursor cur = (e->button == Button1) ? c_move : c_resize;
 		XGrabPointer(dpy, root, True,
 				ButtonReleaseMask|PointerMotionMask,
@@ -322,17 +326,20 @@ hdl_config_req(XEvent *xev)
 		for (c = workspaces[ws]; c; c = c->next)
 			if (c->win == e->window) break;
 
+
 	if (!c || c->floating || c->fullscreen) {
-		XWindowChanges wc = {
-			.x = e->x, .y = e->y,
-			.width			= e->width,
-			.height			= e->height,
-			.border_width	= e->border_width,
-			.sibling		= e->above,
-			.stack_mode		= e->detail
-		};
+		/* allow the client to configure itself */
+		XWindowChanges wc = { .x = e->x, .y = e->y,
+			.width  = e->width,  .height = e->height,
+			.border_width = e->border_width,
+			.sibling = e->above, .stack_mode = e->detail };
 		XConfigureWindow(dpy, e->window, e->value_mask, &wc);
+		return;
 	}
+
+	/* managed and tiling – ignore size hints unless it’s fixed */
+	if (c->fixed)
+		return;
 }
 
 static void
@@ -478,13 +485,17 @@ hdl_map_req(XEvent *xev)
 	if (XGetTransientForHint(dpy, c->win, &trans))
 		c->floating = True;
 
-	XSizeHints sh;
-	long supplied;
+	XSizeHints sh; long supplied;
 	if (XGetWMNormalHints(dpy, c->win, &sh, &supplied) &&
 			(sh.flags & PMinSize) && (sh.flags & PMaxSize) &&
-			sh.min_width  == sh.max_width &&
+			sh.min_width == sh.max_width &&
 			sh.min_height == sh.max_height) {
 		c->floating = True;
+		c->fixed = True;
+
+		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
+		XSetWindowBorder      (dpy, c->win,
+				(c == focused ? border_foc_col : border_ufoc_col));
 	}
 
 	{
