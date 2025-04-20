@@ -1,7 +1,7 @@
 # sxwm - *The (truly) Simple Xorg Window Manager*
 Performance greater than DWM, and easier to config than i3wm
 
-<a href="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg"><img src="https://user-images.githubusercontent.com/username/sxwm-screen1.jpg" width="45%" align="right"></a>
+<a href="1"><img src="screenshots/1.png" width="35%" align="right"></a>
 
 Here we have a **minimal**, **tiling**, and **configurable** window manager.
 
@@ -15,7 +15,7 @@ Here we have a **minimal**, **tiling**, and **configurable** window manager.
 - **Minimal Codebase**: ~1000 LOC
 <br>
 
-<a href="TODO"><img src="TODO" width="45%" align="right"></a>
+<a href="2"><img src="screenshots/2.png" width="35%" align="right"></a>
 
 - **Master-Stack**: Use the DWM native and super productive layout.
 - **Keyboard-driven**: Full coverage via `MOD` + keys.
