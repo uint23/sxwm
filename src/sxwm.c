@@ -58,6 +58,7 @@ static void quit(void);
 static void resize_master_add(void);
 static void resize_master_sub(void);
 static void run(void);
+static void scan_existing_windows(void);
 static void setup(void);
 static void setup_atoms(void);
 static void spawn(const char **cmd);
@@ -440,7 +441,7 @@ hdl_map_req(XEvent *xev)
 				atom_wm_window_type, 0, 1, False,
 				XA_ATOM, &type, &format,
 				&nitems, &bytes_after,
-				(unsigned char**)&types) == Success && types)
+				(u_char**)&types) == Success && types)
 	{
 		if (nitems > 0 && types[0] == atom_net_wm_window_type_dock) {
 			XFree(types);
@@ -451,7 +452,7 @@ hdl_map_req(XEvent *xev)
 						atom_wm_strut_partial, 0, 12, False,
 						XA_CARDINAL, &type, &format,
 						&nitems, &bytes_after,
-						(unsigned char**)&strut) == Success && strut)
+						(u_char**)&strut) == Success && strut)
 			{
 				if (nitems >= 4) {
 					reserve_left	= strut[0];
@@ -470,7 +471,7 @@ hdl_map_req(XEvent *xev)
 			};
 			XChangeProperty(dpy, root,
 					atom_net_workarea, XA_CARDINAL, 32,
-					PropModeReplace, (unsigned char*)workarea, 4);
+					PropModeReplace, (u_char*)workarea, 4);
 			return;
 		}
 		XFree(types);
@@ -738,6 +739,29 @@ run(void)
 }
 
 static void
+scan_existing_windows(void)
+{
+	Window root_return, parent_return;
+	Window *children;
+	uint nchildren;
+
+	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &nchildren)) {
+		for (uint i = 0; i < nchildren; i++) {
+			XWindowAttributes wa;
+			if (!XGetWindowAttributes(dpy, children[i], &wa) || wa.override_redirect || wa.map_state != IsViewable)
+				continue;
+
+			XEvent fake_event = {0};
+			fake_event.type = MapRequest;
+			fake_event.xmaprequest.window = children[i];
+			hdl_map_req(&fake_event);
+		}
+		if (children)
+			XFree(children);
+	}
+}
+
+static void
 setup(void)
 {
 	if ((dpy = XOpenDisplay(NULL)) == 0)
@@ -779,6 +803,8 @@ setup(void)
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
+
+	scan_existing_windows();
 }
 
 static void
@@ -801,7 +827,7 @@ setup_atoms(void)
 	XChangeProperty(dpy, root,
 			atom_net_supported,
 			XA_ATOM, 32, PropModeReplace,
-			(unsigned char*)support_list,
+			(u_char*)support_list,
 			sizeof(support_list)/sizeof(Atom));
 
 	/* workspace atoms */
@@ -810,7 +836,7 @@ setup_atoms(void)
 
 	long  num = NUM_WORKSPACES;
 	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32,
-			PropModeReplace, (unsigned char*)&num, 1);
+			PropModeReplace, (u_char*)&num, 1);
 
 	const char names[] = WORKSPACE_NAMES;
 	uint names_len = sizeof(names);
@@ -820,7 +846,7 @@ setup_atoms(void)
 			XInternAtom(dpy, "UTF8_STRING", False),
 			8,
 			PropModeReplace,
-			(unsigned char*)names,
+			(u_char*)names,
 			names_len);
 
 	ulong initial = current_ws;
@@ -828,7 +854,7 @@ setup_atoms(void)
 			XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False),
 			XA_CARDINAL, 32,
 			PropModeReplace,
-			(unsigned char*)&initial, 1);
+			(u_char*)&initial, 1);
 	/* fullscreen atoms */
 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
 	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
@@ -1071,7 +1097,7 @@ update_net_client_list(void)
 	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	XChangeProperty(dpy, root, prop,
 			XA_WINDOW, 32, PropModeReplace,
-			(unsigned char*)wins, n);
+			(u_char*)wins, n);
 }
 
 static void
