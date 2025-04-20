@@ -29,6 +29,7 @@
 #include "defs.h"
 
 static void add_client(Window w);
+static void change_workspace(uint ws);
 static uint clean_mask(uint mask);
 static void close_focused(void);
 static void dec_gaps(void);
@@ -46,6 +47,7 @@ static void hdl_motion(XEvent *xev);
 static void inc_gaps(void);
 static void move_master_next(void);
 static void move_master_prev(void);
+static void move_to_workspace(uint ws);
 static void other_wm(void);
 static int other_wm_err(Display *dpy, XErrorEvent *ee);
 static ulong parse_col(const char *hex);
@@ -71,7 +73,6 @@ static Atom atom_net_workarea;
 static Cursor c_normal, c_move, c_resize;
 static Client *workspaces[NUM_WORKSPACES] = { NULL };
 static uint current_ws = 0;
-static Client *clients = NULL; // TO BE REMOVED TODO
 static Client *drag_client = NULL;
 static Client *focused = NULL;
 static EventHandler evtable[LASTEvent];
@@ -93,6 +94,7 @@ static uint reserve_left = 0;
 static uint reserve_right = 0;
 static uint reserve_top = 0;
 static uint reserve_bottom = 0;
+INIT_WORKSPACE
 
 static void
 add_client(Window w)
@@ -103,8 +105,8 @@ add_client(Window w)
 		return;
 	}
 	c->win = w;
-	c->next = clients;
-	clients = c;
+	c->next = workspaces[current_ws];
+	workspaces[current_ws] = c;
 	if (!focused)
 		focused = c;
 	++open_windows;
@@ -138,7 +140,7 @@ clean_mask(uint mask)
 static void
 close_focused(void)
 {
-	if (!clients)
+	if (!workspaces[current_ws])
 		return;
 
 	Window w = focused->win;
@@ -161,7 +163,7 @@ focus_next(void)
 	if (!focused)
 		return;
 
-	focused = (focused->next ? focused->next : clients);
+	focused = (focused->next ? focused->next : workspaces[current_ws]);
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
 	update_borders();
@@ -173,7 +175,7 @@ focus_prev(void)
 	if (!focused)
 		return;
 
-	Client *p = clients, *prev = NULL;
+	Client *p = workspaces[current_ws], *prev = NULL;
 	while (p && p != focused) {
 		prev = p;
 		p = p->next;
@@ -217,7 +219,8 @@ hdl_button(XEvent *xev)
 	Window w = e->subwindow;
 	if (!w) return;
 
-	for (Client *c = clients; c; c = c->next) {
+	Client *head = workspaces[current_ws];
+	for (Client *c = head; c; c = c->next) {
 		if (c->win != w)
 			continue;
 
@@ -272,7 +275,7 @@ hdl_destroy_ntf(XEvent *xev)
 {
 	Window w = xev->xdestroywindow.window;
 
-	Client *prev = NULL, *c = clients;
+	Client *prev = NULL, *c = workspaces[current_ws];
 	while (c && c->win != w) {
 		prev = c;
 		c = c->next;
@@ -287,7 +290,7 @@ hdl_destroy_ntf(XEvent *xev)
 				focused = NULL;
 		}
 		if (!prev)
-			clients = c->next;
+			workspaces[current_ws] = c->next;
 		else
 			prev->next = c->next;
 		free(c);
@@ -309,7 +312,8 @@ hdl_enter(XEvent *xev)
 {
 	Window w = xev->xcrossing.window;
 
-	for (Client *c = clients; c; c = c->next) {
+	Client *head = workspaces[current_ws];
+	for (Client *c = head; c; c = c->next) {
 		if (c->win == w) {
 			focused = c;
 			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
@@ -464,12 +468,12 @@ inc_gaps(void)
 static void
 move_master_next(void)
 {
-	if (!clients || !clients->next)
+	if (!workspaces[current_ws] || !workspaces[current_ws]->next)
 		return;
-	Client *first = clients;
-	clients = first->next;
+	Client *first = workspaces[current_ws];
+	workspaces[current_ws] = first->next;
 	first->next = NULL;
-	Client *tail = clients;
+	Client *tail = workspaces[current_ws];
 	while (tail->next)
 		tail = tail->next;
 	tail->next = first;
@@ -480,18 +484,43 @@ move_master_next(void)
 static void
 move_master_prev(void)
 {
-	if (!clients || !clients->next)
+	if (!workspaces[current_ws] || !workspaces[current_ws]->next)
 		return;
-	Client *prev = NULL, *cur = clients;
+	Client *prev = NULL, *cur = workspaces[current_ws];
 	while (cur->next) {
 		prev = cur;
 		cur	 = cur->next;
 	}
 	prev->next	= NULL;
-	cur->next	= clients;
-	clients		= cur;
+	cur->next	= workspaces[current_ws];
+	workspaces[current_ws]		= cur;
 	tile();
 	update_borders();
+}
+
+static void
+move_to_workspace(uint ws)
+{
+	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws)
+		return;
+
+	/* remove from current list */
+	Client **pp = &workspaces[current_ws];
+	while (*pp && *pp != focused) pp = &(*pp)->next;
+	if (*pp) *pp = focused->next;
+
+	/* push to target list */
+	focused->next = workspaces[ws];
+	workspaces[ws] = focused;
+
+	/* unmap it here if switching away */
+	XUnmapWindow(dpy, focused->win);
+
+	/* tile current ws */
+	tile();
+	focused = workspaces[current_ws];
+	if (focused)
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 }
 
 static void
@@ -537,9 +566,11 @@ parse_col(const char *hex)
 static void
 quit(void)
 {
-	for (Client *c = clients; c; c = c->next) {
-		XUnmapWindow(dpy, c->win);
-		XKillClient(dpy, c->win);
+	for (uint ws = 0; ws < NUM_WORKSPACES; ++ws) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			XUnmapWindow(dpy, c->win);
+			XKillClient(dpy, c->win);
+		}
 	}
 	XSync(dpy, False);
 	XCloseDisplay(dpy);
@@ -601,27 +632,51 @@ setup(void)
 static void
 setup_atoms(void)
 {
-	/* intern the atoms we need */
+	/* bar atoms */
 	atom_net_supported				= XInternAtom(dpy, "_NET_SUPPORTED",			False);
 	atom_wm_strut_partial			= XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL",		False);
 	atom_wm_window_type				= XInternAtom(dpy, "_NET_WM_WINDOW_TYPE",		False);
 	atom_net_wm_window_type_dock	= XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK",	False);
 	atom_net_workarea				= XInternAtom(dpy, "_NET_WORKAREA",				False);
 
-	/* advertise which EWMH hints we support on the root window */
 	Atom support_list[] = {
 		XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL",	False),
 		XInternAtom(dpy, "_NET_WM_WINDOW_TYPE",		False),
 		XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK",False),
 		XInternAtom(dpy, "_NET_WORKAREA",			False),
-		/* you can add more here as you implement them: */
-		/* _NET_CLIENT_LIST, _NET_ACTIVE_WINDOW, etc. */
 	};
+
 	XChangeProperty(dpy, root,
 			atom_net_supported,
 			XA_ATOM, 32, PropModeReplace,
 			(unsigned char*)support_list,
 			sizeof(support_list)/sizeof(Atom));
+
+	/* workspace atoms */
+	Atom a_num = XInternAtom(dpy, 	"_NET_NUMBER_OF_DESKTOPS",	False);
+	Atom a_names= XInternAtom(dpy, 	"_NET_DESKTOP_NAMES",		False);
+
+	long  num = NUM_WORKSPACES;
+	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char*)&num, 1);
+
+	const char names[] = WORKSPACE_NAMES;
+	uint names_len = sizeof(names);
+
+	XChangeProperty(dpy, root,
+			a_names,
+			XInternAtom(dpy, "UTF8_STRING", False),
+			8,
+			PropModeReplace,
+			(unsigned char*)names,
+			names_len);
+
+	ulong initial = current_ws;
+	XChangeProperty(dpy, root,
+			XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False),
+			XA_CARDINAL, 32,
+			PropModeReplace,
+			(unsigned char*)&initial, 1);
 }
 
 static void
@@ -646,7 +701,8 @@ static void
 tile(void)
 {
 	uint total_windows = 0;
-	for (Client *c = clients; c; c = c->next)
+	Client *head = workspaces[current_ws];
+	for (Client *c = head; c; c = c->next)
 		if (!c->floating)
 			++total_windows;
 	if (total_windows == 0)
@@ -684,7 +740,7 @@ tile(void)
 		: workarea_height;
 
 	uint index = 0;
-	for (Client *c = clients; c; c = c->next) {
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->floating)
 			continue;
 
@@ -757,14 +813,14 @@ toggle_floating_global(void)
 {
 	global_floating = !global_floating;
 	Bool any_tiled = False;
-	for (Client *c = clients; c; c = c->next) {
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (!c->floating) {
 			any_tiled = True;
 			break;
 		}
 	}
 
-	for (Client *c = clients; c; c = c->next) {
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		c->floating = any_tiled;
 		if (c->floating) {
 			XWindowAttributes wa;
@@ -793,10 +849,41 @@ toggle_floating_global(void)
 static void
 update_borders(void)
 {
-	for (Client *c = clients; c; c = c->next) {
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		XSetWindowBorder(dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
 	}
+}
+
+static void
+change_workspace(uint ws)
+{
+	if (ws >= NUM_WORKSPACES || ws == current_ws)
+		return;
+
+	/* unmap old desktop */
+	for (Client *c = workspaces[current_ws]; c; c=c->next)
+		XUnmapWindow(dpy, c->win);
+
+	current_ws = ws;
+
+	/* map new desktop */
+	for (Client *c = workspaces[current_ws]; c; c=c->next)
+		XMapWindow(dpy, c->win);
+
+	/* retile & refocus */
+	tile();
+	if (workspaces[current_ws]) {
+		focused = workspaces[current_ws];
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+	}
+
+	/* update atom */
+	ulong cd = current_ws;
+	XChangeProperty(dpy, root,
+			XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False),
+			XA_CARDINAL, 32, PropModeReplace,
+			(u_char*)&cd, 1);
 }
 
 static int

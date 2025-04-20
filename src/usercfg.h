@@ -1,6 +1,5 @@
 /*< You can ignore this >*/
 #include <X11/keysym.h>
-#include "defs.h"
 
 /*
  * ——————————————< Appearance >—————————————— *
@@ -39,9 +38,17 @@
  *	   until the window *snaps* to the edge
  *
  *	   NUM_WORKSPACES (int):
- *	   This is how many workspaces you want
- *	   in this window manager. Best to leave
- *	   it default (9).
+ *	   This is how many workspaces you want in
+ *	   this window manager. Best to leave it
+ *	   default (9).
+ *
+ *	   WORKSPACE_NAMES (char[]):
+ *	   This is just the label that will appear
+ *	   on your status bar. Doesn't have to be
+ *	   a number, it can be anything. Ignore
+ *	   the "\0", this is just a NULL that says
+ *	   to start again, otherwise it would be
+ *	   all of them concatenated together.
  *
  * ———————————————————————————————————————————*
 */
@@ -57,6 +64,16 @@
 #define SNAP_DISTANCE		5
 
 #define NUM_WORKSPACES		9
+#define WORKSPACE_NAMES		\
+	"1"					"\0"\
+	"2"					"\0"\
+	"3"					"\0"\
+	"4"					"\0"\
+	"5"					"\0"\
+	"6"					"\0"\
+	"7"					"\0"\
+	"8"					"\0"\
+	"9"					"\0"\
 
 /*
  * ————————————< Keys & Bindins >—————————————*
@@ -92,10 +109,16 @@ CMD(browser, 	"firefox");
  *     perform some actions.
  *
  *     How do you bind keys? In sxwm, there is
- *     two ways to bind keys to perform tasks,
- *     BIND, or CALL. CALL, calls a function
- *     whereas BIND, executes a specified
+ *     three ways to bind keys to perform
+ *     tasks:
+ *
+ *     BIND, CALL or WORKSPACE.
+ *     CALL, calls a function,
+ *     BIND, executes a specified
  *     program.
+ *     WORKSPACE, sets the bind to move
+ *     and item to said workspace or to
+ *     change to that workspace.
  *
  *     USEAGE:
  *     	 BIND(MODIFIERS, KEY, FUNCTION)
@@ -136,9 +159,10 @@ CMD(browser, 	"firefox");
 
 static const Binding binds[] =
 {
-/*——< MODIFIER(S) >—————< KEY >—————< FUNCTION >——*/
+/*————< MODIFIER(S) >< KEY >—————< FUNCTION >——*/
 
 /*———————< Here are your functions calls >————— — */
+
 	CALL(MOD|SHIFT,		e,			quit),
 	CALL(MOD|SHIFT,		q,			close_focused),
 
@@ -155,6 +179,36 @@ static const Binding binds[] =
 	CALL(MOD|SHIFT,		space,		toggle_floating_global),
 
 /*—————< Here are your executable functions >—————*/
+
 	BIND(MOD, 			Return,		terminal),
 	BIND(MOD,			b,			browser),
+
+/*—————< This is for workspaces >—————————————————*/
+
+	CALL(MOD,			1,			change_ws1),
+	CALL(MOD|SHIFT,		1,			moveto_ws1),
+
+	CALL(MOD,			2,			change_ws2),
+	CALL(MOD|SHIFT,		2,			moveto_ws2),
+
+	CALL(MOD,			3,			change_ws3),
+	CALL(MOD|SHIFT,		3,			moveto_ws3),
+
+	CALL(MOD,			4,			change_ws4),
+	CALL(MOD|SHIFT,		4,			moveto_ws4),
+
+	CALL(MOD,			5,			change_ws5),
+	CALL(MOD|SHIFT,		5,			moveto_ws5),
+
+	CALL(MOD,			6,			change_ws6),
+	CALL(MOD|SHIFT,		6,			moveto_ws6),
+
+	CALL(MOD,			7,			change_ws7),
+	CALL(MOD|SHIFT,		7,			moveto_ws7),
+
+	CALL(MOD,			8,			change_ws8),
+	CALL(MOD|SHIFT,		8,			moveto_ws8),
+
+	CALL(MOD,			9,			change_ws9),
+	CALL(MOD|SHIFT,		9,			moveto_ws9),
 };
