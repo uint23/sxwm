@@ -38,6 +38,7 @@ static void focus_prev(void);
 static void grab_keys(void);
 static void hdl_button(XEvent *xev);
 static void hdl_button_release(XEvent *xev);
+static void hdl_client_msg(XEvent *xev);
 static void hdl_dummy(XEvent *xev);
 static void hdl_destroy_ntf(XEvent *xev);
 static void hdl_enter(XEvent *xev);
@@ -61,6 +62,7 @@ static void toggle_floating(void);
 static void toggle_floating_global(void);
 static void toggle_fullscreen(void);
 static void update_borders(void);
+static void update_net_client_list(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
 #include "config"
@@ -68,6 +70,8 @@ static void xev_case(XEvent *xev);
 static Atom atom_net_supported;
 static Atom atom_wm_strut_partial;
 static Atom atom_wm_window_type;
+static Atom atom_net_wm_state;
+static Atom atom_net_wm_state_fullscreen;
 static Atom atom_net_wm_window_type_dock;
 static Atom atom_net_workarea;
 
@@ -192,7 +196,8 @@ focus_prev(void)
 
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
-	update_borders();}
+	update_borders();
+}
 
 static void
 grab_keys(void)
@@ -267,6 +272,22 @@ hdl_button_release(XEvent *xev)
 }
 
 static void
+hdl_client_msg(XEvent *xev)
+{
+	if (xev->xclient.message_type == atom_net_wm_state) {
+		long action = xev->xclient.data.l[0];
+		Atom  target = xev->xclient.data.l[1];
+		if (target == atom_net_wm_state_fullscreen) {
+			if (action == 1 || action == 2)
+				toggle_fullscreen();
+			else if (action == 0 && focused && focused->fullscreen)
+				toggle_fullscreen();
+		}
+		return;
+	}
+}
+
+static void
 hdl_dummy(XEvent *xev)
 {
 	(void) xev;
@@ -296,6 +317,7 @@ hdl_destroy_ntf(XEvent *xev)
 		else
 			prev->next = c->next;
 		free(c);
+		update_net_client_list();
 		--open_windows;
 	}
 
@@ -395,7 +417,17 @@ hdl_map_req(XEvent *xev)
 	if (open_windows == MAXCLIENTS)
 		return;
 	add_client(cr->window);
+
+	{
+		Window transient;
+		if (XGetTransientForHint(dpy, cr->window, &transient)) {
+			Client *c = workspaces[current_ws];
+			c->floating = True;
+		}
+	}
+
 	XMapWindow(dpy, cr->window);
+	update_net_client_list();
 	if (!global_floating)
 		tile();
 	update_borders();
@@ -549,7 +581,8 @@ other_wm_err(Display *dpy, XErrorEvent *ee)
 {
 	errx(0, "can't start because another window manager is already running");
 	return 0;
-	if (dpy && ee) return 0;
+	(void) dpy;
+	(void) ee;
 }
 
 static ulong
@@ -627,6 +660,7 @@ setup(void)
 
 	evtable[ButtonPress]	= hdl_button;
 	evtable[ButtonRelease]	= hdl_button_release;
+	evtable[ClientMessage]	= hdl_client_msg;
 	evtable[DestroyNotify]	= hdl_destroy_ntf;
 	evtable[EnterNotify] 	= hdl_enter;
 	evtable[KeyPress]		= hdl_keypress;
@@ -685,6 +719,9 @@ setup_atoms(void)
 			XA_CARDINAL, 32,
 			PropModeReplace,
 			(unsigned char*)&initial, 1);
+	/* fullscreen atoms */
+	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
+	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
 }
 
 static void
@@ -890,7 +927,7 @@ toggle_fullscreen(void)
 
 		XSetWindowBorderWidth(dpy, focused->win, 0);
 		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
-		XRaiseWindow(dpy, focused->win); // Ensure it's on top
+		XRaiseWindow(dpy, focused->win);
 	} else {
 		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
 		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
@@ -906,6 +943,22 @@ update_borders(void)
 		XSetWindowBorder(dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
 	}
+}
+
+static void
+update_net_client_list(void)
+{
+	Window wins[MAXCLIENTS];
+	int n = 0;
+	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			wins[n++] = c->win; /* has to be n++ or well get an off by one error i think */
+		}
+	}
+	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
+	XChangeProperty(dpy, root, prop,
+			XA_WINDOW, 32, PropModeReplace,
+			(unsigned char*)wins, n);
 }
 
 static void
@@ -942,25 +995,24 @@ change_workspace(uint ws)
 static int
 xerr(Display *dpy, XErrorEvent *ee)
 {
-	/* TODO MAKE IT BETTER */
-	if (ee->error_code == BadWindow
-			|| ee->error_code == BadDrawable
-			|| (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
-			|| (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch))
-		return 0;
+	/* ignore noise and non fatal errors */
+	static const struct {
+		uint req, code;
+	} ignore[] = {
+		{ 0, BadWindow },
+		{ X_GetGeometry, BadDrawable },
+		{ X_SetInputFocus, BadMatch },
+		{ X_ConfigureWindow, BadMatch },
+	};
 
-	char buf[256];
-	XGetErrorText(dpy, ee->error_code, buf, sizeof(buf));
-	fprintf(stderr,
-			"sxwm: X error:\n"
-			"\trequest code: %d\n"
-			"\terror code:	 %d (%s)\n"
-			"\tresource id:	 0x%lx\n",
-			ee->request_code,
-			ee->error_code, buf,
-			ee->resourceid);
+	for (size_t i = 0; i < sizeof(ignore)/sizeof(ignore[0]); ++i)
+		if ((ignore[i].req == 0 || ignore[i].req  == ee->request_code) &&
+				(ignore[i].code == ee->error_code))
+			return 0;
+
 	return 0;
-	if (dpy && ee) return 0;
+	(void) dpy;
+	(void) ee;
 }
 
 static void
