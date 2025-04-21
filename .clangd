@@ -1,5 +1,6 @@
 CompileFlags:
   Add: [
+    "-x", "c",
     "-std=c99",
     "-Wall",
     "-Wextra",
@@ -7,4 +8,4 @@ CompileFlags:
     "-Isrc",
     "-lX11",
     "-lXinerama"
-]
+  ]

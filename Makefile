@@ -1,5 +1,5 @@
 CC		?= gcc
-CFLAGS	?= -std=99 -Wall -Wextra -O3 -Isrc
+CFLAGS	?= -std=c99 -Wall -Wextra -O3 -Isrc
 LDFLAGS	?= -lX11 -lXinerama
 
 PREFIX	?= /usr/local
