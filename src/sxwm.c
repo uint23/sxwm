@@ -65,6 +65,7 @@ void scan_existing_windows(void);
 void setup(void);
 void setup_atoms(void);
 void spawn(const char **cmd);
+void swap_clients(Client *a, Client *b);
 void tile(void);
 void toggle_floating(void);
 void toggle_floating_global(void);
@@ -94,7 +95,9 @@ Atom atom_net_workarea;
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = { NULL };
 uint current_ws = 0;
+DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
+Client *swap_target = NULL;
 Client *focused = NULL;
 EventHandler evtable[LASTEvent];
 Display *dpy;
@@ -106,6 +109,7 @@ Bool global_floating = False;
 ulong last_motion_time = 0;
 ulong border_foc_col;
 ulong border_ufoc_col;
+ulong border_swap_col;
 float master_frac = MASTER_WIDTH;
 uint gaps = GAPS;
 uint scr_width;
@@ -301,8 +305,28 @@ hdl_button(XEvent *xev)
 			continue;
 		}
 
-		if (((e->state & MOD) && e->button == Button1 && !c->floating) ||
-			((e->state & MOD) && e->button == Button3 && !c->floating)) {
+		/* begin swap drag mode */
+		if ((e->state & MOD) && (e->state & ShiftMask) && e->button == Button1 && !c->floating) {
+			drag_client = c;
+			drag_start_x = e->x_root;
+			drag_start_y = e->y_root;
+			drag_orig_x = c->x;
+			drag_orig_y = c->y;
+			drag_orig_w = c->w;
+			drag_orig_h = c->h;
+			drag_mode = DRAG_SWAP;
+			XGrabPointer(dpy, root, True,
+				ButtonReleaseMask | PointerMotionMask,
+				GrabModeAsync, GrabModeAsync,
+				None, c_move, CurrentTime);
+			focused = c;
+			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+			XSetWindowBorder(dpy, c->win, border_swap_col);
+			XRaiseWindow(dpy, c->win);
+			return;
+		}
+
+		if ((e->state & MOD) && (e->button == Button1 || e->button == Button3) && !c->floating) {
 			focused = c;
 			toggle_floating();
 		}
@@ -317,20 +341,21 @@ hdl_button(XEvent *xev)
 
 		Cursor cur = (e->button == Button1) ? c_move : c_resize;
 		XGrabPointer(dpy, root, True,
-				ButtonReleaseMask|PointerMotionMask,
-				GrabModeAsync, GrabModeAsync,
-				None, cur, CurrentTime);
+			ButtonReleaseMask | PointerMotionMask,
+			GrabModeAsync, GrabModeAsync,
+			None, cur, CurrentTime);
 
-		drag_client		= c;
-		drag_start_x	= e->x_root;
-		drag_start_y	= e->y_root;
-		drag_orig_x		= c->x;
-		drag_orig_y		= c->y;
-		drag_orig_w		= c->w;
-		drag_orig_h		= c->h;
-		drag_mode		= (e->button == Button1 ? DRAG_MOVE : DRAG_RESIZE);
-		focused			= c;
-		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
+		drag_client = c;
+		drag_start_x = e->x_root;
+		drag_start_y = e->y_root;
+		drag_orig_x = c->x;
+		drag_orig_y = c->y;
+		drag_orig_w = c->w;
+		drag_orig_h = c->h;
+		drag_mode = (e->button == Button1) ? DRAG_MOVE : DRAG_RESIZE;
+		focused = c;
+
+		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 		update_borders();
 		XRaiseWindow(dpy, c->win);
 		return;
@@ -341,9 +366,22 @@ void
 hdl_button_release(XEvent *xev)
 {
 	(void)xev;
+
+	if (drag_mode == DRAG_SWAP) {
+		if (swap_target) {
+			XSetWindowBorder(dpy, swap_target->win,
+				(swap_target == focused ? border_foc_col : border_ufoc_col));
+			swap_clients(drag_client, swap_target);
+		}
+		tile();
+		update_borders();
+	}
+
 	XUngrabPointer(dpy, CurrentTime);
-	drag_mode	= DRAG_NONE;
+
+	drag_mode = DRAG_NONE;
 	drag_client = NULL;
+	swap_target = NULL;
 }
 
 void
@@ -393,7 +431,7 @@ hdl_config_req(XEvent *xev)
 
 
 	if (!c || c->floating || c->fullscreen) {
-		/* allow the client to configure itself */
+		/* allow client to configure itself */
 		XWindowChanges wc = { .x = e->x, .y = e->y,
 			.width = e->width, .height = e->height,
 			.border_width = e->border_width,
@@ -402,7 +440,6 @@ hdl_config_req(XEvent *xev)
 		return;
 	}
 
-	/* managed and tiling – ignore size hints unless it’s fixed */
 	if (c->fixed) {
 		return;
 	}
@@ -488,6 +525,45 @@ hdl_keypress(XEvent *xev)
 			return;
 		}
 	}
+}
+
+void
+swap_clients(Client *a, Client *b)
+{
+	if (!a || !b || a == b) {
+		return;
+	}
+
+	Client **head = &workspaces[current_ws];
+	Client **pa = head, **pb = head;
+
+	while (*pa && *pa != a) pa = &(*pa)->next;
+	while (*pb && *pb != b) pb = &(*pb)->next;
+
+	if (!*pa || !*pb) {
+		return;
+	}
+
+	/* if next to it swap */
+	if (*pa == b && *pb == a) {
+		Client *tmp = b->next;
+		b->next = a;
+		a->next = tmp;
+		*pa = b;
+		return;
+	}
+
+	/* full swap */
+	Client *ta = *pa;
+	Client *tb = *pb;
+	Client *ta_next = ta->next;
+	Client *tb_next = tb->next;
+
+	*pa = tb;
+	tb->next = ta_next == tb ? ta : ta_next;
+
+	*pb = ta;
+	ta->next = tb_next == ta ? tb : tb_next;
 }
 
 void
@@ -605,18 +681,53 @@ void
 hdl_motion(XEvent *xev)
 {
 	XMotionEvent *e = &xev->xmotion;
+
 	if ((drag_mode == DRAG_NONE || !drag_client) ||
-		(e->time - last_motion_time <= (1000 / MOTION_THROTTLE))) {
+			(e->time - last_motion_time <= (1000 / MOTION_THROTTLE))) {
+		return;
+	}
+	last_motion_time = e->time;
+
+	if (drag_mode == DRAG_SWAP) {
+		Window root_ret, child;
+		int rx, ry, wx, wy;
+		uint mask;
+		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
+
+		static Client *last_swap_target = NULL;
+		Client *new_target = NULL;
+
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			if (c == drag_client || c->floating) {
+				continue;
+			}
+			if (c->win == child) {
+				new_target = c;
+				break;
+			}
+		}
+
+		if (new_target != last_swap_target) {
+			if (last_swap_target) {
+				XSetWindowBorder(dpy, last_swap_target->win, 
+					(last_swap_target == focused ? border_foc_col : border_ufoc_col));
+			}
+			if (new_target) {
+				XSetWindowBorder(dpy, new_target->win, border_swap_col);
+			}
+			last_swap_target = new_target;
+		}
+
+		swap_target = new_target;
 		return;
 	}
 
-	last_motion_time = e->time;
-	int dx = e->x_root - drag_start_x;
-	int dy = e->y_root - drag_start_y;
-	int nx = drag_orig_x + dx;
-	int ny = drag_orig_y + dy;
+	else if (drag_mode == DRAG_MOVE) {
+		int dx = e->x_root - drag_start_x;
+		int dy = e->y_root - drag_start_y;
+		int nx = drag_orig_x + dx;
+		int ny = drag_orig_y + dy;
 
-	if (drag_mode == DRAG_MOVE) {
 		int outer_w = drag_client->w + 2 * BORDER_WIDTH;
 		int outer_h = drag_client->h + 2 * BORDER_WIDTH;
 
@@ -626,7 +737,6 @@ hdl_motion(XEvent *xev)
 			nx = scr_width - outer_w;
 		}
 
-		/* snap y */
 		if (UDIST(ny, 0) <= SNAP_DISTANCE) {
 			ny = 0;
 		} else if (UDIST(ny + outer_h, scr_height) <= SNAP_DISTANCE) {
@@ -644,15 +754,14 @@ hdl_motion(XEvent *xev)
 		drag_client->y = ny;
 	}
 
-
-	else {
-		/* resize clamp is 20px */
+	else if (drag_mode == DRAG_RESIZE) {
+		int dx = e->x_root - drag_start_x;
+		int dy = e->y_root - drag_start_y;
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
 		drag_client->w = nw < 20 ? 20 : nw;
 		drag_client->h = nh < 20 ? 20 : nh;
-		XResizeWindow(dpy, drag_client->win,
-				drag_client->w, drag_client->h);
+		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
 	}
 }
 
@@ -667,11 +776,11 @@ hdl_root_property(XEvent *xev)
 	long *val = NULL;
 	Atom actual;
 	int fmt;
-	unsigned long n, after;
+	ulong n, after;
 	if (XGetWindowProperty(dpy, root, atom_net_current_desktop,
 				0, 1, False, XA_CARDINAL,
 				&actual, &fmt, &n, &after,
-				(unsigned char**)&val) == Success &&
+				(u_char**)&val) == Success &&
 			val) {
 		change_workspace((uint)val[0]);
 		XFree(val);
@@ -900,8 +1009,12 @@ setup(void)
 			SubstructureNotifyMask |
 			KeyPressMask |
 			PropertyChangeMask);
+
 	XGrabButton(dpy, Button1, MOD, root,
 			True, ButtonPressMask | ButtonReleaseMask|PointerMotionMask,
+			GrabModeAsync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button1, MOD | ShiftMask, root, True,
+			ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 			GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button3, MOD, root,
 			True, ButtonPressMask | ButtonReleaseMask|PointerMotionMask,
@@ -926,6 +1039,7 @@ setup(void)
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
+	border_swap_col = parse_col(BORDER_SWAP_COL);
 
 	scan_existing_windows();
 }
@@ -1373,7 +1487,7 @@ change_workspace(uint ws)
 int
 xerr(Display *dpy, XErrorEvent *ee)
 {
-	/* ignore noise and non fatal errors */
+	/* ignore noise & non fatal errors */
 	 const struct {
 		uint req, code;
 	} ignore[] = {

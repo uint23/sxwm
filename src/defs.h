@@ -9,7 +9,7 @@
 #define ulong unsigned long
 #define u_char unsigned char
 
-#define SXWM_VERSION	"sxwm ver. 1.0.0"
+#define SXWM_VERSION	"sxwm ver. 1.1.0"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
@@ -70,7 +70,13 @@ void moveto_ws9(void) { move_to_workspace(8); update_net_client_list(); }\
 #define MAXCLIENTS	99
 #define MAXGAPS		100
 
-enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } drag_mode = DRAG_NONE;
+typedef enum {
+	DRAG_NONE,
+	DRAG_MOVE,
+	DRAG_RESIZE,
+	DRAG_SWAP
+} DragMode;
+
 typedef void (*EventHandler)(XEvent *);
 
 typedef union {

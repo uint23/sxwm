@@ -63,6 +63,7 @@
 #define BORDER_WIDTH		1
 #define BORDER_FOC_COL		"#c0cbff"
 #define BORDER_UFOC_COL		"#555555"
+#define BORDER_SWAP_COL		"#fff4c0"
 
 #define MASTER_WIDTH		0.6
 #define RESIZE_MASTER_AMT	1
