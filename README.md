@@ -119,28 +119,26 @@ Below are the available `make` targets for streamlining common tasks:
 
 ## Installation
 
+### Arch linux - AUR
+
+   ```
+   yay -S sxwm
+   ```
+
+### Build from source
+
 1. **Clone repository**
 
    ```bash
-   git clone https://github.com/uint23/sxwm.git
-   cd sxwm
-   ```
-
-2. **Build**
-
-   ```bash
+   git clone --depth=1 https://github.com/uint23/sxwm.git
+   cd sxwm/
    make
-   ```
-
-3. **Install**
-
-   ```bash
    sudo make clean-install
    ```
 
-4. **Run**
+2. **Run**
 
-   Add to `~/.xinitrc`:
+   Add `sxwm` to `~/.xinitrc`:
    ```sh
    exec sxwm
    ```
