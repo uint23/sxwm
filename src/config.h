@@ -164,7 +164,7 @@ CMD(browser,	"firefox");
 #define MOD	ALT
 
 #include <X11/keysym.h>
-static const Binding binds[] =
+const Binding binds[] =
 {
 /*————< MODIFIER(S) >< KEY >—————< FUNCTION >——*/
 

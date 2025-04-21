@@ -1,0 +1,10 @@
+CompileFlags:
+  Add: [
+    "-std=c99",
+    "-Wall",
+    "-Wextra",
+    "-O3",
+    "-Isrc",
+    "-lX11",
+    "-lXinerama"
+]

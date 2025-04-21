@@ -25,46 +25,46 @@
 #define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
 #define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }
 #define CMD(name, ...) 						\
-	static const char *name[] = { __VA_ARGS__, NULL }
+	const char *name[] = { __VA_ARGS__, NULL }
 
 
 #define INIT_WORKSPACE \
-static void change_ws1(void);\
-static void moveto_ws1(void);\
-static void change_ws2(void);\
-static void moveto_ws2(void);\
-static void change_ws3(void);\
-static void moveto_ws3(void);\
-static void change_ws4(void);\
-static void moveto_ws4(void);\
-static void change_ws5(void);\
-static void moveto_ws5(void);\
-static void change_ws6(void);\
-static void moveto_ws6(void);\
-static void change_ws7(void);\
-static void moveto_ws7(void);\
-static void change_ws8(void);\
-static void moveto_ws8(void);\
-static void change_ws9(void);\
-static void moveto_ws9(void);\
-static void change_ws1(void) { change_workspace(0); update_net_client_list(); }	\
-static void moveto_ws1(void) { move_to_workspace(0); update_net_client_list(); }\
-static void change_ws2(void) { change_workspace(1); update_net_client_list(); }	\
-static void moveto_ws2(void) { move_to_workspace(1); update_net_client_list(); }\
-static void change_ws3(void) { change_workspace(2); update_net_client_list(); }	\
-static void moveto_ws3(void) { move_to_workspace(2); update_net_client_list(); }\
-static void change_ws4(void) { change_workspace(3); update_net_client_list(); }	\
-static void moveto_ws4(void) { move_to_workspace(3); update_net_client_list(); }\
-static void change_ws5(void) { change_workspace(4); update_net_client_list(); }	\
-static void moveto_ws5(void) { move_to_workspace(4); update_net_client_list(); }\
-static void change_ws6(void) { change_workspace(5); update_net_client_list(); }	\
-static void moveto_ws6(void) { move_to_workspace(5); update_net_client_list(); }\
-static void change_ws7(void) { change_workspace(6); update_net_client_list(); }	\
-static void moveto_ws7(void) { move_to_workspace(6); update_net_client_list(); }\
-static void change_ws8(void) { change_workspace(7); update_net_client_list(); }	\
-static void moveto_ws8(void) { move_to_workspace(7); update_net_client_list(); }\
-static void change_ws9(void) { change_workspace(8); update_net_client_list(); }	\
-static void moveto_ws9(void) { move_to_workspace(8); update_net_client_list(); }\
+void change_ws1(void);\
+void moveto_ws1(void);\
+void change_ws2(void);\
+void moveto_ws2(void);\
+void change_ws3(void);\
+void moveto_ws3(void);\
+void change_ws4(void);\
+void moveto_ws4(void);\
+void change_ws5(void);\
+void moveto_ws5(void);\
+void change_ws6(void);\
+void moveto_ws6(void);\
+void change_ws7(void);\
+void moveto_ws7(void);\
+void change_ws8(void);\
+void moveto_ws8(void);\
+void change_ws9(void);\
+void moveto_ws9(void);\
+void change_ws1(void) { change_workspace(0); update_net_client_list(); }	\
+void moveto_ws1(void) { move_to_workspace(0); update_net_client_list(); }\
+void change_ws2(void) { change_workspace(1); update_net_client_list(); }	\
+void moveto_ws2(void) { move_to_workspace(1); update_net_client_list(); }\
+void change_ws3(void) { change_workspace(2); update_net_client_list(); }	\
+void moveto_ws3(void) { move_to_workspace(2); update_net_client_list(); }\
+void change_ws4(void) { change_workspace(3); update_net_client_list(); }	\
+void moveto_ws4(void) { move_to_workspace(3); update_net_client_list(); }\
+void change_ws5(void) { change_workspace(4); update_net_client_list(); }	\
+void moveto_ws5(void) { move_to_workspace(4); update_net_client_list(); }\
+void change_ws6(void) { change_workspace(5); update_net_client_list(); }	\
+void moveto_ws6(void) { move_to_workspace(5); update_net_client_list(); }\
+void change_ws7(void) { change_workspace(6); update_net_client_list(); }	\
+void moveto_ws7(void) { move_to_workspace(6); update_net_client_list(); }\
+void change_ws8(void) { change_workspace(7); update_net_client_list(); }	\
+void moveto_ws8(void) { move_to_workspace(7); update_net_client_list(); }\
+void change_ws9(void) { change_workspace(8); update_net_client_list(); }	\
+void moveto_ws9(void) { move_to_workspace(8); update_net_client_list(); }\
 
 #define UDIST(a,b) abs((int)(a) - (int)(b))
 #define MAXCLIENTS	99
