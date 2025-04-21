@@ -5,6 +5,7 @@ Performance greater than DWM, and easier to config than i3wm
 
 Here we have a **minimal**, **tiling**, and **configurable** window manager.
 
+- **[NEW] Multi-Monitor Support with Xinerama. Enable / Disable from config.**
 - **Tiling & Floating**: Seamlessly switch between layouts.
 - **Workspaces**: Workspaces work with your bar.
 - **Bars work too**: BAR BAR BAR?! Why not try [sxbar](https://github.com/uint23/sxbar)
