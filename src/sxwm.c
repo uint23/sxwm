@@ -49,6 +49,7 @@ static void hdl_enter(XEvent *xev);
 static void hdl_keypress(XEvent *xev);
 static void hdl_map_req(XEvent *xev);
 static void hdl_motion(XEvent *xev);
+static void hdl_root_property(XEvent *xev);
 static void inc_gaps(void);
 static void move_master_next(void);
 static void move_master_prev(void);
@@ -73,7 +74,9 @@ static void update_monitors(void);
 static void update_net_client_list(void);
 static int xerr(Display *dpy, XErrorEvent *ee);
 static void xev_case(XEvent *xev);
+INIT_WORKSPACE
 #include "config.h"
+
 #ifdef XINERAMA_SUPPORT
 #include <X11/extensions/Xinerama.h>
 #endif
@@ -83,6 +86,7 @@ static Atom atom_wm_strut_partial;
 static Atom atom_wm_window_type;
 static Atom atom_net_supported;
 static Atom atom_net_wm_state;
+static Atom atom_net_current_desktop;
 static Atom atom_net_wm_state_fullscreen;
 static Atom atom_net_wm_window_type_dock;
 static Atom atom_net_workarea;
@@ -114,7 +118,6 @@ static uint reserve_left = 0;
 static uint reserve_right = 0;
 static uint reserve_top = 0;
 static uint reserve_bottom = 0;
-INIT_WORKSPACE
 
 static void
 add_client(Window w)
@@ -333,6 +336,12 @@ hdl_button_release(XEvent *xev)
 static void
 hdl_client_msg(XEvent *xev)
 {
+	/* clickable bar workspace switching */
+	if (xev->xclient.message_type == atom_net_current_desktop) {
+		uint ws = (uint)xev->xclient.data.l[0];
+		change_workspace(ws);
+		return;
+	}
 	if (xev->xclient.message_type == atom_net_wm_state) {
 		long action = xev->xclient.data.l[0];
 		Atom target = xev->xclient.data.l[1];
@@ -621,6 +630,26 @@ hdl_motion(XEvent *xev)
 }
 
 static void
+hdl_root_property(XEvent *xev)
+{
+	XPropertyEvent *e = &xev->xproperty;
+	if (e->atom != atom_net_current_desktop) return;
+
+	long *val = NULL;
+	Atom actual;
+	int fmt;
+	unsigned long n, after;
+	if (XGetWindowProperty(dpy, root, atom_net_current_desktop,
+				0, 1, False, XA_CARDINAL,
+				&actual, &fmt, &n, &after,
+				(unsigned char**)&val) == Success &&
+			val) {
+		change_workspace((uint)val[0]);
+		XFree(val);
+	}
+}
+
+static void
 inc_gaps(void)
 {
 	if (gaps < MAXGAPS) {
@@ -820,8 +849,12 @@ setup(void)
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
 	update_monitors();
 
-	XSelectInput(dpy, root, StructureNotifyMask | SubstructureRedirectMask |
-			SubstructureNotifyMask | KeyPressMask);
+	XSelectInput(dpy, root,
+			StructureNotifyMask |
+			SubstructureRedirectMask |
+			SubstructureNotifyMask |
+			KeyPressMask |
+			PropertyChangeMask);
 	XGrabButton(dpy, Button1, MOD, root,
 			True, ButtonPressMask | ButtonReleaseMask|PointerMotionMask,
 			GrabModeAsync, GrabModeAsync, None, None);
@@ -843,6 +876,7 @@ setup(void)
 	evtable[KeyPress]		= hdl_keypress;
 	evtable[MapRequest]		= hdl_map_req;
 	evtable[MotionNotify]	= hdl_motion;
+	evtable[PropertyNotify] = hdl_root_property;
 
 	border_foc_col = parse_col(BORDER_FOC_COL);
 	border_ufoc_col = parse_col(BORDER_UFOC_COL);
@@ -851,7 +885,7 @@ setup(void)
 }
 
 static void
-setup_atoms(void)
+setup_atoms (void)
 {
 	/* bar atoms */
 	atom_net_supported				= XInternAtom(dpy, "_NET_SUPPORTED",			False);
@@ -904,6 +938,9 @@ setup_atoms(void)
 
 	/* delete atoms */
 	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+
+	/* current desktop atoms */
+	atom_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
 }
 
 static void

@@ -9,7 +9,7 @@
 #define ulong unsigned long
 #define u_char unsigned char
 
-#define SXWM_VERSION	"sxwm ver. 0.1.6"
+#define SXWM_VERSION	"sxwm ver. 1.0.0"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
@@ -27,26 +27,26 @@
 #define CMD(name, ...) 						\
 	static const char *name[] = { __VA_ARGS__, NULL }
 
-static void change_ws1(void);
-static void moveto_ws1(void);
-static void change_ws2(void);
-static void moveto_ws2(void);
-static void change_ws3(void);
-static void moveto_ws3(void);
-static void change_ws4(void);
-static void moveto_ws4(void);
-static void change_ws5(void);
-static void moveto_ws5(void);
-static void change_ws6(void);
-static void moveto_ws6(void);
-static void change_ws7(void);
-static void moveto_ws7(void);
-static void change_ws8(void);
-static void moveto_ws8(void);
-static void change_ws9(void);
-static void moveto_ws9(void);
 
 #define INIT_WORKSPACE \
+static void change_ws1(void);\
+static void moveto_ws1(void);\
+static void change_ws2(void);\
+static void moveto_ws2(void);\
+static void change_ws3(void);\
+static void moveto_ws3(void);\
+static void change_ws4(void);\
+static void moveto_ws4(void);\
+static void change_ws5(void);\
+static void moveto_ws5(void);\
+static void change_ws6(void);\
+static void moveto_ws6(void);\
+static void change_ws7(void);\
+static void moveto_ws7(void);\
+static void change_ws8(void);\
+static void moveto_ws8(void);\
+static void change_ws9(void);\
+static void moveto_ws9(void);\
 static void change_ws1(void) { change_workspace(0); update_net_client_list(); }	\
 static void moveto_ws1(void) { move_to_workspace(0); update_net_client_list(); }\
 static void change_ws2(void) { change_workspace(1); update_net_client_list(); }	\
