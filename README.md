@@ -108,7 +108,7 @@ Below are the available `make` targets for streamlining common tasks:
 | `make clean`     | Remove object files (`*.o`) and build artifacts.                    |
 | `make install`   | Install `sxwm` to `$(PREFIX)/bin` (default `/usr/local/bin`).       |
 | `make uninstall` | Remove the installed binary from `$(PREFIX)/bin`.                   |
-| `make clean-install` | Runs `make clean` then `make install`.                          |
+| `make clean install` | Runs `make clean` then `make install`.                          |
 
 > You can override the install directory by specifying `PREFIX` or `DESTDIR`, for example:
 > ```sh
@@ -121,7 +121,7 @@ Below are the available `make` targets for streamlining common tasks:
 
 ### Arch linux - AUR
 
-   ```
+   ```bash
    yay -S sxwm
    ```
 
@@ -133,13 +133,13 @@ Below are the available `make` targets for streamlining common tasks:
    git clone --depth=1 https://github.com/uint23/sxwm.git
    cd sxwm/
    make
-   sudo make clean-install
+   sudo make clean install
    ```
 
 2. **Run**
 
    Add `sxwm` to `~/.xinitrc`:
-   ```sh
+   ```bash
    exec sxwm
    ```
 
