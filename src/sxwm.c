@@ -167,6 +167,7 @@ add_client(Window w)
 	c->fullscreen = False;
 
 	if (global_floating) {
+		c->floating = True;
 		XSetWindowBorder(dpy, c->win, border_foc_col);
 		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
 	}
@@ -587,9 +588,7 @@ hdl_map_req(XEvent *xev)
 				atom_wm_window_type, 0, 1, False,
 				XA_ATOM, &type, &format,
 				&nitems, &bytes_after,
-				(u_char**)&types) == Success && types)
-
-	{
+				(u_char**)&types) == Success && types) {
 		if (nitems > 0 && types[0] == atom_net_wm_window_type_dock) {
 			XFree(types);
 
@@ -646,6 +645,20 @@ hdl_map_req(XEvent *xev)
 		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
 		XSetWindowBorder (dpy, c->win,
 				(c == focused ? border_foc_col : border_ufoc_col));
+	}
+
+	if (c->floating && !c->fullscreen) {
+		int w = (c->w < 64 ? 640 : c->w);
+		int h = (c->h < 64 ? 480 : c->h);
+		int x = (scr_width - w) / 2;
+		int y = (scr_height - h) / 2;
+
+		c->x = x;
+		c->y = y;
+		c->w = w;
+		c->h = h;
+
+		XMoveResizeWindow(dpy, c->win, x, y, w, h);
 	}
 
 	{
