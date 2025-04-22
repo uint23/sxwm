@@ -93,7 +93,7 @@ static const Binding binds[] =
 
 ## Dependencies
 
-- `libX11` (Xorg client library)
+- `libX11` (Xorg client library) 'Xinerama' (if you want multi-monitor support)
 - GCC / Clang & Make
 
 ---
