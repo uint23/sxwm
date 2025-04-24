@@ -1,26 +1,29 @@
 # sxwm - *The (truly) Simple Xorg Window Manager*
 Performance greater than DWM, and easier to config than i3wm
+<details>
+<summary><h2>Patch Notes</h2></summary>
 
-<a href="1"><img src="screenshots/1.png" width="35%" align="right"></a>
+### v1.1.1
+- **NEW**: *Xinerama Support*, *Can swap windows holding Mod + Shift + Dragging*.
+- **FIXED**: New windows in `global_floating` mode will spawn in the middle.
+</details>
+---
+
+<a href="1"><img src="screenshots/1.png" width="45%" align="right"></a>
 
 Here we have a **minimal**, **tiling**, and **configurable** window manager.
-
-- **[NEW] Multi-Monitor Support with Xinerama. Enable / Disable from config.**
 - **Tiling & Floating**: Seamlessly switch between layouts.
 - **Workspaces**: Workspaces work with your bar.
 - **Bars work too**: BAR BAR BAR?! Why not try [sxbar](https://github.com/uint23/sxbar)
 - **Lightweight**: Single C file plus a small header and config.
 - **Easy Config**: All settings in `config`.
-- **SUPER Fast**: Sometimes **0.2M** sometimes **0.3M**, idk ~~but still destroys DWM~~ (this is a lie because dwm also has font rendering but still :] )
-- **BEST WM**: Basically DWM on roids (and without the elitism).
-- **Minimal Codebase**: ~1000 LOC
 <br>
 
-<a href="2"><img src="screenshots/2.png" width="35%" align="right"></a>
+<a href="2"><img src="screenshots/2.png" width="45%" align="right"></a>
 
 - **Master-Stack**: Use the DWM native and super productive layout.
 - **Keyboard-driven**: Full coverage via `MOD` + keys.
-- **Mouse Support**: Focus under cursor, move & resize with modifiers.
+- **Mouse Support**: Focus under cursor, move, swap & resize with mouse.
 - **Zero Dependencies**: Only requires `libX11`.
 - **Compiles on a Toaster**: As long as it has a decently modern compiler.
 
@@ -32,7 +35,7 @@ Here we have a **minimal**, **tiling**, and **configurable** window manager.
 
 All options reside in `config` (which is just a header-file) with clear comments.
 Keybindings are also easy to understand and quick to implement.
-No more bindsym or... *\*shudders\** C code...
+No more bindsym or C code
 ```c
 CMD(terminal,  "st");
 CMD(browser,   "firefox");
@@ -43,20 +46,20 @@ static const Binding binds[] =
 
 /*———————< Here are your functions calls >————— — */
 
-	CALL(MOD|SHIFT,		e,			quit),
-	CALL(MOD|SHIFT,		q,			close_focused),
+	CALL(MOD|SHIFT,     e,          quit),
+	CALL(MOD|SHIFT,     q,          close_focused),
 
-	CALL(MOD, 			j, 			focus_next),
-	CALL(MOD, 			k, 			focus_prev),
+	CALL(MOD,           j,          focus_next),
+	CALL(MOD, 			k,          focus_prev),
 
-	CALL(MOD|SHIFT, 	j, 			move_master_next),
-	CALL(MOD|SHIFT, 	k, 			move_master_prev),
+	CALL(MOD|SHIFT,     j,          move_master_next),
+	CALL(MOD|SHIFT,     k,          move_master_prev),
 
-	CALL(MOD,			equal,		inc_gaps),
-	CALL(MOD,			minus,		dec_gaps),
+	CALL(MOD,           equal,      inc_gaps),
+	CALL(MOD,           minus,      dec_gaps),
 
-	CALL(MOD,			space,		toggle_floating),
-	CALL(MOD|SHIFT,		space,		toggle_floating_global),
+	CALL(MOD,           space,      toggle_floating),
+	CALL(MOD|SHIFT,     space,      toggle_floating_global),
    .....
 ```
 
@@ -93,7 +96,7 @@ static const Binding binds[] =
 
 ## Dependencies
 
-- `libX11` (Xorg client library) 'Xinerama' (if you want multi-monitor support)
+- `libX11` (Xorg client library) `Xinerama` (if you want multi-monitor support)
 - GCC / Clang & Make
 
 ---
