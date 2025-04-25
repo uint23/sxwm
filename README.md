@@ -1,11 +1,8 @@
 <div align="center">
-    <img src="images/sxwm_logo.png" width="30%">
+   <img src="images/sxwm_logo.png" width="50%">
+   <h3>High Performance</h3>
+   <h3>Easy Config</h3>
 </div>
-
-<p align="center">
-<h3>High Performance</h3>
-<h3>Easy Config</h3>
-</p>
 
 <details>
 <summary><h2>Patch Notes</h2></summary>
