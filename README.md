@@ -1,7 +1,7 @@
 <div align="center">
-   <img src="images/sxwm_logo.png" width="50%">
-   <h3>High Performance</h3>
-   <h3>Easy Config</h3>
+   <img src="images/sxwm_logo.png" width="20%">
+   <h4>High Performance</h4>
+   <h4>Easy Config</h4>
 </div>
 
 <details>
