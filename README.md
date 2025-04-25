@@ -1,9 +1,9 @@
-<div style="text-align: center;">
-    <img src="images/sxwm_logo.png" style="image-rendering: pixelated; width: 30%;" alt="sxwm logo">
+<div align="center">
+    <img src="images/sxwm_logo.png">
 </div>
 
-<p style="text-align: center;">
-Performance greater than DWM, and easier to config than i3wm
+<p align="center">
+<h3>Performance greater than DWM, and easier to config than i3wm</h3>
 </p>
 
 <details>
