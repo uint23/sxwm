@@ -1,9 +1,10 @@
 <div align="center">
-    <img src="images/sxwm_logo.png">
+    <img src="images/sxwm_logo.png" width="30%">
 </div>
 
 <p align="center">
-<h3>Performance greater than DWM, and easier to config than i3wm</h3>
+<h3>High Performance</h3>
+<h3>Easy Config</h3>
 </p>
 
 <details>
