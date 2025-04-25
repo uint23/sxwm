@@ -1,15 +1,19 @@
-# sxwm - *The (truly) Simple Xorg Window Manager*
+<div style="text-align: center;">
+    <img src="images/sxwm_logo.png" style="image-rendering: pixelated; width: 30%;" alt="sxwm logo">
+</div>
+
+<p style="text-align: center;">
 Performance greater than DWM, and easier to config than i3wm
+</p>
+
 <details>
 <summary><h2>Patch Notes</h2></summary>
-
 ### v1.1.1
 - **NEW**: *Xinerama Support*, *Can swap windows holding Mod + Shift + Dragging*.
 - **FIXED**: New windows in `global_floating` mode will spawn in the middle.
 </details>
----
 
-<a href="1"><img src="screenshots/1.png" width="45%" align="right"></a>
+<a href="1"><img src="images/1.png" width="45%" align="right"></a>
 
 Here we have a **minimal**, **tiling**, and **configurable** window manager.
 - **Tiling & Floating**: Seamlessly switch between layouts.
@@ -19,7 +23,7 @@ Here we have a **minimal**, **tiling**, and **configurable** window manager.
 - **Easy Config**: All settings in `config`.
 <br>
 
-<a href="2"><img src="screenshots/2.png" width="45%" align="right"></a>
+<a href="2"><img src="images/2.png" width="45%" align="right"></a>
 
 - **Master-Stack**: Use the DWM native and super productive layout.
 - **Keyboard-driven**: Full coverage via `MOD` + keys.
