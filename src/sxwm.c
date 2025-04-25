@@ -51,6 +51,7 @@ void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
 void hdl_root_property(XEvent *xev);
 void inc_gaps(void);
+void init_defaults(void);
 void move_master_next(void);
 void move_master_prev(void);
 void move_to_workspace(uint ws);
@@ -94,6 +95,7 @@ Atom atom_net_workarea;
 
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = { NULL };
+Config default_config;
 uint current_ws = 0;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
@@ -189,6 +191,8 @@ close_focused(void)
 		return;
 	}
 
+
+	XUnmapWindow(dpy, focused->win);
 	Atom *protos;
 	int n;
 	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
@@ -808,6 +812,19 @@ inc_gaps(void)
 		tile();
 		update_borders();
 	}
+}
+
+void
+init_defaults(void)
+{
+	default_config.gaps = 10;
+	default_config.border_width = 1;
+	default_config.border_foc_col = parse_col("#c0cbff");
+	default_config.border_ufoc_col = parse_col("#555555");
+	default_config.border_swap_col = parse_col("#fff4c0");
+	default_config.master_width = 50;
+	default_config.resize_master_amt = 5;
+	default_config.snap_distance = 5;
 }
 
 void
