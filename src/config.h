@@ -21,10 +21,9 @@
  *	   The colour of your border when the
  *	   window is unfocused
  *
- *	   MASTER_WIDTH (float):
+ *	   MASTER_WIDTH (int):
  *	   % of the screen the master window
- *	   should take as a decimal value 0-1
- *	   eg. 0.5 is 50%
+ *	   should take
  *	   
  *	   RESIZE_MASTER_AMT (%):
  *	   % of the master width you want to
@@ -65,7 +64,7 @@
 #define BORDER_UFOC_COL		"#555555"
 #define BORDER_SWAP_COL		"#fff4c0"
 
-#define MASTER_WIDTH		0.6
+#define MASTER_WIDTH		60
 #define RESIZE_MASTER_AMT	1
 #define MOTION_THROTTLE		60
 #define SNAP_DISTANCE		5

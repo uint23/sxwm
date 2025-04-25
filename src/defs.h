@@ -103,6 +103,18 @@ typedef struct Client{
 } Client;
 
 typedef struct {
+	uint gaps;
+	uint border_width;
+	ulong border_foc_col;
+	ulong border_ufoc_col;
+	ulong border_swap_col;
+	uint master_width;
+	uint resize_master_amt;
+	uint snap_distance;
+	Binding *binds;
+} Config;
+
+typedef struct {
 	int x, y;
 	uint w, h;
 } Monitor;

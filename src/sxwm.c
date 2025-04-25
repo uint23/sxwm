@@ -110,7 +110,7 @@ ulong last_motion_time = 0;
 ulong border_foc_col;
 ulong border_ufoc_col;
 ulong border_swap_col;
-float master_frac = MASTER_WIDTH;
+float master_frac = (float) MASTER_WIDTH / 100;
 uint gaps = GAPS;
 uint scr_width;
 uint scr_height;
