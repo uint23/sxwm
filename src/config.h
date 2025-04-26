@@ -55,8 +55,6 @@
  * ———————————————————————————————————————————*
 */
 
-#define XINERAMA_SUPPORT	0
-
 #define GAPS				10
 
 #define BORDER_WIDTH		1
@@ -161,7 +159,7 @@ CMD(browser,	"firefox");
 */
 
 /*< This is your modifier key (ALT/SUPER) >*/
-#define MOD	ALT
+#define MOD	SUPER
 
 #include <X11/keysym.h>
 const Binding binds[] =
