@@ -5,10 +5,6 @@
 
 #include <X11/Xlib.h>
 
-#define uint unsigned int
-#define ulong unsigned long
-#define u_char unsigned char
-
 #define SXWM_VERSION	"sxwm ver. 1.1.1"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
@@ -85,7 +81,7 @@ typedef union {
 } Action;
 
 typedef struct {
-	unsigned int mods;
+	int mods;
 	KeySym keysym;
 	Action action;
 	Bool is_func;
@@ -93,8 +89,8 @@ typedef struct {
 
 typedef struct Client{
 	Window win;
-	uint x, y, h, w;
-	uint orig_x, orig_y, orig_w, orig_h;
+	int x, y, h, w;
+	int orig_x, orig_y, orig_w, orig_h;
 	int mon;
 	Bool fixed;
 	Bool floating;
@@ -103,20 +99,20 @@ typedef struct Client{
 } Client;
 
 typedef struct {
-	uint gaps;
-	uint border_width;
-	ulong border_foc_col;
-	ulong border_ufoc_col;
-	ulong border_swap_col;
-	uint master_width;
-	uint resize_master_amt;
-	uint snap_distance;
+	int gaps;
+	int border_width;
+	long border_foc_col;
+	long border_ufoc_col;
+	long border_swap_col;
+	int master_width;
+	int resize_master_amt;
+	int snap_distance;
 	Binding *binds;
 } Config;
 
 typedef struct {
 	int x, y;
-	uint w, h;
+	int w, h;
 } Monitor;
 
 #endif

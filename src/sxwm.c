@@ -30,8 +30,8 @@
 #include "defs.h"
 
 void add_client(Window w);
-void change_workspace(uint ws);
-uint clean_mask(uint mask);
+void change_workspace(int ws);
+int clean_mask(int mask);
 void close_focused(void);
 void dec_gaps(void);
 void focus_next(void);
@@ -54,10 +54,10 @@ void inc_gaps(void);
 void init_defaults(void);
 void move_master_next(void);
 void move_master_prev(void);
-void move_to_workspace(uint ws);
+void move_to_workspace(int ws);
 void other_wm(void);
 int other_wm_err(Display *dpy, XErrorEvent *ee);
-ulong parse_col(const char *hex);
+long parse_col(const char *hex);
 void quit(void);
 void resize_master_add(void);
 void resize_master_sub(void);
@@ -96,7 +96,7 @@ Atom atom_net_workarea;
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = { NULL };
 Config default_config;
-uint current_ws = 0;
+int current_ws = 0;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
 Client *swap_target = NULL;
@@ -108,22 +108,22 @@ Monitor *mons = NULL;
 int monsn = 0;
 Bool global_floating = False;
 
-ulong last_motion_time = 0;
-ulong border_foc_col;
-ulong border_ufoc_col;
-ulong border_swap_col;
+long last_motion_time = 0;
+long border_foc_col;
+long border_ufoc_col;
+long border_swap_col;
 float master_frac = (float) MASTER_WIDTH / 100;
-uint gaps = GAPS;
-uint scr_width;
-uint scr_height;
-uint open_windows = 0;
+int gaps = GAPS;
+int scr_width;
+int scr_height;
+int open_windows = 0;
 int drag_start_x, drag_start_y;
 int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
-uint reserve_left = 0;
-uint reserve_right = 0;
-uint reserve_top = 0;
-uint reserve_bottom = 0;
+int reserve_left = 0;
+int reserve_right = 0;
+int reserve_top = 0;
+int reserve_bottom = 0;
 
 void
 add_client(Window w)
@@ -178,8 +178,8 @@ add_client(Window w)
 	XRaiseWindow(dpy, w);
 }
 
-uint
-clean_mask(uint mask)
+int
+clean_mask(int mask)
 {
 	return mask & ~(LockMask | Mod2Mask | Mod3Mask);
 }
@@ -267,10 +267,10 @@ focus_prev(void)
 int
 get_monitor_for(Client *c)
 {
-	uint cx = c->x + c->w/2, cy = c->y + c->h/2;
+	int cx = c->x + c->w/2, cy = c->y + c->h/2;
 	for (int i = 0; i < monsn; ++i) {
-		if (cx >= (uint)mons[i].x && cx < mons[i].x + mons[i].w &&
-				cy >= (uint)mons[i].y && cy < mons[i].y + mons[i].h)
+		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w &&
+				cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h)
 			return i;
 	}
 	return 0; 
@@ -280,14 +280,14 @@ void
 grab_keys(void)
 {
 	KeyCode keycode;
-	uint modifiers[] = { 0, LockMask, Mod2Mask, LockMask|Mod2Mask };
+	int modifiers[] = { 0, LockMask, Mod2Mask, LockMask|Mod2Mask };
 
 	/* ungrab all keys */
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
-	for (uint i = 0; i < LENGTH(binds); ++i) {
+	for (unsigned int i = 0; i < LENGTH(binds); ++i) {
 		if ((keycode = XKeysymToKeycode(dpy, binds[i].keysym))) {
-			for (uint j = 0; j < LENGTH(modifiers); ++j) {
+			for (unsigned int j = 0; j < LENGTH(modifiers); ++j) {
 				XGrabKey(dpy, keycode,
 						binds[i].mods | modifiers[j],
 						root, True, GrabModeAsync, GrabModeAsync);
@@ -395,7 +395,7 @@ hdl_client_msg(XEvent *xev)
 {
 	/* clickable bar workspace switching */
 	if (xev->xclient.message_type == atom_net_current_desktop) {
-		uint ws = (uint)xev->xclient.data.l[0];
+		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
 		return;
 	}
@@ -429,7 +429,7 @@ hdl_config_req(XEvent *xev)
 	XConfigureRequestEvent *e = &xev->xconfigurerequest;
 	Client *c = NULL;
 
-	for (uint ws = 0; ws < NUM_WORKSPACES && !c; ++ws)
+	for (int ws = 0; ws < NUM_WORKSPACES && !c; ++ws)
 		for (c = workspaces[ws]; c; c = c->next)
 			if (c->win == e->window) {
 				break;
@@ -519,10 +519,10 @@ void
 hdl_keypress(XEvent *xev)
 {
 	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
-	uint mods = clean_mask(xev->xkey.state);
+	unsigned int mods = clean_mask(xev->xkey.state);
 
-	for (uint i = 0; i < LENGTH(binds); ++i) {
-		if (keysym == binds[i].keysym && mods == clean_mask(binds[i].mods)) {
+	for (unsigned int i = 0; i < LENGTH(binds); ++i) {
+		if (keysym == binds[i].keysym && mods == (unsigned int)clean_mask(binds[i].mods)) {
 			if (binds[i].is_func) {
 				binds[i].action.fn();
 			} else {
@@ -586,24 +586,24 @@ hdl_map_req(XEvent *xev)
 
 	Atom type;
 	int format;
-	ulong nitems, bytes_after;
+	unsigned long nitems, bytes_after;
 	Atom *types = NULL;
 
 	if (XGetWindowProperty(dpy, cr->window,
 				atom_wm_window_type, 0, 1, False,
 				XA_ATOM, &type, &format,
 				&nitems, &bytes_after,
-				(u_char**)&types) == Success && types) {
+				(unsigned char**)&types) == Success && types) {
 		if (nitems > 0 && types[0] == atom_net_wm_window_type_dock) {
 			XFree(types);
 
 			XMapWindow(dpy, cr->window);
-			ulong *strut = NULL;
+			long *strut = NULL;
 			if (XGetWindowProperty(dpy, cr->window,
 						atom_wm_strut_partial, 0, 12, False,
 						XA_CARDINAL, &type, &format,
 						&nitems, &bytes_after,
-						(u_char**)&strut) == Success && strut) {
+						(unsigned char**)&strut) == Success && strut) {
 				if (nitems >= 4) {
 					reserve_left	= strut[0];
 					reserve_right	= strut[1];
@@ -613,7 +613,7 @@ hdl_map_req(XEvent *xev)
 				XFree(strut);
 			}
 
-			ulong workarea[4] = {
+			long workarea[4] = {
 				reserve_left,
 				reserve_top,
 				scr_width - reserve_left	- reserve_right,
@@ -621,7 +621,7 @@ hdl_map_req(XEvent *xev)
 			};
 			XChangeProperty(dpy, root,
 					atom_net_workarea, XA_CARDINAL, 32,
-					PropModeReplace, (u_char*)workarea, 4);
+					PropModeReplace, (unsigned char*)workarea, 4);
 			return;
 		}
 		XFree(types);
@@ -709,7 +709,7 @@ hdl_motion(XEvent *xev)
 	if (drag_mode == DRAG_SWAP) {
 		Window root_ret, child;
 		int rx, ry, wx, wy;
-		uint mask;
+		unsigned int mask;
 		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
 
 		static Client *last_swap_target = NULL;
@@ -794,13 +794,13 @@ hdl_root_property(XEvent *xev)
 	long *val = NULL;
 	Atom actual;
 	int fmt;
-	ulong n, after;
+	unsigned long n, after;
 	if (XGetWindowProperty(dpy, root, atom_net_current_desktop,
 				0, 1, False, XA_CARDINAL,
 				&actual, &fmt, &n, &after,
-				(u_char**)&val) == Success &&
+				(unsigned char**)&val) == Success &&
 			val) {
-		change_workspace((uint)val[0]);
+		change_workspace((int)val[0]);
 		XFree(val);
 	}
 }
@@ -867,7 +867,7 @@ move_master_prev(void)
 }
 
 void
-move_to_workspace(uint ws)
+move_to_workspace(int ws)
 {
 	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
@@ -922,7 +922,7 @@ other_wm_err(Display *dpy, XErrorEvent *ee)
 	(void) ee;
 }
 
-ulong
+long
 parse_col(const char *hex)
 {
 	XColor col;
@@ -943,7 +943,7 @@ parse_col(const char *hex)
 
 void quit (void)
 {
-	for (uint ws = 0; ws < NUM_WORKSPACES; ++ws) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			XUnmapWindow(dpy, c->win);
 			XKillClient(dpy, c->win);
@@ -989,10 +989,10 @@ scan_existing_windows(void)
 {
 	Window root_return, parent_return;
 	Window *children;
-	uint nchildren;
+	unsigned int nchildren;
 
 	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &nchildren)) {
-		for (uint i = 0; i < nchildren; ++i) {
+		for (unsigned int i = 0; i < nchildren; ++i) {
 			XWindowAttributes wa;
 			if (!XGetWindowAttributes(dpy, children[i], &wa) ||
 						wa.override_redirect || wa.map_state != IsViewable) {
@@ -1092,7 +1092,7 @@ setup_atoms (void)
 	XChangeProperty(dpy, root,
 			atom_net_supported,
 			XA_ATOM, 32, PropModeReplace,
-			(u_char*)support_list,
+			(unsigned char*)support_list,
 			sizeof(support_list)/sizeof(Atom));
 
 	/* workspace atoms */
@@ -1101,25 +1101,25 @@ setup_atoms (void)
 
 	long num = NUM_WORKSPACES;
 	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32,
-			PropModeReplace, (u_char*)&num, 1);
+			PropModeReplace, (unsigned char*)&num, 1);
 
 	const char names[] = WORKSPACE_NAMES;
-	uint names_len = sizeof(names);
+	int names_len = sizeof(names);
 
 	XChangeProperty(dpy, root,
 			a_names,
 			XInternAtom(dpy, "UTF8_STRING", False),
 			8,
 			PropModeReplace,
-			(u_char*)names,
+			(unsigned char*)names,
 			names_len);
 
-	ulong initial = current_ws;
+	long initial = current_ws;
 	XChangeProperty(dpy, root,
 			XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False),
 			XA_CARDINAL, 32,
 			PropModeReplace,
-			(u_char*)&initial, 1);
+			(unsigned char*)&initial, 1);
 	/* fullscreen atoms */
 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
 	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
@@ -1153,7 +1153,7 @@ spawn(const char **cmd)
 void
 tile(void)
 {
-	uint total_windows = 0;
+	int total_windows = 0;
 	Client *head = workspaces[current_ws];
 	for (Client *c = head; c; c = c->next) {
 		if (c->fullscreen) {
@@ -1171,7 +1171,7 @@ tile(void)
 
 	for (int m = 0; m < monsn; ++m) {
 		Client *c;
-		uint count = 0;
+		int count = 0;
 		for (c = workspaces[current_ws]; c; c = c->next) {
 			if (!c->floating && c->mon == m) {
 				++count;
@@ -1182,29 +1182,29 @@ tile(void)
 			continue;
 		}
 
-		uint master = 1;
-		uint stack = count - master;
+		int master = 1;
+		int stack = count - master;
 
 		/* reserved space */
-		uint left = mons[m].x + reserve_left + gaps;
-		uint top = mons[m].y + reserve_top + gaps;
-		uint width = mons[m].w - reserve_left - reserve_right - 2 * gaps;
-		uint height = mons[m].h - reserve_top - reserve_bottom - 2 * gaps;
+		int left = mons[m].x + reserve_left + gaps;
+		int top = mons[m].y + reserve_top + gaps;
+		int width = mons[m].w - reserve_left - reserve_right - 2 * gaps;
+		int height = mons[m].h - reserve_top - reserve_bottom - 2 * gaps;
 
-		uint master_width = (stack > 0)
+		int master_width = (stack > 0)
 			? width * master_frac
 			: width;
 
-		uint stack_width = (stack > 0)
+		int stack_width = (stack > 0)
 			? (width - master_width - gaps)
 			: 0;
 
-		uint stack_row_height = (stack > 0)
+		int stack_row_height = (stack > 0)
 			? (height - (stack - 1) * gaps) / stack
 			: 0;
 
-		uint i = 0;
-		uint stack_x = left + master_width + gaps;
+		int i = 0;
+		int stack_x = left + master_width + gaps;
 		for (c = workspaces[current_ws]; c; c = c->next) {
 			if (c->floating || c->mon != m) {
 				continue;
@@ -1219,8 +1219,8 @@ tile(void)
 				wc.height = height - 2 * BORDER_WIDTH;
 			} else {
 				/* stack */
-				uint y = top + (i - 1) * (stack_row_height + gaps);
-				uint h = (i == count - 1)
+				int y = top + (i - 1) * (stack_row_height + gaps);
+				int h = (i == count - 1)
 					? (height - (stack_row_height + gaps) * (stack - 1))
 					: stack_row_height;
 
@@ -1345,10 +1345,10 @@ toggle_fullscreen(void)
 		focused->orig_h = wa.height;
 
 		int m = focused->mon;
-		uint fs_x = mons[m].x;
-		uint fs_y = mons[m].y;
-		uint fs_w = mons[m].w;
-		uint fs_h = mons[m].h;
+		int fs_x = mons[m].x;
+		int fs_y = mons[m].y;
+		int fs_w = mons[m].w;
+		int fs_h = mons[m].h;
 
 		XSetWindowBorderWidth(dpy, focused->win, 0);
 		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
@@ -1423,11 +1423,11 @@ update_net_client_list(void)
 	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	XChangeProperty(dpy, root, prop,
 			XA_WINDOW, 32, PropModeReplace,
-			(u_char*)wins, n);
+			(unsigned char*)wins, n);
 }
 
 void
-change_workspace(uint ws)
+change_workspace(int ws)
 {
 	if (ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
@@ -1437,6 +1437,9 @@ change_workspace(uint ws)
 	for (Client *c = workspaces[current_ws]; c; c=c->next) {
 		XUnmapWindow(dpy, c->win);
 	}
+
+	/* for compositors like picom-animations */
+	XSync(dpy, False);
 
 	current_ws = ws;
 
@@ -1453,11 +1456,11 @@ change_workspace(uint ws)
 	}
 
 	/* update atom */
-	ulong cd = current_ws;
+	long cd = current_ws;
 	XChangeProperty(dpy, root,
 			XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False),
 			XA_CARDINAL, 32, PropModeReplace,
-			(u_char*)&cd, 1);
+			(unsigned char*)&cd, 1);
 }
 
 int
@@ -1465,7 +1468,7 @@ xerr(Display *dpy, XErrorEvent *ee)
 {
 	/* ignore noise & non fatal errors */
 	 const struct {
-		uint req, code;
+		int req, code;
 	} ignore[] = {
 		{ 0, BadWindow },
 		{ X_GetGeometry, BadDrawable },
