@@ -941,7 +941,8 @@ parse_col(const char *hex)
 	return col.pixel;
 }
 
-void quit (void)
+void
+quit(void)
 {
 	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
@@ -951,6 +952,9 @@ void quit (void)
 	}
 	XSync(dpy, False);
 	XCloseDisplay(dpy);
+	XFreeCursor(dpy, c_move);
+	XFreeCursor(dpy, c_normal);
+	XFreeCursor(dpy, c_resize);
 	errx(0, "quitting...");
 }
 
