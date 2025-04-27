@@ -1,18 +1,17 @@
 # Colour Themes:
-border_focused_colour =	#c0cbff
-border_unfocused_colour = #555555
-border_swap_colour = #fff4c0
+border_focused_colour 	: #c0cbff
+border_unfocused_colour : #555555
+border_swap_colour 		: #fff4c0
 
 # General Options:
-master_coverage = 60%
-gaps = 10
+master_coverage : 60%
+gaps : 10
 
 # Keybinds:
 # Commands must be surrounded with ""
 # Function calls don't need this
 
-mod_key = alt
+mod_key : alt
 
-bind mod + shift + return = "st"
-# this is an internal command - a pointer to a function
-bind mod + j = focus_next
+bind : [mod + shift + return] : "st"
+bind : [mod + j] 			  : focus_next

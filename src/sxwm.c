@@ -34,10 +34,10 @@
 void add_client(Window w);
 void change_workspace(int ws);
 int clean_mask(int mask);
-void close_focused(void);
-void dec_gaps(void);
-void focus_next(void);
-void focus_prev(void);
+/* void close_focused(void); */
+/* void dec_gaps(void); */
+/* void focus_next(void); */
+/* void focus_prev(void); */
 int get_monitor_for(Client *c);
 void grab_keys(void);
 void hdl_button(XEvent *xev);
@@ -52,17 +52,17 @@ void hdl_keypress(XEvent *xev);
 void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
 void hdl_root_property(XEvent *xev);
-void inc_gaps(void);
+/* void inc_gaps(void); */
 void init_defaults(void);
-void move_master_next(void);
-void move_master_prev(void);
+/* void move_master_next(void); */
+/* void move_master_prev(void); */
 void move_to_workspace(int ws);
 void other_wm(void);
 int other_wm_err(Display *dpy, XErrorEvent *ee);
 long parse_col(const char *hex);
-void quit(void);
-void resize_master_add(void);
-void resize_master_sub(void);
+/* void quit(void); */
+/* void resize_master_add(void); */
+/* void resize_master_sub(void); */
 void run(void);
 void scan_existing_windows(void);
 void setup(void);
@@ -70,9 +70,9 @@ void setup_atoms(void);
 void spawn(const char **cmd);
 void swap_clients(Client *a, Client *b);
 void tile(void);
-void toggle_floating(void);
-void toggle_floating_global(void);
-void toggle_fullscreen(void);
+/* void toggle_floating(void); */
+/* void toggle_floating_global(void); */
+/* void toggle_fullscreen(void); */
 void update_borders(void);
 void update_monitors(void);
 void update_net_client_list(void);
@@ -95,6 +95,7 @@ Atom atom_net_workarea;
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = { NULL };
 Config default_config;
+Config user_config;
 int current_ws = 0;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
@@ -132,16 +133,23 @@ add_client(Window w)
 		fprintf(stderr, "sxwm: could not alloc memory for client\n");
 		return;
 	}
+
+	if (workspaces[current_ws] == NULL) {
+		workspaces[current_ws] = c;
+	} else {
+		Client *tail = workspaces[current_ws];
+		while (tail->next)
+			tail = tail->next;
+		tail->next = c;
+	}
 	c->win = w;
-	c->next = workspaces[current_ws];
-	workspaces[current_ws] = c;
+	c->next = NULL;
 
 	if (!focused) {
 		focused = c;
 	}
 
 	++open_windows;
-
 	XSelectInput(dpy, w,
 			EnterWindowMask | LeaveWindowMask |
 			FocusChangeMask | PropertyChangeMask |
@@ -284,11 +292,11 @@ grab_keys(void)
 	/* ungrab all keys */
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
-	for (unsigned int i = 0; i < LENGTH(binds); ++i) {
-		if ((keycode = XKeysymToKeycode(dpy, binds[i].keysym))) {
+	for (unsigned int i = 0; i < LENGTH(user_config.binds); ++i) {
+		if ((keycode = XKeysymToKeycode(dpy, user_config.binds[i].keysym))) {
 			for (unsigned int j = 0; j < LENGTH(modifiers); ++j) {
 				XGrabKey(dpy, keycode,
-						binds[i].mods | modifiers[j],
+						user_config.binds[i].mods | modifiers[j],
 						root, True, GrabModeAsync, GrabModeAsync);
 			}
 		}
@@ -520,12 +528,13 @@ hdl_keypress(XEvent *xev)
 	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
 	unsigned int mods = clean_mask(xev->xkey.state);
 
-	for (unsigned int i = 0; i < LENGTH(binds); ++i) {
-		if (keysym == binds[i].keysym && mods == (unsigned int)clean_mask(binds[i].mods)) {
-			if (binds[i].is_func) {
-				binds[i].action.fn();
+	for (unsigned int i = 0; i < LENGTH(user_config.binds); ++i) {
+		if (keysym == user_config.binds[i].keysym &&
+				mods == (unsigned int)clean_mask(user_config.binds[i].mods)) {
+			if (user_config.binds[i].is_func) {
+				user_config.binds[i].action.fn();
 			} else {
-				spawn(binds[i].action.cmd);
+				spawn(user_config.binds[i].action.cmd);
 			}
 			return;
 		}
@@ -825,6 +834,15 @@ init_defaults(void)
 	default_config.master_width = 50;
 	default_config.resize_master_amt = 5;
 	default_config.snap_distance = 5;
+
+	for (unsigned long i = 0; i < LENGTH(binds); ++i) {
+		default_config.binds[i].mods = binds[i].mods;
+		default_config.binds[i].keysym = binds[i].keysym;
+		default_config.binds[i].action.cmd = binds[i].action.cmd;
+		default_config.binds[i].is_func = binds[i].is_func;
+	}
+
+	user_config = default_config;
 }
 
 void
@@ -955,6 +973,7 @@ quit(void)
 	XFreeCursor(dpy, c_normal);
 	XFreeCursor(dpy, c_resize);
 	errx(0, "quitting...");
+
 }
 
 void
@@ -1023,6 +1042,7 @@ setup(void)
 
 	setup_atoms();
 	other_wm();
+	init_defaults();
 	grab_keys();
 
 	c_normal = XCreateFontCursor(dpy, XC_left_ptr);

@@ -1,11 +1,6 @@
 /* See LICENSE for more information on use */
-
-#ifndef DEFS_H
-#define DEFS_H
-
-#include <X11/Xlib.h>
-
-#define SXWM_VERSION	"sxwm ver. 1.1.1"
+#pragma once
+#define SXWM_VERSION	"sxwm ver. 1.2"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
@@ -24,6 +19,7 @@
 	const char *name[] = { __VA_ARGS__, NULL }
 
 
+#include <X11/Xlib.h>
 #define INIT_WORKSPACE \
 void change_ws1(void);\
 void moveto_ws1(void);\
@@ -107,7 +103,7 @@ typedef struct {
 	int master_width;
 	int resize_master_amt;
 	int snap_distance;
-	Binding *binds;
+	Binding binds[256];
 } Config;
 
 typedef struct {
@@ -115,4 +111,16 @@ typedef struct {
 	int w, h;
 } Monitor;
 
-#endif
+extern void close_focused(void);
+extern void dec_gaps(void);
+extern void focus_next(void);
+extern void focus_prev(void);
+extern void inc_gaps(void);
+extern void move_master_next(void);
+extern void move_master_prev(void);
+extern void quit(void);
+extern void resize_master_add(void);
+extern void resize_master_sub(void);
+extern void toggle_floating(void);
+extern void toggle_floating_global(void);
+extern void toggle_fullscreen(void);
