@@ -30,6 +30,7 @@
 #include <X11/extensions/Xinerama.h>
 
 #include "defs.h"
+#include "parser.h"
 
 void add_client(Window w);
 void change_workspace(int ws);
@@ -59,8 +60,9 @@ void init_defaults(void);
 void move_to_workspace(int ws);
 void other_wm(void);
 int other_wm_err(Display *dpy, XErrorEvent *ee);
-long parse_col(const char *hex);
+/* long parse_col(const char *hex); */
 /* void quit(void); */
+/* void reload_config(void); */
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
 void run(void);
@@ -834,12 +836,14 @@ init_defaults(void)
 	default_config.master_width = 50;
 	default_config.resize_master_amt = 5;
 	default_config.snap_distance = 5;
+	default_config.bindsn = 0;
 
 	for (unsigned long i = 0; i < LENGTH(binds); ++i) {
 		default_config.binds[i].mods = binds[i].mods;
 		default_config.binds[i].keysym = binds[i].keysym;
 		default_config.binds[i].action.cmd = binds[i].action.cmd;
 		default_config.binds[i].is_func = binds[i].is_func;
+		++default_config.bindsn;
 	}
 
 	user_config = default_config;
@@ -973,7 +977,13 @@ quit(void)
 	XFreeCursor(dpy, c_normal);
 	XFreeCursor(dpy, c_resize);
 	errx(0, "quitting...");
+}
 
+void
+reload_config(void)
+{
+	puts("sxwm: reloading config...");
+	/* parser(&user_config); */
 }
 
 void
@@ -1043,6 +1053,7 @@ setup(void)
 	setup_atoms();
 	other_wm();
 	init_defaults();
+	/* parser(&user_config); */
 	grab_keys();
 
 	c_normal = XCreateFontCursor(dpy, XC_left_ptr);

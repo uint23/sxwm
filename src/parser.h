@@ -1,19 +1,11 @@
 #pragma once
 #include "defs.h"
+#define MAX_ARGS 64
 
-static struct { const char *n; void (*fn)(void); } call_table[] = {
-	{"close_window",	close_focused},
-	{"decrease_gaps",	dec_gaps},
-	{"focus_next",		focus_next},
-	{"focus_previous", 	focus_prev},
-	{"increase_gaps",	inc_gaps},
-	{"master_next",		move_master_next},
-	{"master_previous",	move_master_prev},
-	{"quit",			quit},
-	{"master_increase", resize_master_add},
-	{"master_decrease", resize_master_sub},
-	{"floating",		toggle_floating},
-	{"global_floating", toggle_floating_global},
-	{"fullscreen",		toggle_fullscreen},
-	{NULL,NULL}
-};
+void handler(char *command, char *arg, unsigned int mods, KeySym keysym, Action action, Bool is_func, Config *user_config);
+void parser(Config *user_config);
+unsigned int parse_mods(const char *mods, Config *user_config);
+KeySym parse_keysym(const char *key);
+char* strip_quotes(char *s);
+char* strip(char *str);
+static const char** build_argv(char *cmdline);

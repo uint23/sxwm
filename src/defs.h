@@ -95,6 +95,7 @@ typedef struct Client{
 } Client;
 
 typedef struct {
+	int modkey;
 	int gaps;
 	int border_width;
 	long border_foc_col;
@@ -103,6 +104,7 @@ typedef struct {
 	int master_width;
 	int resize_master_amt;
 	int snap_distance;
+	int bindsn;
 	Binding binds[256];
 } Config;
 
@@ -118,7 +120,9 @@ extern void focus_prev(void);
 extern void inc_gaps(void);
 extern void move_master_next(void);
 extern void move_master_prev(void);
+extern long parse_col(const char *hex);
 extern void quit(void);
+extern void reload_config(void);
 extern void resize_master_add(void);
 extern void resize_master_sub(void);
 extern void toggle_floating(void);
