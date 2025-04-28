@@ -1,3 +1,4 @@
+/* See LICENSE for more information on use */
 #define _POSIX_C_SOURCE 200809L /* for strdup */
 #include <ctype.h>
 #include <linux/limits.h>

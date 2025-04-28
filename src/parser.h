@@ -1,3 +1,4 @@
+/* See LICENSE for more information on use */
 #pragma once
 #include "defs.h"
 #define MAX_ARGS 64
