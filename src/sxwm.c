@@ -33,6 +33,7 @@
 #include "parser.h"
 
 void add_client(Window w);
+void apply_user_config(void);
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -187,6 +188,16 @@ add_client(Window w)
 	XRaiseWindow(dpy, w);
 }
 
+void
+apply_user_config(void)
+{
+	gaps = user_config.gaps;
+	border_foc_col = user_config.border_foc_col;
+	border_ufoc_col = user_config.border_ufoc_col;
+	border_swap_col = user_config.border_swap_col;
+	master_frac = (float)user_config.master_width / 100.0f;
+}
+
 int
 clean_mask(int mask)
 {
@@ -291,10 +302,8 @@ grab_keys(void)
 	KeyCode keycode;
 	int modifiers[] = { 0, LockMask, Mod2Mask, LockMask|Mod2Mask };
 
-	/* ungrab all keys */
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
-
-	for (unsigned int i = 0; i < LENGTH(user_config.binds); ++i) {
+	for (int i = 0; i < user_config.bindsn; ++i) {
 		if ((keycode = XKeysymToKeycode(dpy, user_config.binds[i].keysym))) {
 			for (unsigned int j = 0; j < LENGTH(modifiers); ++j) {
 				XGrabKey(dpy, keycode,
@@ -530,7 +539,7 @@ hdl_keypress(XEvent *xev)
 	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
 	unsigned int mods = clean_mask(xev->xkey.state);
 
-	for (unsigned int i = 0; i < LENGTH(user_config.binds); ++i) {
+	for (int i = 0; i < user_config.bindsn; ++i) {
 		if (keysym == user_config.binds[i].keysym &&
 				mods == (unsigned int)clean_mask(user_config.binds[i].mods)) {
 			if (user_config.binds[i].is_func) {
@@ -818,11 +827,9 @@ hdl_root_property(XEvent *xev)
 void
 inc_gaps(void)
 {
-	if (gaps < MAXGAPS) {
-		++gaps;
-		tile();
-		update_borders();
-	}
+	++gaps;
+	tile();
+	update_borders();
 }
 
 void
@@ -983,7 +990,16 @@ void
 reload_config(void)
 {
 	puts("sxwm: reloading config...");
-	/* parser(&user_config); */
+	memset(user_config.binds, 0, sizeof(user_config.binds));
+	init_defaults();
+	if (parser(&user_config)) {
+		fprintf(stderr, "sxrc: error parsing config file\n");
+		init_defaults();
+	}
+	apply_user_config();
+	grab_keys();
+	tile();
+	update_borders();
 }
 
 void
@@ -1053,7 +1069,11 @@ setup(void)
 	setup_atoms();
 	other_wm();
 	init_defaults();
-	/* parser(&user_config); */
+	if (parser(&user_config)) {
+		fprintf(stderr, "sxrc: error parsing config file\n");
+		init_defaults();
+	}
+	apply_user_config();
 	grab_keys();
 
 	c_normal = XCreateFontCursor(dpy, XC_left_ptr);
@@ -1464,10 +1484,11 @@ change_workspace(int ws)
 		return;
 	}
 
-	/* unmap old desktop */
+	/* unmap old desktop
 	for (Client *c = workspaces[current_ws]; c; c=c->next) {
 		XUnmapWindow(dpy, c->win);
 	}
+	*/
 
 	/* for compositors like picom-animations */
 	XSync(dpy, False);

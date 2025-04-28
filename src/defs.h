@@ -1,6 +1,6 @@
 /* See LICENSE for more information on use */
 #pragma once
-#define SXWM_VERSION	"sxwm ver. 1.2"
+#define SXWM_VERSION	"sxwm ver. 1.4"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
@@ -60,7 +60,6 @@ void moveto_ws9(void) { move_to_workspace(8); update_net_client_list(); }\
 
 #define UDIST(a,b) abs((int)(a) - (int)(b))
 #define MAXCLIENTS	99
-#define MAXGAPS		100
 
 typedef enum {
 	DRAG_NONE,

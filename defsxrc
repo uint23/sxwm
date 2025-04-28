@@ -1,17 +1,70 @@
 # Colour Themes:
-border_focused_colour 	: #c0cbff
-border_unfocused_colour : #555555
-border_swap_colour 		: #fff4c0
+focused_border_colour    : #c0cbff
+unfocused_border_colour  : #555555
+swap_border_colour       : #fff4c0
 
 # General Options:
-master_coverage : 60%
-gaps : 10
+gaps                    : 10
+border_width            : 1
+master_coverage         : 60 # Percentage of screen width
+resize_master_amount    : 1
+snap_distance           : 5
 
 # Keybinds:
 # Commands must be surrounded with ""
 # Function calls don't need this
 
-mod_key : alt
+mod_key : super
 
-bind : [mod + shift + return] : "st"
-bind : [mod + j] 			  : focus_next
+# --- Application Launchers ---
+bind : [mod + Return]        : "st"
+bind : [mod + b]             : "firefox"
+bind : [mod + p]             : "dmenu_run"
+
+# --- Window Management ---
+bind : [mod + shift + q]     : close_window
+bind : [mod + shift + e]     : quit
+
+# --- Focus Movement ---
+bind : [mod + j]             : focus_next
+bind : [mod + k]             : focus_prev
+
+# --- Master/Stack Movement ---
+bind : [mod + shift + j]     : move_master_next
+bind : [mod + shift + k]     : move_master_prev
+
+# --- Master Area Resize ---
+bind : [mod + l]             : master_increase
+bind : [mod + h]             : master_decrease
+
+# --- Gaps ---
+bind : [mod + equal]         : increase_gaps
+bind : [mod + minus]         : decrease_gaps
+
+# --- Floating/Fullscreen ---
+bind : [mod + space]         : toggle_floating
+bind : [mod + shift + space] : global_floating
+bind : [mod + shift + f]     : fullscreen
+
+# --- Reload Config ---
+bind : [mod + r]             : reload_config
+
+# --- Workspaces (1-9) ---
+bind : [mod + 1]             : change_ws1
+bind : [mod + shift + 1]     : moveto_ws1
+bind : [mod + 2]             : change_ws2
+bind : [mod + shift + 2]     : moveto_ws2
+bind : [mod + 3]             : change_ws3
+bind : [mod + shift + 3]     : moveto_ws3
+bind : [mod + 4]             : change_ws4
+bind : [mod + shift + 4]     : moveto_ws4
+bind : [mod + 5]             : change_ws5
+bind : [mod + shift + 5]     : moveto_ws5
+bind : [mod + 6]             : change_ws6
+bind : [mod + shift + 6]     : moveto_ws6
+bind : [mod + 7]             : change_ws7
+bind : [mod + shift + 7]     : moveto_ws7
+bind : [mod + 8]             : change_ws8
+bind : [mod + shift + 8]     : moveto_ws8
+bind : [mod + 9]             : change_ws9
+bind : [mod + shift + 9]     : moveto_ws9
