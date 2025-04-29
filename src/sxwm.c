@@ -1195,6 +1195,7 @@ void tile(void)
 
 		int i = 0;
 		int stack_x = left + master_width + user_config.gaps;
+		focused = workspaces[current_ws];
 		for (c = workspaces[current_ws]; c; c = c->next) {
 			if (c->floating || c->mon != m) {
 				continue;
