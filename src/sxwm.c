@@ -32,7 +32,7 @@
 #include "defs.h"
 #include "parser.h"
 
-void add_client(Window w);
+Client *add_client(Window w);
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -122,13 +122,16 @@ int reserve_right = 0;
 int reserve_top = 0;
 int reserve_bottom = 0;
 
-void add_client(Window w)
+Client *add_client(Window w)
 {
 	Client *c = malloc(sizeof(Client));
 	if (!c) {
 		fprintf(stderr, "sxwm: could not alloc memory for client\n");
-		return;
+		return NULL;
 	}
+
+	c->win = w;
+	c->next = NULL;
 
 	if (workspaces[current_ws] == NULL) {
 		workspaces[current_ws] = c;
@@ -139,8 +142,6 @@ void add_client(Window w)
 			tail = tail->next;
 		tail->next = c;
 	}
-	c->win = w;
-	c->next = NULL;
 
 	if (!focused) {
 		focused = c;
@@ -164,22 +165,27 @@ void add_client(Window w)
 		c->mon = focused->mon;
 	}
 	else {
-		c->mon = get_monitor_for(c);
+		/* need better way to determine mon */
+		int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
+		c->mon = 0;
+		for (int i = 0; i < monsn; ++i) {
+			if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y &&
+			    cy < mons[i].y + mons[i].h) {
+				c->mon = i;
+				break;
+			}
+		}
 	}
 
-	c->mon = get_monitor_for(c);
 	c->fixed = False;
 	c->floating = False;
 	c->fullscreen = False;
 
 	if (global_floating) {
 		c->floating = True;
-		XSetWindowBorder(dpy, c->win, user_config.border_foc_col);
-		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
 	}
-	tile();
-	update_borders();
 	XRaiseWindow(dpy, w);
+	return c;
 }
 
 int clean_mask(int mask)
@@ -576,7 +582,8 @@ void hdl_map_req(XEvent *xev)
 	int format;
 	unsigned long nitems, bytes_after;
 	Atom *types = NULL;
-
+	Client *new_client = NULL;
+	Bool should_float = False;
 	if (XGetWindowProperty(dpy, cr->window, atom_wm_window_type, 0, 8, False, XA_ATOM, &type,
 	                       &format, &nitems, &bytes_after, (unsigned char **)&types) == Success &&
 	    types) {
@@ -589,7 +596,6 @@ void hdl_map_req(XEvent *xev)
 		for (unsigned long i = 0; i < nitems; ++i) {
 			if (types[i] == atom_net_wm_window_type_dock) {
 				XFree(types);
-
 				XMapWindow(dpy, cr->window);
 				long *strut = NULL;
 				if (XGetWindowProperty(dpy, cr->window, atom_wm_strut_partial, 0, 12, False,
@@ -604,7 +610,6 @@ void hdl_map_req(XEvent *xev)
 					}
 					XFree(strut);
 				}
-
 				long workarea[4] = {reserve_left, reserve_top,
 				                    scr_width - reserve_left - reserve_right,
 				                    scr_height - reserve_top - reserve_bottom};
@@ -614,83 +619,83 @@ void hdl_map_req(XEvent *xev)
 			}
 			if (types[i] == utility || types[i] == dialog || types[i] == toolbar ||
 			    types[i] == splash || types[i] == popup) {
-				/* float the listed items */
-				add_client(cr->window);
-				Client *c = workspaces[current_ws];
-				c->floating = True;
-				XMapWindow(dpy, cr->window);
-				update_net_client_list();
-				update_borders();
-				XFree(types);
-				return;
+				should_float = True;
+				break;
 			}
 		}
 		XFree(types);
 	}
 
 	if (open_windows == MAXCLIENTS) {
+		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
-	add_client(cr->window);
-	Client *c = workspaces[current_ws];
-	Window trans;
+	new_client = add_client(cr->window);
+	if (!new_client) {
+		return;
+	}
 
-	if (XGetTransientForHint(dpy, c->win, &trans)) {
-		c->floating = True;
+	Window trans;
+	if (!should_float && XGetTransientForHint(dpy, new_client->win, &trans)) {
+		should_float = True;
 	}
 
 	XSizeHints sh;
 	long supplied;
-	if (XGetWMNormalHints(dpy, c->win, &sh, &supplied) && (sh.flags & PMinSize) &&
-	    (sh.flags & PMaxSize) && sh.min_width == sh.max_width && sh.min_height == sh.max_height) {
-		c->floating = True;
-		c->fixed = True;
-
-		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
-		XSetWindowBorder(dpy, c->win,
-		                 (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+	if (!should_float && XGetWMNormalHints(dpy, new_client->win, &sh, &supplied) &&
+	    (sh.flags & PMinSize) && (sh.flags & PMaxSize) && sh.min_width == sh.max_width &&
+	    sh.min_height == sh.max_height) {
+		should_float = True;
+		new_client->fixed = True;
 	}
 
-	if (c->floating && !c->fullscreen) {
-		int w = (c->w < 64 ? 640 : c->w);
-		int h = (c->h < 64 ? 480 : c->h);
-		int x = (scr_width - w) / 2;
-		int y = (scr_height - h) / 2;
-
-		c->x = x;
-		c->y = y;
-		c->w = w;
-		c->h = h;
-
-		XMoveResizeWindow(dpy, c->win, x, y, w, h);
+	if (should_float) {
+		new_client->floating = True;
 	}
 
-	{
-		Window transient;
-		if (XGetTransientForHint(dpy, cr->window, &transient)) {
-			Client *c = workspaces[current_ws];
-			c->floating = True;
-			XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
-			XSetWindowBorder(
-			    dpy, c->win,
-			    (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+	if (new_client->floating && !new_client->fullscreen) {
+		int w = new_client->w;
+		int h = new_client->h;
 
-			if (c->w < 64 || c->h < 64) {
-				int w = (c->w < 64 ? 640 : c->w);
-				int h = (c->h < 64 ? 480 : c->h);
-				int x = (scr_width - w) / 2;
-				int y = (scr_height - h) / 2;
-				XMoveResizeWindow(dpy, c->win, x, y, w, h);
-			}
+		if (w < 64)
+			w = 64;
+		if (h < 64)
+			h = 64;
+
+		int mon_x, mon_y, mon_w, mon_h;
+		if (new_client->mon >= 0 && new_client->mon < monsn) {
+			mon_x = mons[new_client->mon].x;
+			mon_y = mons[new_client->mon].y;
+			mon_w = mons[new_client->mon].w;
+			mon_h = mons[new_client->mon].h;
 		}
+		else {
+			mon_x = mons[0].x;
+			mon_y = mons[0].y;
+			mon_w = mons[0].w;
+			mon_h = mons[0].h;
+		}
+
+		int x = mon_x + (mon_w - w) / 2;
+		int y = mon_y + (mon_h - h) / 2;
+
+		new_client->x = x;
+		new_client->y = y;
+		new_client->w = w;
+		new_client->h = h;
+		XMoveResizeWindow(dpy, new_client->win, x, y, w, h);
+		XSetWindowBorderWidth(dpy, new_client->win, user_config.border_width);
 	}
 
 	XMapWindow(dpy, cr->window);
 	update_net_client_list();
 
-	if (!global_floating) {
+	if (!global_floating && !new_client->floating) {
 		tile();
+	}
+	else if (new_client->floating) {
+		XRaiseWindow(dpy, new_client->win);
 	}
 
 	update_borders();
@@ -1484,7 +1489,8 @@ int main(int ac, char **av)
 	if (ac > 1) {
 		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0) {
 			errx(0, "%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
-		} else {
+		}
+		else {
 			errx(0, "usage:\n[-v || --version]: See the version of sxwm");
 		}
 	}
