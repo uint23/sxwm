@@ -580,6 +580,11 @@ void hdl_map_req(XEvent *xev)
 		return;
 	}
 
+	if (wa.width <= 0 || wa.height <= 0) {
+		XMapWindow(dpy, cr->window);
+		return;
+	}
+
 	Atom type;
 	int format;
 	unsigned long nitems, bytes_after;
