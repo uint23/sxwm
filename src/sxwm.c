@@ -226,7 +226,7 @@ void dec_gaps(void)
 
 void focus_next(void)
 {
-	if (!focused) {
+	if (!focused || !workspaces[current_ws]) {
 		return;
 	}
 
@@ -238,7 +238,7 @@ void focus_next(void)
 
 void focus_prev(void)
 {
-	if (!focused) {
+	if (!focused || !workspaces[current_ws]) {
 		return;
 	}
 
