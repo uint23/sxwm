@@ -55,18 +55,6 @@
  * ———————————————————————————————————————————*
 */
 
-#define GAPS				10
-
-#define BORDER_WIDTH		1
-#define BORDER_FOC_COL		"#c0cbff"
-#define BORDER_UFOC_COL		"#555555"
-#define BORDER_SWAP_COL		"#fff4c0"
-
-#define MASTER_WIDTH		60
-#define RESIZE_MASTER_AMT	1
-#define MOTION_THROTTLE		60
-#define SNAP_DISTANCE		5
-
 #define NUM_WORKSPACES		9
 #define WORKSPACE_NAMES		\
 	"1"					"\0"\

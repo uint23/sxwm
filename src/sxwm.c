@@ -33,7 +33,6 @@
 #include "parser.h"
 
 void add_client(Window w);
-void apply_user_config(void);
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -112,11 +111,6 @@ int monsn = 0;
 Bool global_floating = False;
 
 long last_motion_time = 0;
-long border_foc_col;
-long border_ufoc_col;
-long border_swap_col;
-float master_frac = (float)MASTER_WIDTH / 100;
-int gaps = GAPS;
 int scr_width;
 int scr_height;
 int open_windows = 0;
@@ -180,21 +174,12 @@ void add_client(Window w)
 
 	if (global_floating) {
 		c->floating = True;
-		XSetWindowBorder(dpy, c->win, border_foc_col);
-		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
+		XSetWindowBorder(dpy, c->win, user_config.border_foc_col);
+		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
 	}
 	tile();
 	update_borders();
 	XRaiseWindow(dpy, w);
-}
-
-void apply_user_config(void)
-{
-	gaps = user_config.gaps;
-	border_foc_col = user_config.border_foc_col;
-	border_ufoc_col = user_config.border_ufoc_col;
-	border_swap_col = user_config.border_swap_col;
-	master_frac = (float)user_config.master_width / 100.0f;
 }
 
 int clean_mask(int mask)
@@ -232,8 +217,8 @@ void close_focused(void)
 
 void dec_gaps(void)
 {
-	if (gaps > 0) {
-		--gaps;
+	if (user_config.gaps > 0) {
+		--user_config.gaps;
 		tile();
 		update_borders();
 	}
@@ -332,7 +317,7 @@ void hdl_button(XEvent *xev)
 			             GrabModeAsync, None, c_move, CurrentTime);
 			focused = c;
 			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-			XSetWindowBorder(dpy, c->win, border_swap_col);
+			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
 			XRaiseWindow(dpy, c->win);
 			return;
 		}
@@ -378,7 +363,8 @@ void hdl_button_release(XEvent *xev)
 	if (drag_mode == DRAG_SWAP) {
 		if (swap_target) {
 			XSetWindowBorder(dpy, swap_target->win,
-			                 (swap_target == focused ? border_foc_col : border_ufoc_col));
+			                 (swap_target == focused ? user_config.border_foc_col
+			                                         : user_config.border_ufoc_col));
 			swap_clients(drag_client, swap_target);
 		}
 		tile();
@@ -640,8 +626,9 @@ void hdl_map_req(XEvent *xev)
 		c->floating = True;
 		c->fixed = True;
 
-		XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
-		XSetWindowBorder(dpy, c->win, (c == focused ? border_foc_col : border_ufoc_col));
+		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
+		XSetWindowBorder(dpy, c->win,
+		                 (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
 	}
 
 	if (c->floating && !c->fullscreen) {
@@ -663,8 +650,10 @@ void hdl_map_req(XEvent *xev)
 		if (XGetTransientForHint(dpy, cr->window, &transient)) {
 			Client *c = workspaces[current_ws];
 			c->floating = True;
-			XSetWindowBorderWidth(dpy, c->win, BORDER_WIDTH);
-			XSetWindowBorder(dpy, c->win, (c == focused ? border_foc_col : border_ufoc_col));
+			XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
+			XSetWindowBorder(
+			    dpy, c->win,
+			    (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
 
 			if (c->w < 64 || c->h < 64) {
 				int w = (c->w < 64 ? 640 : c->w);
@@ -691,7 +680,7 @@ void hdl_motion(XEvent *xev)
 	XMotionEvent *e = &xev->xmotion;
 
 	if ((drag_mode == DRAG_NONE || !drag_client) ||
-	    (e->time - last_motion_time <= (1000 / MOTION_THROTTLE))) {
+	    (e->time - last_motion_time <= (1000 / (long unsigned int)user_config.motion_throttle))) {
 		return;
 	}
 	last_motion_time = e->time;
@@ -718,10 +707,11 @@ void hdl_motion(XEvent *xev)
 		if (new_target != last_swap_target) {
 			if (last_swap_target) {
 				XSetWindowBorder(dpy, last_swap_target->win,
-				                 (last_swap_target == focused ? border_foc_col : border_ufoc_col));
+				                 (last_swap_target == focused ? user_config.border_foc_col
+				                                              : user_config.border_ufoc_col));
 			}
 			if (new_target) {
-				XSetWindowBorder(dpy, new_target->win, border_swap_col);
+				XSetWindowBorder(dpy, new_target->win, user_config.border_swap_col);
 			}
 			last_swap_target = new_target;
 		}
@@ -736,25 +726,25 @@ void hdl_motion(XEvent *xev)
 		int nx = drag_orig_x + dx;
 		int ny = drag_orig_y + dy;
 
-		int outer_w = drag_client->w + 2 * BORDER_WIDTH;
-		int outer_h = drag_client->h + 2 * BORDER_WIDTH;
+		int outer_w = drag_client->w + 2 * user_config.border_width;
+		int outer_h = drag_client->h + 2 * user_config.border_width;
 
-		if (UDIST(nx, 0) <= SNAP_DISTANCE) {
+		if (UDIST(nx, 0) <= user_config.snap_distance) {
 			nx = 0;
 		}
-		else if (UDIST(nx + outer_w, scr_width) <= SNAP_DISTANCE) {
+		else if (UDIST(nx + outer_w, scr_width) <= user_config.snap_distance) {
 			nx = scr_width - outer_w;
 		}
 
-		if (UDIST(ny, 0) <= SNAP_DISTANCE) {
+		if (UDIST(ny, 0) <= user_config.snap_distance) {
 			ny = 0;
 		}
-		else if (UDIST(ny + outer_h, scr_height) <= SNAP_DISTANCE) {
+		else if (UDIST(ny + outer_h, scr_height) <= user_config.snap_distance) {
 			ny = scr_height - outer_h;
 		}
 
-		if (!drag_client->floating && (UDIST(nx, drag_client->x) > SNAP_DISTANCE ||
-		                               UDIST(ny, drag_client->y) > SNAP_DISTANCE)) {
+		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
+		                               UDIST(ny, drag_client->y) > user_config.snap_distance)) {
 			toggle_floating();
 		}
 
@@ -795,19 +785,21 @@ void hdl_root_property(XEvent *xev)
 
 void inc_gaps(void)
 {
-	++gaps;
+	++user_config.gaps;
 	tile();
 	update_borders();
 }
 
 void init_defaults(void)
 {
+	default_config.modkey = Mod4Mask;
 	default_config.gaps = 10;
 	default_config.border_width = 1;
 	default_config.border_foc_col = parse_col("#c0cbff");
 	default_config.border_ufoc_col = parse_col("#555555");
 	default_config.border_swap_col = parse_col("#fff4c0");
-	default_config.master_width = 50;
+	default_config.master_width = 50 / 100.0f;
+	default_config.motion_throttle = 60;
 	default_config.resize_master_amt = 5;
 	default_config.snap_distance = 5;
 	default_config.bindsn = 0;
@@ -869,7 +861,7 @@ void move_to_workspace(int ws)
 		focused->fullscreen = False;
 		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w,
 		                  focused->orig_h);
-		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
 	}
 
 	XUnmapWindow(dpy, focused->win);
@@ -955,7 +947,6 @@ void reload_config(void)
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
-	apply_user_config();
 	grab_keys();
 	tile();
 	update_borders();
@@ -963,8 +954,8 @@ void reload_config(void)
 
 void resize_master_add(void)
 {
-	if (master_frac < MF_MAX - 0.001f) {
-		master_frac += ((float)RESIZE_MASTER_AMT / 100);
+	if (user_config.master_width < MF_MAX - 0.001f) {
+		user_config.master_width += ((float)user_config.resize_master_amt / 100);
 	}
 	tile();
 	update_borders();
@@ -972,8 +963,8 @@ void resize_master_add(void)
 
 void resize_master_sub(void)
 {
-	if (master_frac > MF_MIN + 0.001f) {
-		master_frac -= ((float)RESIZE_MASTER_AMT / 100);
+	if (user_config.master_width > MF_MIN + 0.001f) {
+		user_config.master_width -= ((float)user_config.resize_master_amt / 100);
 	}
 	tile();
 	update_borders();
@@ -1049,7 +1040,6 @@ void setup(void)
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
-	apply_user_config();
 	grab_keys();
 
 	c_normal = XCreateFontCursor(dpy, XC_left_ptr);
@@ -1091,11 +1081,6 @@ void setup(void)
 	evtable[MapRequest] = hdl_map_req;
 	evtable[MotionNotify] = hdl_motion;
 	evtable[PropertyNotify] = hdl_root_property;
-
-	border_foc_col = parse_col(BORDER_FOC_COL);
-	border_ufoc_col = parse_col(BORDER_UFOC_COL);
-	border_swap_col = parse_col(BORDER_SWAP_COL);
-
 	scan_existing_windows();
 }
 
@@ -1199,43 +1184,45 @@ void tile(void)
 		int stack = count - master;
 
 		/* reserved space */
-		int left = mons[m].x + reserve_left + gaps;
-		int top = mons[m].y + reserve_top + gaps;
-		int width = mons[m].w - reserve_left - reserve_right - 2 * gaps;
-		int height = mons[m].h - reserve_top - reserve_bottom - 2 * gaps;
+		int left = mons[m].x + reserve_left + user_config.gaps;
+		int top = mons[m].y + reserve_top + user_config.gaps;
+		int width = mons[m].w - reserve_left - reserve_right - 2 * user_config.gaps;
+		int height = mons[m].h - reserve_top - reserve_bottom - 2 * user_config.gaps;
 
-		int master_width = (stack > 0) ? width * master_frac : width;
-		int stack_width = (stack > 0) ? (width - master_width - gaps) : 0;
-		int stack_row_height = (stack > 0) ? (height - (stack - 1) * gaps) / stack : 0;
+		int master_width = (stack > 0) ? width * user_config.master_width : width;
+		int stack_width = (stack > 0) ? (width - master_width - user_config.gaps) : 0;
+		int stack_row_height = (stack > 0) ? (height - (stack - 1) * user_config.gaps) / stack : 0;
 
 		int i = 0;
-		int stack_x = left + master_width + gaps;
+		int stack_x = left + master_width + user_config.gaps;
 		for (c = workspaces[current_ws]; c; c = c->next) {
 			if (c->floating || c->mon != m) {
 				continue;
 			}
 
-			XWindowChanges wc = {.border_width = BORDER_WIDTH};
+			XWindowChanges wc = {.border_width = user_config.border_width};
 			if (i == 0) {
 				/* master */
 				wc.x = left;
 				wc.y = top;
-				wc.width = master_width - 2 * BORDER_WIDTH;
-				wc.height = height - 2 * BORDER_WIDTH;
+				wc.width = master_width - 2 * user_config.border_width;
+				wc.height = height - 2 * user_config.border_width;
 			}
 			else {
 				/* stack */
-				int y = top + (i - 1) * (stack_row_height + gaps);
-				int h = (i == count - 1) ? (height - (stack_row_height + gaps) * (stack - 1))
-				                         : stack_row_height;
+				int y = top + (i - 1) * (stack_row_height + user_config.gaps);
+				int h = (i == count - 1)
+				            ? (height - (stack_row_height + user_config.gaps) * (stack - 1))
+				            : stack_row_height;
 
 				wc.x = stack_x;
 				wc.y = y;
-				wc.width = stack_width - 2 * BORDER_WIDTH;
-				wc.height = h - 2 * BORDER_WIDTH;
+				wc.width = stack_width - 2 * user_config.border_width;
+				wc.height = h - 2 * user_config.border_width;
 			}
 
-			XSetWindowBorder(dpy, c->win, (i == 0 ? border_foc_col : border_ufoc_col));
+			XSetWindowBorder(dpy, c->win,
+			                 (i == 0 ? user_config.border_foc_col : user_config.border_ufoc_col));
 
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 
@@ -1254,7 +1241,7 @@ void toggle_floating(void)
 	if (focused->fullscreen) {
 		focused->fullscreen = False;
 		tile();
-		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
 	}
 
 	if (focused->floating) {
@@ -1346,7 +1333,7 @@ void toggle_fullscreen(void)
 	else {
 		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w,
 		                  focused->orig_h);
-		XSetWindowBorderWidth(dpy, focused->win, BORDER_WIDTH);
+		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
 		tile();
 		update_borders();
 	}
@@ -1355,7 +1342,8 @@ void toggle_fullscreen(void)
 void update_borders(void)
 {
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		XSetWindowBorder(dpy, c->win, (c == focused ? border_foc_col : border_ufoc_col));
+		XSetWindowBorder(dpy, c->win,
+		                 (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
 	}
 }
 

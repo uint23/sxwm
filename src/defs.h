@@ -100,7 +100,8 @@ typedef struct {
 	long border_foc_col;
 	long border_ufoc_col;
 	long border_swap_col;
-	int master_width;
+	float master_width;
+	int motion_throttle;
 	int resize_master_amt;
 	int snap_distance;
 	int bindsn;
