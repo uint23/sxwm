@@ -28,6 +28,7 @@
 #include <X11/Xutil.h>
 
 #include <X11/extensions/Xinerama.h>
+#include <X11/Xcursor/Xcursor.h>
 
 #include "defs.h"
 #include "parser.h"
@@ -1075,9 +1076,9 @@ void setup(void)
 	}
 	grab_keys();
 
-	c_normal = XCreateFontCursor(dpy, XC_left_ptr);
-	c_move = XCreateFontCursor(dpy, XC_fleur);
-	c_resize = XCreateFontCursor(dpy, XC_bottom_right_corner);
+	c_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
+	c_move = XcursorLibraryLoadCursor(dpy, "fleur");
+	c_resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
 	XDefineCursor(dpy, root, c_normal);
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
