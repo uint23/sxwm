@@ -1413,21 +1413,23 @@ void change_workspace(int ws)
 	if (ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
 	}
+
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		XUnmapWindow(dpy, c->win);
+	}
+
 	current_ws = ws;
 
-	/* map new desktop */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		XMapWindow(dpy, c->win);
 	}
 
-	/* retile & refocus */
 	tile();
 	if (workspaces[current_ws]) {
 		focused = workspaces[current_ws];
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	}
 
-	/* update atom */
 	long cd = current_ws;
 	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32,
 	                PropModeReplace, (unsigned char *)&cd, 1);
