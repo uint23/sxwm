@@ -12,7 +12,11 @@
 #define OUT_IN (2 * BORDER_WIDTH)
 #define MF_MIN 0.05f
 #define MF_MAX 0.95f
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LENGTH(X) (sizeof X / sizeof X[0])
+#define UDIST(a,b) abs((int)(a) - (int)(b))
+#define MAXCLIENTS	99
 #define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
 #define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }
 #define CMD(name, ...) 						\
@@ -58,8 +62,6 @@ void moveto_ws8(void) { move_to_workspace(7); update_net_client_list(); }\
 void change_ws9(void) { change_workspace(8); update_net_client_list(); }	\
 void moveto_ws9(void) { move_to_workspace(8); update_net_client_list(); }\
 
-#define UDIST(a,b) abs((int)(a) - (int)(b))
-#define MAXCLIENTS	99
 
 typedef enum {
 	DRAG_NONE,
