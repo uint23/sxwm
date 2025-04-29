@@ -310,7 +310,8 @@ void hdl_button(XEvent *xev)
 		}
 
 		/* begin swap drag mode */
-		if ((e->state & user_config.modkey) && (e->state & ShiftMask) && e->button == Button1 && !c->floating) {
+		if ((e->state & user_config.modkey) && (e->state & ShiftMask) && e->button == Button1 &&
+		    !c->floating) {
 			drag_client = c;
 			drag_start_x = e->x_root;
 			drag_start_y = e->y_root;
@@ -328,7 +329,8 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		if ((e->state & user_config.modkey) && (e->button == Button1 || e->button == Button3) && !c->floating) {
+		if ((e->state & user_config.modkey) && (e->button == Button1 || e->button == Button3) &&
+		    !c->floating) {
 			focused = c;
 			toggle_floating();
 		}
@@ -1177,82 +1179,86 @@ void spawn(const char **cmd)
 
 void tile(void)
 {
-	int total_windows = 0;
 	Client *head = workspaces[current_ws];
+	int tiled_count = 0;
+
 	for (Client *c = head; c; c = c->next) {
+		if (!c->floating && !c->fullscreen) {
+			++tiled_count;
+		}
+		c->mon = get_monitor_for(c);
 		if (c->fullscreen) {
 			return;
 		}
-		if (!c->floating) {
-			++total_windows;
-		}
-		c->mon = get_monitor_for(c);
 	}
-
-	if (total_windows == 0) {
+	if (tiled_count == 0)
 		return;
-	}
 
 	for (int m = 0; m < monsn; ++m) {
-		Client *c;
 		int count = 0;
-		for (c = workspaces[current_ws]; c; c = c->next) {
-			if (!c->floating && c->mon == m) {
+		for (Client *c = head; c; c = c->next)
+			if (!c->floating && !c->fullscreen && c->mon == m)
 				++count;
-			}
-		}
-
-		if (count == 0) {
+		if (count == 0)
 			continue;
-		}
 
-		int master = 1;
-		int stack = count - master;
+		int master_area = (count > 1) ? 1 : count;
+		int stack_area = count - master_area;
 
-		/* reserved space */
 		int left = mons[m].x + reserve_left + user_config.gaps;
 		int top = mons[m].y + reserve_top + user_config.gaps;
 		int width = mons[m].w - reserve_left - reserve_right - 2 * user_config.gaps;
 		int height = mons[m].h - reserve_top - reserve_bottom - 2 * user_config.gaps;
 
-		int master_width = (stack > 0) ? width * user_config.master_width : width;
-		int stack_width = (stack > 0) ? (width - master_width - user_config.gaps) : 0;
-		int stack_row_height = (stack > 0) ? (height - (stack - 1) * user_config.gaps) / stack : 0;
+		if (width < 1)
+			width = 1;
+		if (height < 1)
+			height = 1;
+
+		float mfact = user_config.master_width;
+		if (mfact < MF_MIN)
+			mfact = MF_MIN;
+		if (mfact > MF_MAX)
+			mfact = MF_MAX;
+
+		int master_w = (count > 1) ? (int)(width * mfact) : width;
+		int stack_w = width - master_w - ((stack_area > 0) ? user_config.gaps : 0);
+
+		int stack_h =
+		    (stack_area > 0) ? (height - (stack_area - 1) * user_config.gaps) / stack_area : 0;
 
 		int i = 0;
-		int stack_x = left + master_width + user_config.gaps;
-		for (c = workspaces[current_ws]; c; c = c->next) {
-			if (c->floating || c->mon != m) {
+		int stack_y = top;
+		for (Client *c = head; c; c = c->next) {
+			if (c->floating || c->fullscreen || c->mon != m)
 				continue;
-			}
 
 			XWindowChanges wc = {.border_width = user_config.border_width};
+			int border_adj = 2 * user_config.border_width;
+
 			if (i == 0) {
 				/* master */
 				wc.x = left;
 				wc.y = top;
-				wc.width = master_width - 2 * user_config.border_width;
-				wc.height = height - 2 * user_config.border_width;
+				wc.width = (master_w > border_adj) ? master_w - border_adj : 1;
+				wc.height = (height > border_adj) ? height - border_adj : 1;
 			}
 			else {
 				/* stack */
-				int y = top + (i - 1) * (stack_row_height + user_config.gaps);
-				int h = (i == count - 1)
-				            ? (height - (stack_row_height + user_config.gaps) * (stack - 1))
-				            : stack_row_height;
+				wc.x = left + master_w + user_config.gaps;
+				wc.y = stack_y;
 
-				wc.x = stack_x;
-				wc.y = y;
-				wc.width = stack_width - 2 * user_config.border_width;
-				wc.height = h - 2 * user_config.border_width;
+				int this_h = (i == count - 1) ? (top + height - stack_y) : stack_h;
+				wc.width = (stack_w > border_adj) ? stack_w - border_adj : 1;
+				wc.height = (this_h > border_adj) ? this_h - border_adj : 1;
+				stack_y += stack_h + user_config.gaps;
 			}
 
-			focused = workspaces[current_ws];
-			XSetWindowBorder(dpy, c->win,
-			                 (i == 0 ? user_config.border_foc_col : user_config.border_ufoc_col));
-
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
-
+			c->x = wc.x;
+			c->y = wc.y;
+			c->w = wc.width;
+			c->h = wc.height;
 			++i;
 		}
 	}
@@ -1488,10 +1494,12 @@ int main(int ac, char **av)
 {
 	if (ac > 1) {
 		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0) {
-			errx(0, "%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
+			printf("%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
+			exit(0);
 		}
 		else {
-			errx(0, "usage:\n[-v || --version]: See the version of sxwm");
+			printf("usage:\n[-v || --version]: See the version of sxwm");
+			exit(0);
 		}
 	}
 	setup();

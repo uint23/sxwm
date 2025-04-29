@@ -160,7 +160,7 @@ handler(char *command, char *arg, int mods, KeySym keysym, Action action,
 	else if (strcmp(command, "unfocused_border_colour") == 0)	user_config->border_ufoc_col = parse_col(arg);
 	else if (strcmp(command, "swap_border_colour") == 0)		user_config->border_swap_col = parse_col(arg);
 	else if (strcmp(command, "master_width") == 0)				user_config->master_width = atoi(arg) / 100.0f;
-	else if (strcmp(command, "motion_throttle") == 0)			user_config->master_width = atoi(arg);
+	else if (strcmp(command, "motion_throttle") == 0)			user_config->motion_throttle = atoi(arg);
 	else if (strcmp(command, "resize_master_amount") == 0)		user_config->resize_master_amt = atoi(arg);
 	else if (strcmp(command, "snap_distance") == 0)				user_config->snap_distance = atoi(arg);
 	else if (strcmp(command, "mod_key") == 0)					user_config->modkey = parse_mods(arg, user_config);
