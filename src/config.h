@@ -147,67 +147,65 @@ CMD(browser,	"firefox");
 */
 
 /*< This is your modifier key (ALT/SUPER) >*/
-#define MOD	SUPER
-
 #include <X11/keysym.h>
 const Binding binds[] =
 {
-/*————< MODIFIER(S) >< KEY >—————< FUNCTION >——*/
+/*————< Mod4MaskIFIER(S) >< KEY >—————< FUNCTION >——*/
 
 /*———————< Here are your functions calls >————— — */
 
-	CALL(MOD|SHIFT,		e,			quit),
-	CALL(MOD|SHIFT,		q,			close_focused),
+	CALL(Mod4Mask|SHIFT,		e,			quit),
+	CALL(Mod4Mask|SHIFT,		q,			close_focused),
 
-	CALL(MOD, 			j, 			focus_next),
-	CALL(MOD, 			k, 			focus_prev),
+	CALL(Mod4Mask, 			j, 			focus_next),
+	CALL(Mod4Mask, 			k, 			focus_prev),
 
-	CALL(MOD|SHIFT, 	j, 			move_master_next),
-	CALL(MOD|SHIFT, 	k, 			move_master_prev),
+	CALL(Mod4Mask|SHIFT, 	j, 			move_master_next),
+	CALL(Mod4Mask|SHIFT, 	k, 			move_master_prev),
 
-	CALL(MOD, 			l, 			resize_master_add),
-	CALL(MOD,		 	h, 			resize_master_sub),
+	CALL(Mod4Mask, 			l, 			resize_master_add),
+	CALL(Mod4Mask,		 	h, 			resize_master_sub),
 
-	CALL(MOD,			equal,		inc_gaps),
-	CALL(MOD,			minus,		dec_gaps),
+	CALL(Mod4Mask,			equal,		inc_gaps),
+	CALL(Mod4Mask,			minus,		dec_gaps),
 
-	CALL(MOD,			space,		toggle_floating),
-	CALL(MOD|SHIFT,		space,		toggle_floating_global),
+	CALL(Mod4Mask,			space,		toggle_floating),
+	CALL(Mod4Mask|SHIFT,		space,		toggle_floating_global),
 
-	CALL(MOD|SHIFT,		f,			toggle_fullscreen),
+	CALL(Mod4Mask|SHIFT,		f,			toggle_fullscreen),
 
 /*—————< Here are your executable functions >—————*/
 
-	BIND(MOD, 			Return,		terminal),
-	BIND(MOD,			b,			browser),
+	BIND(Mod4Mask, 			Return,		terminal),
+	BIND(Mod4Mask,			b,			browser),
 
 /*—————< This is for workspaces >—————————————————*/
 
-	CALL(MOD,			1,			change_ws1),
-	CALL(MOD|SHIFT,		1,			moveto_ws1),
+	CALL(Mod4Mask,			1,			change_ws1),
+	CALL(Mod4Mask|SHIFT,		1,			moveto_ws1),
 
-	CALL(MOD,			2,			change_ws2),
-	CALL(MOD|SHIFT,		2,			moveto_ws2),
+	CALL(Mod4Mask,			2,			change_ws2),
+	CALL(Mod4Mask|SHIFT,		2,			moveto_ws2),
 
-	CALL(MOD,			3,			change_ws3),
-	CALL(MOD|SHIFT,		3,			moveto_ws3),
+	CALL(Mod4Mask,			3,			change_ws3),
+	CALL(Mod4Mask|SHIFT,		3,			moveto_ws3),
 
-	CALL(MOD,			4,			change_ws4),
-	CALL(MOD|SHIFT,		4,			moveto_ws4),
+	CALL(Mod4Mask,			4,			change_ws4),
+	CALL(Mod4Mask|SHIFT,		4,			moveto_ws4),
 
-	CALL(MOD,			5,			change_ws5),
-	CALL(MOD|SHIFT,		5,			moveto_ws5),
+	CALL(Mod4Mask,			5,			change_ws5),
+	CALL(Mod4Mask|SHIFT,		5,			moveto_ws5),
 
-	CALL(MOD,			6,			change_ws6),
-	CALL(MOD|SHIFT,		6,			moveto_ws6),
+	CALL(Mod4Mask,			6,			change_ws6),
+	CALL(Mod4Mask|SHIFT,		6,			moveto_ws6),
 
-	CALL(MOD,			7,			change_ws7),
-	CALL(MOD|SHIFT,		7,			moveto_ws7),
+	CALL(Mod4Mask,			7,			change_ws7),
+	CALL(Mod4Mask|SHIFT,		7,			moveto_ws7),
 
-	CALL(MOD,			8,			change_ws8),
-	CALL(MOD|SHIFT,		8,			moveto_ws8),
+	CALL(Mod4Mask,			8,			change_ws8),
+	CALL(Mod4Mask|SHIFT,		8,			moveto_ws8),
 
-	CALL(MOD,			9,			change_ws9),
-	CALL(MOD|SHIFT,		9,			moveto_ws9),
+	CALL(Mod4Mask,			9,			change_ws9),
+	CALL(Mod4Mask|SHIFT,		9,			moveto_ws9),
 
 };

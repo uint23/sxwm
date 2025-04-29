@@ -6,9 +6,10 @@ swap_border_colour       : #fff4c0
 # General Options:
 gaps                    : 10
 border_width            : 1
-master_coverage         : 60 # Percentage of screen width
+master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
 snap_distance           : 5
+motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 
 # Keybinds:
 # Commands must be surrounded with ""
@@ -16,40 +17,40 @@ snap_distance           : 5
 
 mod_key : super
 
-# --- Application Launchers ---
+# Application Launchers:
 bind : [mod + Return]        : "st"
 bind : [mod + b]             : "firefox"
 bind : [mod + p]             : "dmenu_run"
 
-# --- Window Management ---
+# Window Management:
 bind : [mod + shift + q]     : close_window
 bind : [mod + shift + e]     : quit
 
-# --- Focus Movement ---
+# Focus Movement:
 bind : [mod + j]             : focus_next
 bind : [mod + k]             : focus_prev
 
-# --- Master/Stack Movement ---
-bind : [mod + shift + j]     : move_master_next
-bind : [mod + shift + k]     : move_master_prev
+# Master/Stack Movement
+bind : [mod + shift + j]     : master_next
+bind : [mod + shift + k]     : master_previous
 
-# --- Master Area Resize ---
+# Master Area Resize
 bind : [mod + l]             : master_increase
 bind : [mod + h]             : master_decrease
 
-# --- Gaps ---
+# Gaps 
 bind : [mod + equal]         : increase_gaps
 bind : [mod + minus]         : decrease_gaps
 
-# --- Floating/Fullscreen ---
+# Floating/Fullscreen
 bind : [mod + space]         : toggle_floating
 bind : [mod + shift + space] : global_floating
 bind : [mod + shift + f]     : fullscreen
 
-# --- Reload Config ---
+# Reload Config
 bind : [mod + r]             : reload_config
 
-# --- Workspaces (1-9) ---
+# Workspaces (1-9)
 bind : [mod + 1]             : change_ws1
 bind : [mod + shift + 1]     : moveto_ws1
 bind : [mod + 2]             : change_ws2

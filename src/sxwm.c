@@ -310,7 +310,7 @@ void hdl_button(XEvent *xev)
 		}
 
 		/* begin swap drag mode */
-		if ((e->state & MOD) && (e->state & ShiftMask) && e->button == Button1 && !c->floating) {
+		if ((e->state & user_config.modkey) && (e->state & ShiftMask) && e->button == Button1 && !c->floating) {
 			drag_client = c;
 			drag_start_x = e->x_root;
 			drag_start_y = e->y_root;
@@ -328,7 +328,7 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		if ((e->state & MOD) && (e->button == Button1 || e->button == Button3) && !c->floating) {
+		if ((e->state & user_config.modkey) && (e->button == Button1 || e->button == Button3) && !c->floating) {
 			focused = c;
 			toggle_floating();
 		}
@@ -1081,13 +1081,13 @@ void setup(void)
 	             StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask |
 	                 KeyPressMask | PropertyChangeMask);
 
-	XGrabButton(dpy, Button1, MOD, root, True,
+	XGrabButton(dpy, Button1, user_config.modkey, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
 	            GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, MOD | ShiftMask, root, True,
+	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
 	            GrabModeAsync, None, None);
-	XGrabButton(dpy, Button3, MOD, root, True,
+	XGrabButton(dpy, Button3, user_config.modkey, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
 	            GrabModeAsync, None, None);
 	XSync(dpy, False);

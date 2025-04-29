@@ -49,11 +49,82 @@
 
 ---
 
-## Default Configuration
+## Configuration (`~/.config/sxwmrc`)
 
-All options are in `sxwmrc` (which uses a simple DSL).  
-Keybindings are easy to read and edit.
-No recompiling, no C code, just edit and reload!
+`sxwm` is configured via a simple text file located at `~/.config/sxwmrc`. Changes can be applied instantly by reloading the configuration (default keybind: `MOD + r`).
+
+The file uses a `key : value` format. Lines starting with `#` are ignored.
+
+### General Options
+
+| Option                  | Type    | Default   | Description                                                                 |
+| ----------------------- | ------- | --------- | --------------------------------------------------------------------------- |
+| `mod_key`               | String  | `super`   | Sets the primary modifier key (`alt`, `super`, `ctrl`).                       |
+| `gaps`                  | Integer | `10`      | Pixels between windows and screen edges.                                    |
+| `border_width`          | Integer | `1`       | Thickness of window borders in pixels.                                      |
+| `focused_border_colour` | Hex     | `#c0cbff` | Border color for the currently focused window.                              |
+| `unfocused_border_colour`| Hex     | `#555555` | Border color for unfocused windows.                                         |
+| `swap_border_colour`    | Hex     | `#fff4c0` | Border color highlight when selecting a window to swap with (`MOD+Shift+Drag`).|
+| `master_width`          | Integer | `60`      | Percentage (%) of the screen width the master window should occupy.         |
+| `resize_master_amount`  | Integer | `1`       | Percentage (%) to increase/decrease the master width when resizing.         |
+| `snap_distance`         | Integer | `5`       | Pixels from screen edge before a floating window snaps to the edge.         |
+| `motion_throttle`       | Integer | `60`      | Target updates per second for mouse drag operations (move/resize/swap). Set close to your monitor's refresh rate for smoother visuals. |
+
+### Keybindings
+
+Keybindings associate key combinations with actions (either running external commands or internal `sxwm` functions).
+
+**Syntax:**
+
+``` sh
+bind : [modifier + modifier + ... + key] : action
+```
+
+-   **`bind`**: Keyword to define a keybinding.
+-   **`[...]`**: Contains the key combination.
+    -   **Modifiers**: `mod` (uses the key set by `mod_key`), `shift`, `ctrl`, `alt`, `super`. Use `+` to combine multiple modifiers.
+    -   **`key`**: The final key name (e.g., `Return`, `q`, `1`, `equal`, `space`). Key names generally follow X11 keysym names but are case-insensitive in the config.
+-   **`:`**: Separator.
+-   **`action`**:
+    -   **Command**: An external command enclosed in double quotes (`"`). Arguments are separated by spaces (e.g., `"st -e vim"`).
+    -   **Function**: The name of an internal `sxwm` function (see list below).
+
+**Available Functions:**
+
+| Function Name        | Action                                                      |
+| -------------------- | ----------------------------------------------------------- |
+| `close_window`       | Closes the currently focused window.                        |
+| `decrease_gaps`      | Decreases the gap size between windows.                     |
+| `focus_next`         | Shifts focus to the next window in the stack/list.          |
+| `focus_previous`     | Shifts focus to the previous window in the stack/list.      |
+| `increase_gaps`      | Increases the gap size between windows.                     |
+| `master_next`        | Moves the focused window down the master/stack order.       |
+| `master_previous`    | Moves the focused window up the master/stack order.         |
+| `quit`               | Exits `sxwm`.                                               |
+| `reload_config`      | Reloads the `sxwmrc` configuration file.                    |
+| `master_increase`    | Increases the width allocated to the master area.           |
+| `master_decrease`    | Decreases the width allocated to the master area.           |
+| `toggle_floating`    | Toggles the floating state of the focused window.           |
+| `global_floating`    | Toggles the floating state for *all* windows on the current workspace. |
+| `fullscreen`         | Toggles fullscreen mode for the focused window.             |
+| `change_ws[1-9]`     | Switches focus to the specified workspace (1-9).            |
+| `moveto_ws[1-9]`     | Moves the focused window to the specified workspace (1-9).  |
+
+**Example Bindings:**
+
+```yaml
+# Launch terminal with Mod + Enter
+bind : [mod + Return] : "st"
+
+# Close focused window with Mod + Shift + Q
+bind : [mod + shift + q] : close_window
+
+# Switch to workspace 3 with Mod + 3
+bind : [mod + 3] : change_ws3
+
+# Move focused window to workspace 5 with Mod + Shift + 5
+bind : [mod + shift + 5] : moveto_ws5
+```
 
 ---
 
