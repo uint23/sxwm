@@ -577,32 +577,53 @@ void hdl_map_req(XEvent *xev)
 	unsigned long nitems, bytes_after;
 	Atom *types = NULL;
 
-	if (XGetWindowProperty(dpy, cr->window, atom_wm_window_type, 0, 1, False, XA_ATOM, &type,
+	if (XGetWindowProperty(dpy, cr->window, atom_wm_window_type, 0, 8, False, XA_ATOM, &type,
 	                       &format, &nitems, &bytes_after, (unsigned char **)&types) == Success &&
 	    types) {
-		if (nitems > 0 && types[0] == atom_net_wm_window_type_dock) {
-			XFree(types);
+		Atom utility = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
+		Atom dialog = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+		Atom toolbar = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
+		Atom splash = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
+		Atom popup = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
 
-			XMapWindow(dpy, cr->window);
-			long *strut = NULL;
-			if (XGetWindowProperty(dpy, cr->window, atom_wm_strut_partial, 0, 12, False,
-			                       XA_CARDINAL, &type, &format, &nitems, &bytes_after,
-			                       (unsigned char **)&strut) == Success &&
-			    strut) {
-				if (nitems >= 4) {
-					reserve_left = strut[0];
-					reserve_right = strut[1];
-					reserve_top = strut[2];
-					reserve_bottom = strut[3];
+		for (unsigned long i = 0; i < nitems; ++i) {
+			if (types[i] == atom_net_wm_window_type_dock) {
+				XFree(types);
+
+				XMapWindow(dpy, cr->window);
+				long *strut = NULL;
+				if (XGetWindowProperty(dpy, cr->window, atom_wm_strut_partial, 0, 12, False,
+				                       XA_CARDINAL, &type, &format, &nitems, &bytes_after,
+				                       (unsigned char **)&strut) == Success &&
+				    strut) {
+					if (nitems >= 4) {
+						reserve_left = strut[0];
+						reserve_right = strut[1];
+						reserve_top = strut[2];
+						reserve_bottom = strut[3];
+					}
+					XFree(strut);
 				}
-				XFree(strut);
-			}
 
-			long workarea[4] = {reserve_left, reserve_top, scr_width - reserve_left - reserve_right,
-			                    scr_height - reserve_top - reserve_bottom};
-			XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace,
-			                (unsigned char *)workarea, 4);
-			return;
+				long workarea[4] = {reserve_left, reserve_top,
+				                    scr_width - reserve_left - reserve_right,
+				                    scr_height - reserve_top - reserve_bottom};
+				XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace,
+				                (unsigned char *)workarea, 4);
+				return;
+			}
+			if (types[i] == utility || types[i] == dialog || types[i] == toolbar ||
+			    types[i] == splash || types[i] == popup) {
+				/* float the listed items */
+				add_client(cr->window);
+				Client *c = workspaces[current_ws];
+				c->floating = True;
+				XMapWindow(dpy, cr->window);
+				update_net_client_list();
+				update_borders();
+				XFree(types);
+				return;
+			}
 		}
 		XFree(types);
 	}
@@ -1195,7 +1216,6 @@ void tile(void)
 
 		int i = 0;
 		int stack_x = left + master_width + user_config.gaps;
-		focused = workspaces[current_ws];
 		for (c = workspaces[current_ws]; c; c = c->next) {
 			if (c->floating || c->mon != m) {
 				continue;
@@ -1222,6 +1242,7 @@ void tile(void)
 				wc.height = h - 2 * user_config.border_width;
 			}
 
+			focused = workspaces[current_ws];
 			XSetWindowBorder(dpy, c->win,
 			                 (i == 0 ? user_config.border_foc_col : user_config.border_ufoc_col));
 
@@ -1461,10 +1482,11 @@ void xev_case(XEvent *xev)
 int main(int ac, char **av)
 {
 	if (ac > 1) {
-		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0)
+		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0) {
 			errx(0, "%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
-		else
+		} else {
 			errx(0, "usage:\n[-v || --version]: See the version of sxwm");
+		}
 	}
 	setup();
 	run();
