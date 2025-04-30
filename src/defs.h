@@ -89,6 +89,7 @@ typedef struct Client{
 	int x, y, h, w;
 	int orig_x, orig_y, orig_w, orig_h;
 	int mon;
+	int ws;
 	Bool fixed;
 	Bool floating;
 	Bool fullscreen;

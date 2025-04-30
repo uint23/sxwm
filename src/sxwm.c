@@ -33,7 +33,7 @@
 #include "defs.h"
 #include "parser.h"
 
-Client *add_client(Window w);
+Client *add_client(Window w, int ws);
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -86,16 +86,19 @@ void xev_case(XEvent *xev);
 INIT_WORKSPACE
 #include "config.h"
 
+Atom atom_net_current_desktop;
+Atom atom_net_supported;
+Atom atom_net_wm_state;
+Atom atom_net_wm_state_fullscreen;
+Atom atom_wm_window_type;
+Atom atom_net_wm_window_type_dock;
+Atom atom_net_workarea;
 Atom atom_wm_delete;
 Atom atom_wm_strut;
 Atom atom_wm_strut_partial;
-Atom atom_wm_window_type;
-Atom atom_net_supported;
-Atom atom_net_wm_state;
-Atom atom_net_current_desktop;
-Atom atom_net_wm_state_fullscreen;
-Atom atom_net_wm_window_type_dock;
-Atom atom_net_workarea;
+Atom atom_net_supporting_wm_check;
+Atom atom_net_wm_name;
+Atom atom_utf8_string;
 
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = {NULL};
@@ -109,6 +112,7 @@ Client *focused = NULL;
 EventHandler evtable[LASTEvent];
 Display *dpy;
 Window root;
+Window wm_check_win;
 Monitor *mons = NULL;
 int monsn = 0;
 Bool global_floating = False;
@@ -125,7 +129,7 @@ int reserve_right = 0;
 int reserve_top = 0;
 int reserve_bottom = 0;
 
-Client *add_client(Window w)
+Client *add_client(Window w, int ws)
 {
 	Client *c = malloc(sizeof(Client));
 	if (!c) {
@@ -135,24 +139,26 @@ Client *add_client(Window w)
 
 	c->win = w;
 	c->next = NULL;
+	c->ws = ws;
 
-	if (workspaces[current_ws] == NULL) {
-		workspaces[current_ws] = c;
+	if (!workspaces[ws]) {
+		workspaces[ws] = c;
 	}
 	else {
-		Client *tail = workspaces[current_ws];
+		Client *tail = workspaces[ws];
 		while (tail->next)
 			tail = tail->next;
 		tail->next = c;
 	}
 
-	if (!focused) {
+	if (ws == current_ws && !focused) {
 		focused = c;
 	}
 
 	++open_windows;
 	XSelectInput(dpy, w,
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask);
+
 	Atom protos[] = {atom_wm_delete};
 	XSetWMProtocols(dpy, w, protos, 1);
 
@@ -171,8 +177,7 @@ Client *add_client(Window w)
 		int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
 		c->mon = 0;
 		for (int i = 0; i < monsn; ++i) {
-			if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y &&
-			    cy < mons[i].y + mons[i].h) {
+			if (cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= mons[i].y && cy < mons[i].y + mons[i].h) {
 				c->mon = i;
 				break;
 			}
@@ -186,8 +191,35 @@ Client *add_client(Window w)
 	if (global_floating) {
 		c->floating = True;
 	}
+
 	XRaiseWindow(dpy, w);
 	return c;
+}
+
+void change_workspace(int ws)
+{
+	if (ws >= NUM_WORKSPACES || ws == current_ws) {
+		return;
+	}
+
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		XUnmapWindow(dpy, c->win);
+	}
+
+	current_ws = ws;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		XMapWindow(dpy, c->win);
+	}
+
+	tile();
+	if (workspaces[current_ws]) {
+		focused = workspaces[current_ws];
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+	}
+
+	long cd = current_ws;
+	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+	                (unsigned char *)&cd, 1);
 }
 
 int clean_mask(int mask)
@@ -405,6 +437,25 @@ void hdl_client_msg(XEvent *xev)
 		}
 		return;
 	}
+
+	if (xev->xclient.message_type == XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False)) {
+		Window target = xev->xclient.data.l[0];
+		for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+			for (Client *c = workspaces[ws]; c; c = c->next) {
+				if (c->win == target) {
+					/* do NOT move to current ws */
+					if (ws == current_ws) {
+						focused = c;
+						send_wm_take_focus(c->win);
+						XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+						XRaiseWindow(dpy, c->win);
+						update_borders();
+					}
+					return;
+				}
+			}
+		}
+	}
 }
 
 void hdl_config_ntf(XEvent *xev)
@@ -571,16 +622,16 @@ void hdl_map_req(XEvent *xev)
 	XMapRequestEvent *me = &xev->xmaprequest;
 	Window w = me->window;
 
-	/* if managing this window map & return */
+	/* if we already manage it, only map if it’s on the current workspace */
 	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			if (c->win == w) {
-				XMapWindow(dpy, w);
+				if (c->ws == current_ws)
+					XMapWindow(dpy, w);
 				return;
 			}
 		}
 	}
-
 	XWindowAttributes wa;
 	if (!XGetWindowAttributes(dpy, w, &wa))
 		return;
@@ -627,7 +678,7 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	/* ad client to list */
-	Client *c = add_client(w);
+	Client *c = add_client(w, current_ws);
 	if (!c)
 		return;
 
@@ -1176,6 +1227,11 @@ void setup_atoms(void)
 
 	/* current desktop atoms */
 	atom_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+
+	/* window manager name identifiers atoms */
+	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
+	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
+	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
 }
 
 void spawn(const char **cmd)
@@ -1497,33 +1553,6 @@ void update_net_client_list(void)
 	}
 	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	XChangeProperty(dpy, root, prop, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
-}
-
-void change_workspace(int ws)
-{
-	if (ws >= NUM_WORKSPACES || ws == current_ws) {
-		return;
-	}
-
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		XUnmapWindow(dpy, c->win);
-	}
-
-	current_ws = ws;
-
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		XMapWindow(dpy, c->win);
-	}
-
-	tile();
-	if (workspaces[current_ws]) {
-		focused = workspaces[current_ws];
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-	}
-
-	long cd = current_ws;
-	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&cd, 1);
 }
 
 int xerr(Display *dpy, XErrorEvent *ee)
