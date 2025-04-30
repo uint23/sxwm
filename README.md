@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 ><img src="images/sxwm_logo.png" width="30%"></h1>
+  <h1 ><img src="images/sxwm_logo.png" width="50%"></h1>
   <b>Minimal. Fast. Configurable. Tiling Window Manager for X11</b>
   <br>
   <sub>Abhinav Prasai (2025)</sub>
