@@ -1,9 +1,8 @@
 <div align="center">
-  <img src="images/sxwm_logo.png" width="30%">
-  <h2>sxwm</h2>
+  <h1 ><img src="images/sxwm_logo.png" width="30%"></h1>
   <b>Minimal. Fast. Configurable. Tiling Window Manager for X11</b>
   <br>
-  <sub>By Abhinav Prasai (2025)</sub>
+  <sub>Abhinav Prasai (2025)</sub>
   <br><br>
   <img src="https://img.shields.io/github/v/release/uint23/sxwm?style=flat-square">
   <img src="https://img.shields.io/github/license/uint23/sxwm?style=flat-square">
