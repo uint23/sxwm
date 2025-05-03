@@ -83,7 +83,6 @@ void update_net_client_list(void);
 void update_struts(void);
 int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
-INIT_WORKSPACE
 #include "config.h"
 
 Atom atom_net_current_desktop;
@@ -155,7 +154,7 @@ Client *add_client(Window w, int ws)
 		focused = c;
 	}
 
-	++open_windows;
+	open_windows++;
 	XSelectInput(dpy, w,
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask);
 
@@ -176,7 +175,7 @@ Client *add_client(Window w, int ws)
 		/* need better way to determine mon */
 		int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
 		c->mon = 0;
-		for (int i = 0; i < monsn; ++i) {
+		for (int i = 0; i < monsn; i++) {
 			if (cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= mons[i].y && cy < mons[i].y + mons[i].h) {
 				c->mon = i;
 				break;
@@ -236,7 +235,7 @@ void close_focused(void)
 	Atom *protos;
 	int n;
 	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
-		for (int i = 0; i < n; ++i)
+		for (int i = 0; i < n; i++)
 			if (protos[i] == atom_wm_delete) {
 				XEvent ev = {.xclient = {.type = ClientMessage,
 				                         .window = focused->win,
@@ -258,7 +257,7 @@ void close_focused(void)
 void dec_gaps(void)
 {
 	if (user_config.gaps > 0) {
-		--user_config.gaps;
+		user_config.gaps--;
 		tile();
 		update_borders();
 	}
@@ -305,7 +304,7 @@ void focus_prev(void)
 int get_monitor_for(Client *c)
 {
 	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
-	for (int i = 0; i < monsn; ++i) {
+	for (int i = 0; i < monsn; i++) {
 		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h)
 			return i;
 	}
@@ -314,17 +313,29 @@ int get_monitor_for(Client *c)
 
 void grab_keys(void)
 {
-	KeyCode keycode;
-	int modifiers[] = {0, LockMask, Mod2Mask, LockMask | Mod2Mask};
-
+	const int guards[] = {0,
+	                      LockMask,
+	                      Mod2Mask,
+	                      LockMask | Mod2Mask,
+	                      Mod5Mask,
+	                      LockMask | Mod5Mask,
+	                      Mod2Mask | Mod5Mask,
+	                      LockMask | Mod2Mask | Mod5Mask};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
-	for (int i = 0; i < user_config.bindsn; ++i) {
-		if ((keycode = XKeysymToKeycode(dpy, user_config.binds[i].keysym))) {
-			for (unsigned int j = 0; j < LENGTH(modifiers); ++j) {
-				XGrabKey(dpy, keycode, user_config.binds[i].mods | modifiers[j], root, True, GrabModeAsync,
-				         GrabModeAsync);
-			}
-		}
+
+	for (int i = 0; i < user_config.bindsn; i++) {
+		Binding *b = &user_config.binds[i];
+
+		if ((b->type == TYPE_CWKSP && b->mods != user_config.modkey) ||
+		    (b->type == TYPE_MWKSP && b->mods != (user_config.modkey | ShiftMask)))
+			continue;
+
+		KeyCode kc = XKeysymToKeycode(dpy, b->keysym);
+		if (!kc)
+			continue;
+
+		for (size_t g = 0; g < sizeof guards / sizeof *guards; g++)
+			XGrabKey(dpy, kc, b->mods | guards[g], root, True, GrabModeAsync, GrabModeAsync);
 	}
 }
 
@@ -440,7 +451,7 @@ void hdl_client_msg(XEvent *xev)
 
 	if (xev->xclient.message_type == XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False)) {
 		Window target = xev->xclient.data.l[0];
-		for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+		for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 			for (Client *c = workspaces[ws]; c; c = c->next) {
 				if (c->win == target) {
 					/* do NOT move to current ws */
@@ -472,7 +483,7 @@ void hdl_config_req(XEvent *xev)
 	XConfigureRequestEvent *e = &xev->xconfigurerequest;
 	Client *c = NULL;
 
-	for (int ws = 0; ws < NUM_WORKSPACES && !c; ++ws)
+	for (int ws = 0; ws < NUM_WORKSPACES && !c; ws++)
 		for (c = workspaces[ws]; c; c = c->next)
 			if (c->win == e->window) {
 				break;
@@ -532,7 +543,7 @@ void hdl_destroy_ntf(XEvent *xev)
 
 		free(c);
 		update_net_client_list();
-		--open_windows;
+		open_windows--;
 	}
 
 	tile();
@@ -561,16 +572,28 @@ void hdl_enter(XEvent *xev)
 
 void hdl_keypress(XEvent *xev)
 {
-	KeySym keysym = XLookupKeysym(&xev->xkey, 0);
-	unsigned int mods = clean_mask(xev->xkey.state);
+	KeySym ks = XkbKeycodeToKeysym(dpy, xev->xkey.keycode, 0, 0);
+	int mods = clean_mask(xev->xkey.state);
 
-	for (int i = 0; i < user_config.bindsn; ++i) {
-		if (keysym == user_config.binds[i].keysym && mods == (unsigned int)clean_mask(user_config.binds[i].mods)) {
-			if (user_config.binds[i].is_func) {
-				user_config.binds[i].action.fn();
-			}
-			else {
-				spawn(user_config.binds[i].action.cmd);
+	for (int i = 0; i < user_config.bindsn; i++) {
+		Binding *b = &user_config.binds[i];
+		if (b->keysym == ks && clean_mask(b->mods) == mods) {
+			switch (b->type) {
+				case TYPE_CMD:
+					spawn(b->action.cmd);
+					break;
+				case TYPE_FUNC:
+					if (b->action.fn)
+						b->action.fn();
+					break;
+				case TYPE_CWKSP:
+					change_workspace(b->action.ws);
+					update_net_client_list();
+					break;
+				case TYPE_MWKSP:
+					move_to_workspace(b->action.ws);
+					update_net_client_list();
+					break;
 			}
 			return;
 		}
@@ -622,8 +645,8 @@ void hdl_map_req(XEvent *xev)
 	XMapRequestEvent *me = &xev->xmaprequest;
 	Window w = me->window;
 
-	/* if we already manage it, only map if it’s on the current workspace */
-	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+	/* only manage if on current ws */
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			if (c->win == w) {
 				if (c->ws == current_ws)
@@ -656,7 +679,7 @@ void hdl_map_req(XEvent *xev)
 		Atom splash = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
 		Atom popup = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
 
-		for (unsigned long i = 0; i < nitems; ++i) {
+		for (unsigned long i = 0; i < nitems; i++) {
 			if (types[i] == dock) {
 				XFree(types);
 				XMapWindow(dpy, w);
@@ -735,7 +758,7 @@ void hdl_motion(XEvent *xev)
 		unsigned int mask;
 		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
 
-		static Client *last_swap_target = NULL;
+		Client *last_swap_target = NULL;
 		Client *new_target = NULL;
 
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -839,7 +862,7 @@ void update_struts(void)
 	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &nchildren))
 		return;
 
-	for (unsigned int i = 0; i < nchildren; ++i) {
+	for (unsigned int i = 0; i < nchildren; i++) {
 		Window w = children[i];
 
 		Atom actual_type;
@@ -853,7 +876,7 @@ void update_struts(void)
 			continue;
 
 		Bool is_dock = False;
-		for (unsigned long j = 0; j < nitems; ++j) {
+		for (unsigned long j = 0; j < nitems; j++) {
 			if (types[j] == atom_net_wm_window_type_dock) {
 				is_dock = True;
 				break;
@@ -891,7 +914,7 @@ void update_struts(void)
 
 void inc_gaps(void)
 {
-	++user_config.gaps;
+	user_config.gaps++;
 	tile();
 	update_borders();
 }
@@ -910,12 +933,12 @@ void init_defaults(void)
 	default_config.snap_distance = 5;
 	default_config.bindsn = 0;
 
-	for (unsigned long i = 0; i < LENGTH(binds); ++i) {
+	for (unsigned long i = 0; i < LENGTH(binds); i++) {
 		default_config.binds[i].mods = binds[i].mods;
 		default_config.binds[i].keysym = binds[i].keysym;
 		default_config.binds[i].action.cmd = binds[i].action.cmd;
-		default_config.binds[i].is_func = binds[i].is_func;
-		++default_config.bindsn;
+		default_config.binds[i].type = binds[i].type;
+		default_config.bindsn++;
 	}
 
 	user_config = default_config;
@@ -1028,7 +1051,7 @@ long parse_col(const char *hex)
 
 void quit(void)
 {
-	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			XUnmapWindow(dpy, c->win);
 			XKillClient(dpy, c->win);
@@ -1045,13 +1068,33 @@ void quit(void)
 void reload_config(void)
 {
 	puts("sxwm: reloading config...");
-	memset(user_config.binds, 0, sizeof(user_config.binds));
+	memset(&user_config, 0, sizeof(user_config));
+
+	for (int i = 0; i < user_config.bindsn; i++) {
+		free(user_config.binds[i].action.cmd);
+		user_config.binds[i].action.cmd = NULL;
+
+		user_config.binds[i].action.fn = NULL;
+		user_config.binds[i].type = -1;
+		user_config.binds[i].keysym = 0;
+		user_config.binds[i].mods = 0;
+	}
+
 	init_defaults();
 	if (parser(&user_config)) {
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
 	grab_keys();
+	XUngrabButton(dpy, AnyButton, AnyModifier, root);
+	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	            GrabModeAsync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
+	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	            GrabModeAsync, GrabModeAsync, None, None);
+	XSync(dpy, False);
+
 	tile();
 	update_borders();
 }
@@ -1090,7 +1133,7 @@ void scan_existing_windows(void)
 	unsigned int nchildren;
 
 	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &nchildren)) {
-		for (unsigned int i = 0; i < nchildren; ++i) {
+		for (unsigned int i = 0; i < nchildren; i++) {
 			XWindowAttributes wa;
 			if (!XGetWindowAttributes(dpy, children[i], &wa) || wa.override_redirect || wa.map_state != IsViewable) {
 				continue;
@@ -1114,7 +1157,7 @@ void send_wm_take_focus(Window w)
 	Atom *protos;
 	int n;
 	if (XGetWMProtocols(dpy, w, &protos, &n)) {
-		for (int i = 0; i < n; ++i) {
+		for (int i = 0; i < n; i++) {
 			if (protos[i] == wm_take_focus) {
 				XEvent ev = {
 				    .xclient = {.type = ClientMessage, .window = w, .message_type = wm_protocols, .format = 32}};
@@ -1164,7 +1207,7 @@ void setup(void)
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XSync(dpy, False);
 
-	for (int i = 0; i < LASTEvent; ++i) {
+	for (int i = 0; i < LASTEvent; i++) {
 		evtable[i] = hdl_dummy;
 	}
 
@@ -1308,7 +1351,7 @@ void tile(void)
 		}
 	}
 
-	for (int m = 0; m < monsn; ++m) {
+	for (int m = 0; m < monsn; m++) {
 		int mon_x = mons[m].x;
 		int mon_y = mons[m].y;
 		int mon_w = mons[m].w;
@@ -1387,7 +1430,7 @@ void tile(void)
 			c->y = wc.y;
 			c->w = wc.width;
 			c->h = wc.height;
-			++i;
+			i++;
 		}
 	}
 	update_borders();
@@ -1513,7 +1556,7 @@ void update_monitors(void)
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
 
-	for (int s = 0; s < ScreenCount(dpy); ++s) {
+	for (int s = 0; s < ScreenCount(dpy); s++) {
 		Window scr_root = RootWindow(dpy, s);
 		XDefineCursor(dpy, scr_root, c_normal);
 	}
@@ -1521,7 +1564,7 @@ void update_monitors(void)
 	if (XineramaIsActive(dpy)) {
 		info = XineramaQueryScreens(dpy, &monsn);
 		mons = malloc(sizeof *mons * monsn);
-		for (int i = 0; i < monsn; ++i) {
+		for (int i = 0; i < monsn; i++) {
 			mons[i].x = info[i].x_org;
 			mons[i].y = info[i].y_org;
 			mons[i].w = info[i].width;
@@ -1545,10 +1588,9 @@ void update_net_client_list(void)
 {
 	Window wins[MAXCLIENTS];
 	int n = 0;
-	for (int ws = 0; ws < NUM_WORKSPACES; ++ws) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
-			wins[n++] = c->win; /* has to be n++ or well get an off by one error
-			                       i think */
+			wins[n++] = c->win;
 		}
 	}
 	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
@@ -1567,7 +1609,7 @@ int xerr(Display *dpy, XErrorEvent *ee)
 	    {X_ConfigureWindow, BadMatch},
 	};
 
-	for (size_t i = 0; i < sizeof(ignore) / sizeof(ignore[0]); ++i) {
+	for (size_t i = 0; i < sizeof(ignore) / sizeof(ignore[0]); i++) {
 		if ((ignore[i].req == 0 || ignore[i].req == ee->request_code) && (ignore[i].code == ee->error_code)) {
 			return 0;
 		}

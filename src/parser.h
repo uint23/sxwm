@@ -1,9 +1,8 @@
-/* See LICENSE for more information on use */
 #pragma once
 #include "defs.h"
 #define MAX_ARGS 64
 
-void handler(char *command, char *arg, int mods, KeySym keysym, Action action, Bool is_func, Config *user_config);
+const char **build_argv(const char *cmd);
 int parser(Config *user_config);
-unsigned int parse_mods(const char *mods, Config *user_config);
+int parse_mods(const char *mods, Config *user_config);
 KeySym parse_keysym(const char *key);

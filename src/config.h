@@ -1,211 +1,53 @@
 /* See LICENSE for more information on use */
-
-/*
- * ——————————————< Appearance >—————————————— *
- *
- *	   In this section you can configure the
- *	   settings for sxwm. You can ignore the
- *	   #define as it is C specific syntax
- *
- *	   GAPS (px):
- *	   How many pixels between windows and
- *	   screen edges (including bar)
- *	   BORDER_WIDTH (px):
- *	   How thick your border is
- *
- *	   BORDER_FOC_COL (hex):
- *	   The colour of your border when the
- *	   window is focused
- *
- *	   BORDER_UFOC_COL (hex):
- *	   The colour of your border when the
- *	   window is unfocused
- *
- *	   MASTER_WIDTH (int):
- *	   % of the screen the master window
- *	   should take
- *	   
- *	   RESIZE_MASTER_AMT (%):
- *	   % of the master width you want to
- *	   increment by
- *
- *	   MOTION_THROTTLE (int):
- *	   Usually you should set this to your
- *	   screen refreshrate. This is set so
- *	   there is no exessive number of
- *	   requests being sent to the X server
- *
- *	   SNAP_DISTANCE (px):
- *	   How many pixels away from the screen
- *	   until the window *snaps* to the edge
- *
- *	   NUM_WORKSPACES (int):
- *	   This is how many workspaces you want in
- *	   this window manager. Best to leave it
- *	   default (9).
- *
- *	   WORKSPACE_NAMES (char[]):
- *	   This is just the label that will appear
- *	   on your status bar. Doesn't have to be
- *	   a number, it can be anything. Ignore
- *	   the "\0", this is just a NULL that says
- *	   to start again, otherwise it would be
- *	   all of them concatenated together.
- *
- * ———————————————————————————————————————————*
-*/
-
-#define NUM_WORKSPACES		9
-#define WORKSPACE_NAMES		\
-	"1"					"\0"\
-	"2"					"\0"\
-	"3"					"\0"\
-	"4"					"\0"\
-	"5"					"\0"\
-	"6"					"\0"\
-	"7"					"\0"\
-	"8"					"\0"\
-	"9"					"\0"\
-
-/*
- * ————————————< Keys & Bindins >—————————————*
- *
- *	   This is where you set your keybinds to
- *	   execute apps. You can use the CMD macro
- *	   to make new variables.
- *
- *	   How do you make a command to run an app
- *	   It's simple! Just do this:
- *
- *	   CALL(appcallname, "app", "arg2", ...);
- *
- *	   What is appcallname? This is just the
- *	   variable name given to this string of
- *	   commands given to execvp, the function
- *	   that executes these programs.
- *
- * ———————————————————————————————————————————*
- *
-*/
-
-CMD(terminal,	"st");
-CMD(browser,	"firefox");
-
-/*
- * ———————————————< Bindings >————————————————*
- *
- *     This is where you assign keybinds to
- *     perform some actions.
- *
- *     How do you bind keys? In sxwm, there is
- *     three ways to bind keys to perform
- *     tasks:
- *
- *     BIND, CALL or WORKSPACE.
- *     CALL, calls a function,
- *     BIND, executes a specified
- *     program.
- *     WORKSPACE, sets the bind to move
- *     and item to said workspace or to
- *     change to that workspace.
- *
- *     USEAGE:
- *     	 BIND(MODIFIERS, KEY, FUNCTION)
- *
- *     	 MODIFIERS:
- *     	 The mod keys you want held down
- *     	 for the task to execute. I have
- *     	 also defined SHIFT as a substitute
- *     	 for ShiftMask.
- *
- *     	 KEY:
- *     	 The key to press in combination
- *     	 with the MODIFERS to run the task.
- *
- *     	 FUNCTION:
- *     	 The task to execute. Depending on
- *     	 whether you're calling CALL or
- *     	 BIND, this will execute a program
- *     	 or call a function.
- *
- *     	 If you're
- *     	 calling a function, just put the
- *     	 name of the funtion.
- *
- *     	 Otherwise, put the program you
- *     	 either defined with the CMD above
- *     	 or you can skip that step and just
- *     	 do something like this to create a
- *     	 "string" in the bindings array:
- *
- *     	 { "program", "arg1", NULL }
- *
- *     End the line with a comma, as this is
- *     an array.
- *
- * ———————————————————————————————————————————*
-*/
-
-/*< This is your modifier key (ALT/SUPER) >*/
+#include <X11/Xlib.h>
 #include <X11/keysym.h>
-const Binding binds[] =
-{
-/*————< Mod4MaskIFIER(S) >< KEY >—————< FUNCTION >——*/
+#include "defs.h"
 
-/*———————< Here are your functions calls >————— — */
+CMD(terminal, "st");
+CMD(browser, "firefox");
 
-	CALL(Mod4Mask|SHIFT,		e,			quit),
-	CALL(Mod4Mask|SHIFT,		q,			close_focused),
+const Binding binds[] = {
+    {Mod4Mask | ShiftMask, XK_e, {.fn = quit}, TYPE_FUNC},
+    {Mod4Mask | ShiftMask, XK_q, {.fn = close_focused}, TYPE_FUNC},
 
-	CALL(Mod4Mask, 			j, 			focus_next),
-	CALL(Mod4Mask, 			k, 			focus_prev),
+    {Mod4Mask, XK_j, {.fn = focus_next}, TYPE_FUNC},
+    {Mod4Mask, XK_k, {.fn = focus_prev}, TYPE_FUNC},
 
-	CALL(Mod4Mask|SHIFT, 	j, 			move_master_next),
-	CALL(Mod4Mask|SHIFT, 	k, 			move_master_prev),
+    {Mod4Mask | ShiftMask, XK_j, {.fn = move_master_next}, TYPE_FUNC},
+    {Mod4Mask | ShiftMask, XK_k, {.fn = move_master_prev}, TYPE_FUNC},
 
-	CALL(Mod4Mask, 			l, 			resize_master_add),
-	CALL(Mod4Mask,		 	h, 			resize_master_sub),
+    {Mod4Mask, XK_l, {.fn = resize_master_add}, TYPE_FUNC},
+    {Mod4Mask, XK_h, {.fn = resize_master_sub}, TYPE_FUNC},
 
-	CALL(Mod4Mask,			equal,		inc_gaps),
-	CALL(Mod4Mask,			minus,		dec_gaps),
+    {Mod4Mask, XK_equal, {.fn = inc_gaps}, TYPE_FUNC},
+    {Mod4Mask, XK_minus, {.fn = dec_gaps}, TYPE_FUNC},
 
-	CALL(Mod4Mask,			space,		toggle_floating),
-	CALL(Mod4Mask|SHIFT,		space,		toggle_floating_global),
+    {Mod4Mask, XK_space, {.fn = toggle_floating}, TYPE_FUNC},
+    {Mod4Mask | ShiftMask, XK_space, {.fn = toggle_floating_global}, TYPE_FUNC},
+    {Mod4Mask | ShiftMask, XK_f, {.fn = toggle_fullscreen}, TYPE_FUNC},
 
-	CALL(Mod4Mask|SHIFT,		f,			toggle_fullscreen),
+    {Mod4Mask, XK_Return, {.cmd = terminal}, TYPE_CMD},
+    {Mod4Mask, XK_b, {.cmd = browser}, TYPE_CMD},
+    {Mod4Mask, XK_p, {.cmd = (const char *[]){"dmenu_run", NULL}}, TYPE_CMD},
 
-/*—————< Here are your executable functions >—————*/
+    {Mod4Mask, XK_r, {.fn = reload_config}, TYPE_FUNC},
 
-	BIND(Mod4Mask, 			Return,		terminal),
-	BIND(Mod4Mask,			b,			browser),
-
-/*—————< This is for workspaces >—————————————————*/
-
-	CALL(Mod4Mask,			1,			change_ws1),
-	CALL(Mod4Mask|SHIFT,		1,			moveto_ws1),
-
-	CALL(Mod4Mask,			2,			change_ws2),
-	CALL(Mod4Mask|SHIFT,		2,			moveto_ws2),
-
-	CALL(Mod4Mask,			3,			change_ws3),
-	CALL(Mod4Mask|SHIFT,		3,			moveto_ws3),
-
-	CALL(Mod4Mask,			4,			change_ws4),
-	CALL(Mod4Mask|SHIFT,		4,			moveto_ws4),
-
-	CALL(Mod4Mask,			5,			change_ws5),
-	CALL(Mod4Mask|SHIFT,		5,			moveto_ws5),
-
-	CALL(Mod4Mask,			6,			change_ws6),
-	CALL(Mod4Mask|SHIFT,		6,			moveto_ws6),
-
-	CALL(Mod4Mask,			7,			change_ws7),
-	CALL(Mod4Mask|SHIFT,		7,			moveto_ws7),
-
-	CALL(Mod4Mask,			8,			change_ws8),
-	CALL(Mod4Mask|SHIFT,		8,			moveto_ws8),
-
-	CALL(Mod4Mask,			9,			change_ws9),
-	CALL(Mod4Mask|SHIFT,		9,			moveto_ws9),
-
+    {Mod4Mask, XK_1, {.ws = 0}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_1, {.ws = 0}, TYPE_MWKSP},
+    {Mod4Mask, XK_2, {.ws = 1}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_2, {.ws = 1}, TYPE_MWKSP},
+    {Mod4Mask, XK_3, {.ws = 2}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_3, {.ws = 2}, TYPE_MWKSP},
+    {Mod4Mask, XK_4, {.ws = 3}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_4, {.ws = 3}, TYPE_MWKSP},
+    {Mod4Mask, XK_5, {.ws = 4}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_5, {.ws = 4}, TYPE_MWKSP},
+    {Mod4Mask, XK_6, {.ws = 5}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_6, {.ws = 5}, TYPE_MWKSP},
+    {Mod4Mask, XK_7, {.ws = 6}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_7, {.ws = 6}, TYPE_MWKSP},
+    {Mod4Mask, XK_8, {.ws = 7}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_8, {.ws = 7}, TYPE_MWKSP},
+    {Mod4Mask, XK_9, {.ws = 8}, TYPE_CWKSP},
+    {Mod4Mask | ShiftMask, XK_9, {.ws = 8}, TYPE_MWKSP},
 };

@@ -18,54 +18,54 @@ motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 mod_key : super
 
 # Application Launchers:
-bind : [mod + Return]        : "st"
-bind : [mod + b]             : "firefox"
-bind : [mod + p]             : "dmenu_run"
+bind : mod + Return : "st"
+bind : mod + b : "firefox"
+bind : mod + p : "dmenu_run"
 
 # Window Management:
-bind : [mod + shift + q]     : close_window
-bind : [mod + shift + e]     : quit
+call : mod + shift + q : close_window
+call : mod + shift + e : quit
 
 # Focus Movement:
-bind : [mod + j]             : focus_next
-bind : [mod + k]             : focus_prev
+call : mod + j : focus_next
+call : mod + k : focus_prev
 
 # Master/Stack Movement
-bind : [mod + shift + j]     : master_next
-bind : [mod + shift + k]     : master_previous
+call : mod + shift + j : master_next
+call : mod + shift + k : master_previous
 
 # Master Area Resize
-bind : [mod + l]             : master_increase
-bind : [mod + h]             : master_decrease
+call : mod + l : master_increase
+call : mod + h : master_decrease
 
 # Gaps 
-bind : [mod + equal]         : increase_gaps
-bind : [mod + minus]         : decrease_gaps
+call : mod + equal : increase_gaps
+call : mod + minus : decrease_gaps
 
 # Floating/Fullscreen
-bind : [mod + space]         : toggle_floating
-bind : [mod + shift + space] : global_floating
-bind : [mod + shift + f]     : fullscreen
+call : mod + space : toggle_floating
+call : mod + shift + space : global_floating
+call : mod + shift + f : fullscreen
 
 # Reload Config
-bind : [mod + r]             : reload_config
+call : mod + r : reload_config
 
 # Workspaces (1-9)
-bind : [mod + 1]             : change_ws1
-bind : [mod + shift + 1]     : moveto_ws1
-bind : [mod + 2]             : change_ws2
-bind : [mod + shift + 2]     : moveto_ws2
-bind : [mod + 3]             : change_ws3
-bind : [mod + shift + 3]     : moveto_ws3
-bind : [mod + 4]             : change_ws4
-bind : [mod + shift + 4]     : moveto_ws4
-bind : [mod + 5]             : change_ws5
-bind : [mod + shift + 5]     : moveto_ws5
-bind : [mod + 6]             : change_ws6
-bind : [mod + shift + 6]     : moveto_ws6
-bind : [mod + 7]             : change_ws7
-bind : [mod + shift + 7]     : moveto_ws7
-bind : [mod + 8]             : change_ws8
-bind : [mod + shift + 8]     : moveto_ws8
-bind : [mod + 9]             : change_ws9
-bind : [mod + shift + 9]     : moveto_ws9
+workspace : [mod + 1]          : move 1
+workspace : [mod + shift + 1]  : swap 1
+workspace : [mod + 2]          : move 2
+workspace : [mod + shift + 2]  : swap 2
+workspace : [mod + 3]          : move 3
+workspace : [mod + shift + 3]  : swap 3
+workspace : [mod + 4]          : move 4
+workspace : [mod + shift + 4]  : swap 4
+workspace : [mod + 5]          : move 5
+workspace : [mod + shift + 5]  : swap 5
+workspace : [mod + 6]          : move 6
+workspace : [mod + shift + 6]  : swap 6
+workspace : [mod + 7]          : move 7
+workspace : [mod + shift + 7]  : swap 7
+workspace : [mod + 8]          : move 8
+workspace : [mod + shift + 8]  : swap 8
+workspace : [mod + 9]          : move 9
+workspace : [mod + shift + 9]  : swap 9
