@@ -1,7 +1,7 @@
 /* See LICENSE for more information on use */
 #pragma once
 #include <X11/Xlib.h>
-#define SXWM_VERSION	"sxwm ver. 1.4"
+#define SXWM_VERSION	"sxwm ver. 1.5"
 #define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO	"See LICENSE for more info"
 
