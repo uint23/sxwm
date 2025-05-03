@@ -86,6 +86,7 @@ int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
 
+Atom atom_net_active_window;
 Atom atom_net_current_desktop;
 Atom atom_net_supported;
 Atom atom_net_wm_state;
@@ -1228,27 +1229,41 @@ void setup(void)
 
 void setup_atoms(void)
 {
-	/* bar atoms */
+	Atom a_num = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+	Atom a_names = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
+	atom_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	atom_net_active_window = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
 	atom_net_supported = XInternAtom(dpy, "_NET_SUPPORTED", False);
 	atom_wm_strut_partial = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
 	atom_wm_strut = XInternAtom(dpy, "_NET_WM_STRUT", False); /* legacy struts */
 	atom_wm_window_type = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	atom_net_wm_window_type_dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
 	atom_net_workarea = XInternAtom(dpy, "_NET_WORKAREA", False);
+	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
+	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
+	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
+	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
+	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
 
 	Atom support_list[] = {
-	    XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False),
-	    XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False),
-	    XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False),
-	    XInternAtom(dpy, "_NET_WORKAREA", False),
+	    atom_net_current_desktop,
+	    atom_net_active_window,
+	    atom_net_supported,
+	    atom_net_wm_state,
+	    atom_net_wm_state_fullscreen,
+	    atom_wm_window_type,
+	    atom_net_wm_window_type_dock,
+	    atom_net_workarea,
+	    atom_wm_strut,
+	    atom_wm_strut_partial,
+	    atom_wm_delete,
+	    atom_net_supporting_wm_check,
+	    atom_net_wm_name,
+	    atom_utf8_string,
 	};
-
-	XChangeProperty(dpy, root, atom_net_supported, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
-	                sizeof(support_list) / sizeof(Atom));
-
-	/* workspace atoms */
-	Atom a_num = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
-	Atom a_names = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
 
 	long num = NUM_WORKSPACES;
 	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&num, 1);
@@ -1262,20 +1277,9 @@ void setup_atoms(void)
 	long initial = current_ws;
 	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
 	                (unsigned char *)&initial, 1);
-	/* fullscreen atoms */
-	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
 
-	/* delete atoms */
-	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-
-	/* current desktop atoms */
-	atom_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
-
-	/* window manager name identifiers atoms */
-	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
-	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
-	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
+	XChangeProperty(dpy, root, atom_net_supported, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
+	                sizeof(support_list) / sizeof(Atom));
 }
 
 void spawn(const char **argv)
@@ -1302,7 +1306,8 @@ void spawn(const char **argv)
 		const char **left = argv;
 		const char **right = argv + pipe_idx + 1;
 		int fd[2];
-		(void)pipe(fd);
+		Bool x = pipe(fd);
+		(void)x;
 
 		pid_t pid1 = fork();
 		if (pid1 == 0) {
@@ -1580,6 +1585,10 @@ void update_borders(void)
 {
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		XSetWindowBorder(dpy, c->win, (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+	}
+	if (focused) {
+		Window w = focused->win;
+		XChangeProperty(dpy, root, atom_net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&w, 1);
 	}
 }
 
