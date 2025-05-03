@@ -40,9 +40,25 @@
 <details>
 <summary><strong>Click to expand</strong></summary>
 
-#### v1.1.1
-- **NEW**: Xinerama support, swap windows with Mod + Shift + Drag.
-- **FIXED**: New windows in `global_floating` mode spawn centered.
+#### v1.5 - Ready for Release
+
+- **NEW**: Using XCursor instead of cursor font && new logo.
+- **FIXED**: Proper bind resetting on refresh config.
+- **CHANGE**: No longer using INIT_WORKSPACE macro, proper workspace handling. New sxwmrc
+
+#### v1.4
+- **CHANGE**: Added motion throttle && master width general options
+
+#### v1.3
+- **CHANGE**: ulong, u_char uint are gone
+
+#### v1.2
+- **NEW**: Parser support
+- **FIXED**: Quit syntax && Freeing cursor on exit
+
+#### v1.1
+- **NEW**: Xinerama support, swap windows with Mod + Shift + Drag
+- **FIXED**: New windows in `global_floating` mode spawn centered
 
 </details>
 
