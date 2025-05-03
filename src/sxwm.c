@@ -19,6 +19,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <X11/Xatom.h>
@@ -71,7 +72,7 @@ void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
-void spawn(const char **cmd);
+void spawn(const char **argv);
 void swap_clients(Client *a, Client *b);
 void tile(void);
 /* void toggle_floating(void); */
@@ -1277,22 +1278,56 @@ void setup_atoms(void)
 	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
 }
 
-void spawn(const char **cmd)
+void spawn(const char **argv)
 {
-	pid_t pid;
-
-	if (!cmd || !cmd[0]) {
-		return;
+	int pipe_idx = -1;
+	for (int i = 0; argv[i]; i++) {
+		if (strcmp(argv[i], "|") == 0) {
+			pipe_idx = i;
+			break;
+		}
 	}
 
-	pid = fork();
-	if (pid < 0) {
-		errx(1, "sxwm: fork failed");
+	if (pipe_idx < 0) {
+		if (fork() == 0) {
+			close(ConnectionNumber(dpy));
+			setsid();
+			execvp(argv[0], (char *const *)argv);
+			fprintf(stderr, "sxwm: execvp '%s' failed\n", argv[0]);
+			exit(EXIT_FAILURE);
+		}
 	}
-	else if (pid == 0) {
-		setsid();
-		execvp(cmd[0], (char *const *)cmd);
-		errx(1, "sxwm: execvp '%s' failed", cmd[0]);
+	else {
+		((char **)argv)[pipe_idx] = NULL;
+		const char **left = argv;
+		const char **right = argv + pipe_idx + 1;
+		int fd[2];
+		(void)pipe(fd);
+
+		pid_t pid1 = fork();
+		if (pid1 == 0) {
+			dup2(fd[1], STDOUT_FILENO);
+			close(fd[0]);
+			close(fd[1]);
+			execvp(left[0], (char *const *)left);
+			perror("spawn left");
+			exit(EXIT_FAILURE);
+		}
+
+		pid_t pid2 = fork();
+		if (pid2 == 0) {
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[0]);
+			close(fd[1]);
+			execvp(right[0], (char *const *)right);
+			perror("spawn right");
+			exit(EXIT_FAILURE);
+		}
+
+		close(fd[0]);
+		close(fd[1]);
+		waitpid(pid1, NULL, 0);
+		waitpid(pid2, NULL, 0);
 	}
 }
 
