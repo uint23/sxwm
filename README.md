@@ -43,7 +43,7 @@
 #### v1.5 - Ready for Release
 
 - **NEW**: Using XCursor instead of cursor font && new logo.
-- **FIXED**: Proper bind resetting on refresh config.
+- **FIXED**: Proper bind resetting on refresh config. && Multi-arg binds now work due to new and improved spawn function
 - **CHANGE**: No longer using INIT_WORKSPACE macro, proper workspace handling. New sxwmrc
 
 #### v1.4
