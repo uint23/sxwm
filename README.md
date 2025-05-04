@@ -30,6 +30,8 @@
 
 <a href="1"><img src="images/1.png" width="50%" align="right"></a>
 <a href="2"><img src="images/2.png" width="50%" align="right"></a>
+<a href="3"><img src="images/3.png" width="50%" align="right"></a>
+<a href="4"><img src="images/4.png" width="50%" align="right"></a>
 
 <br clear="right">
 
