@@ -29,7 +29,7 @@
 ## Screenshots
 
 <a href="1"><img src="images/1.png" width="100%" align="right"></a>
-<a href="2"><img src="images/2.png" width="100%" align="left"></a>
+<a href="2"><img src="images/x.png" width="100%" align="left"></a>
 <a href="3"><img src="images/3.png" width="100%" align="right"></a>
 <a href="4"><img src="images/4.png" width="100%" align="left"></a>
 
