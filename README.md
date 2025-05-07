@@ -1,3 +1,7 @@
+# I WON'T BE UPDATING THIS PROJECT FOR A MONTH OR SO DUE TO EXAMS
+
+# ISSUES PR's ETC WELCOME, JUST DON'T EXPECT A SOLUTION FROM ME QUICKLY 🥀🥀
+
 <div align="center">
   <h1 ><img src="images/sxwm_logo.png" width="50%"></h1>
   <b>Minimal. Fast. Configurable. Tiling Window Manager for X11</b>
