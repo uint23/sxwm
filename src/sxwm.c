@@ -1048,7 +1048,8 @@ long parse_col(const char *hex)
 		return WhitePixel(dpy, DefaultScreen(dpy));
 	}
 
-	return col.pixel;
+	/* return col.pixel; */
+	return col.pixel |= 0xff << 24;
 }
 
 void quit(void)
