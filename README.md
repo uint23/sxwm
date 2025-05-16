@@ -194,6 +194,16 @@ bind : [mod + shift + 5] : moveto_ws5
 yay -S sxwm
 ```
 
+### Debian
+
+```sh
+sudo apt install libx11-dev libxinerama-dev git gcc make
+git clone --depth=1 https://github.com/uint23/sxwm.git
+cd sxwm/
+make
+sudo make clean install
+```
+
 ### Build from Source
 
 ```sh
