@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Sxwm
+Comment=Simple Xorg Window Manager
+Exec=sxwm
+Type=XSession
