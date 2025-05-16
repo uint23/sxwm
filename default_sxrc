@@ -51,21 +51,21 @@ call : mod + shift + f : fullscreen
 call : mod + r : reload_config
 
 # Workspaces (1-9)
-workspace : [mod + 1]          : move 1
-workspace : [mod + shift + 1]  : swap 1
-workspace : [mod + 2]          : move 2
-workspace : [mod + shift + 2]  : swap 2
-workspace : [mod + 3]          : move 3
-workspace : [mod + shift + 3]  : swap 3
-workspace : [mod + 4]          : move 4
-workspace : [mod + shift + 4]  : swap 4
-workspace : [mod + 5]          : move 5
-workspace : [mod + shift + 5]  : swap 5
-workspace : [mod + 6]          : move 6
-workspace : [mod + shift + 6]  : swap 6
-workspace : [mod + 7]          : move 7
-workspace : [mod + shift + 7]  : swap 7
-workspace : [mod + 8]          : move 8
-workspace : [mod + shift + 8]  : swap 8
-workspace : [mod + 9]          : move 9
-workspace : [mod + shift + 9]  : swap 9
+workspace : mod + 1          : move 1
+workspace : mod + shift + 1  : swap 1
+workspace : mod + 2          : move 2
+workspace : mod + shift + 2  : swap 2
+workspace : mod + 3          : move 3
+workspace : mod + shift + 3  : swap 3
+workspace : mod + 4          : move 4
+workspace : mod + shift + 4  : swap 4
+workspace : mod + 5          : move 5
+workspace : mod + shift + 5  : swap 5
+workspace : mod + 6          : move 6
+workspace : mod + shift + 6  : swap 6
+workspace : mod + 7          : move 7
+workspace : mod + shift + 7  : swap 7
+workspace : mod + 8          : move 8
+workspace : mod + shift + 8  : swap 8
+workspace : mod + 9          : move 9
+workspace : mod + shift + 9  : swap 9
