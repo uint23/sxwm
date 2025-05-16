@@ -203,6 +203,8 @@ void change_workspace(int ws)
 		return;
 	}
 
+	XGrabServer(dpy);
+
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		XUnmapWindow(dpy, c->win);
 	}
@@ -221,6 +223,8 @@ void change_workspace(int ws)
 	long cd = current_ws;
 	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
 	                (unsigned char *)&cd, 1);
+
+	XUngrabServer(dpy);
 }
 
 int clean_mask(int mask)
