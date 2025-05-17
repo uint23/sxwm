@@ -3,7 +3,9 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <X11/keysym.h>
 
 #include "parser.h"
@@ -137,12 +139,33 @@ int parser(Config *cfg)
 		fputs("sxwmrc: HOME not set\n", stderr);
 		return -1;
 	}
-	snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
-	FILE *f = fopen(path, "r");
-	if (!f) {
-		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
-		return -1;
-	}
+
+	// check $XDG_CONFIG_HOME/sxwmrc, then $XDG_CONFIG_HOME/sxwm/sxwmrc, then $HOME/.config/sxwmrc
+	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+
+    if (xdg_config_home) {
+        snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
+        if (access(path, R_OK) == 0) {
+            goto found;
+        }
+
+        snprintf(path, sizeof path, "%s/sxwm/sxwmrc", xdg_config_home);
+        if (access(path, R_OK) == 0) {
+            goto found;
+        }
+    }
+
+    snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
+    if (access(path, R_OK) == 0) {
+        goto found;
+    }
+
+found:
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        fprintf(stderr, "sxwmrc: cannot open %s\n", path);
+        return -1;
+    }
 
 	char line[512];
 	int lineno = 0;
