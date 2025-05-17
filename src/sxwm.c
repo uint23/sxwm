@@ -17,6 +17,7 @@
 #include <err.h>
 #include <stdio.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -1230,6 +1231,8 @@ void setup(void)
 	evtable[MotionNotify] = hdl_motion;
 	evtable[PropertyNotify] = hdl_root_property;
 	scan_existing_windows();
+
+	signal(SIGCHLD, SIG_IGN); /* Prevent child processes from becoming zombies */
 }
 
 void setup_atoms(void)
