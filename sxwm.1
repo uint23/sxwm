@@ -75,7 +75,7 @@ Keybindings associate key combinations with actions, either running external com
 They follow this syntax:
 
 .TP
-.B bind : [modifier + modifier + ... + key] : action
+.B bind : modifier + modifier + ... + key : action
 
 Modifiers can be mod, shift, ctrl, alt, or super. The key is the final key name (e.g., Return, q, 1, equal, space).
 
@@ -84,22 +84,22 @@ Actions can be either a quoted external command or an internal function name.
 Example bindings:
 
 .TP
-.B bind : [mod + Return] : "st"
+.B bind : mod + Return : "st"
 
 Open the st terminal.
 
 .TP
-.B bind : [mod + shift + q] : close_window
+.B bind : mod + shift + q : close_window
 
 Close any window that is selected.
 
 .TP
-.B bind : [mod + 3] : change_ws3
+.B bind : mod + 3 : change_ws3
 
 Go to workspace 3.
 
 .TP
-.B bind : [mod + shift + 5] : moveto_ws5
+.B bind : mod + shift + 5 : moveto_ws5
 
 Move selected window to workspace 5.
 
