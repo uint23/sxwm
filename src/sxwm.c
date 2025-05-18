@@ -1527,30 +1527,39 @@ void toggle_floating(void)
 		return;
 	}
 
-	focused->floating = !focused->floating;
 	if (focused->fullscreen) {
 		focused->fullscreen = False;
 		tile();
 		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
 	}
 
+	focused->floating = !focused->floating;
+
 	if (focused->floating) {
 		XWindowAttributes wa;
-		XGetWindowAttributes(dpy, focused->win, &wa);
-		focused->x = wa.x;
-		focused->y = wa.y;
-		focused->w = wa.width;
-		focused->h = wa.height;
+		if (XGetWindowAttributes(dpy, focused->win, &wa)) {
+			focused->x = wa.x;
+			focused->y = wa.y;
+			focused->w = wa.width;
+			focused->h = wa.height;
 
-		XConfigureWindow(
-		    dpy, focused->win, CWX | CWY | CWWidth | CWHeight,
-		    &(XWindowChanges){.x = focused->x, .y = focused->y, .width = focused->w, .height = focused->h});
+			XConfigureWindow(
+				dpy, focused->win,
+				CWX | CWY | CWWidth | CWHeight,
+				&(XWindowChanges){
+					.x = focused->x,
+					.y = focused->y,
+					.width = focused->w,
+					.height = focused->h
+				}
+			);
+		}
 	}
 
 	tile();
 	update_borders();
 
-	/* floating windows are on top */
+	/* Raise and refocus floating window */
 	if (focused->floating) {
 		XRaiseWindow(dpy, focused->win);
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
