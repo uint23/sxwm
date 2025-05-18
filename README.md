@@ -1,5 +1,4 @@
 ### I WON'T BE UPDATING THIS PROJECT FOR A MONTH OR SO DUE TO EXAMS
-
 ### ISSUES PR's ETC WELCOME, JUST DON'T EXPECT A SOLUTION FROM ME QUICKLY 🥀🥀
 
 <div align="center">
@@ -98,7 +97,7 @@ Keybindings associate key combinations with actions (either running external com
 **Syntax:**
 
 ``` sh
-bind : [modifier + modifier + ... + key] : action
+bind : modifier + modifier + ... + key : action
 ```
 
 -   **`bind`**: Keyword to define a keybinding.
@@ -128,23 +127,23 @@ bind : [modifier + modifier + ... + key] : action
 | `toggle_floating`    | Toggles the floating state of the focused window.           |
 | `global_floating`    | Toggles the floating state for *all* windows on the current workspace. |
 | `fullscreen`         | Toggles fullscreen mode for the focused window.             |
-| `change_ws[1-9]`     | Switches focus to the specified workspace (1-9).            |
-| `moveto_ws[1-9]`     | Moves the focused window to the specified workspace (1-9).  |
+| `change_ws(1-9)`     | Switches focus to the specified workspace (1-9).            |
+| `moveto_ws(1-9)`     | Moves the focused window to the specified workspace (1-9).  |
 
 **Example Bindings:**
 
 ```yaml
 # Launch terminal with Mod + Enter
-bind : [mod + Return] : "st"
+bind : mod + Return : "st"
 
 # Close focused window with Mod + Shift + Q
-bind : [mod + shift + q] : close_window
+bind : mod + shift + q : close_window
 
 # Switch to workspace 3 with Mod + 3
-bind : [mod + 3] : change_ws3
+bind : mod + 3 : change_ws3
 
 # Move focused window to workspace 5 with Mod + Shift + 5
-bind : [mod + shift + 5] : moveto_ws5
+bind : mod + shift + 5 : moveto_ws5
 ```
 
 ---
