@@ -10,6 +10,7 @@ master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
 snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
+should_float            : st
 
 # Keybinds:
 # Commands must be surrounded with ""
