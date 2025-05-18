@@ -77,19 +77,19 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 
 ### General Options
 
-| Option                  | Type    | Default   | Description                                                                 |
-| ----------------------- | ------- | --------- | --------------------------------------------------------------------------- |
-| `mod_key`               | String  | `super`   | Sets the primary modifier key (`alt`, `super`, `ctrl`).                       |
-| `gaps`                  | Integer | `10`      | Pixels between windows and screen edges.                                    |
-| `border_width`          | Integer | `1`       | Thickness of window borders in pixels.                                      |
-| `focused_border_colour` | Hex     | `#c0cbff` | Border color for the currently focused window.                              |
+| Option                  | Type    | Default    | Description                                                                 |
+| ----------------------- | ------- | -----------| --------------------------------------------------------------------------- |
+| `mod_key`               | String  | `super`    | Sets the primary modifier key (`alt`, `super`, `ctrl`).                     |
+| `gaps`                  | Integer | `10`       | Pixels between windows and screen edges.                                    |
+| `border_width`          | Integer | `1`        | Thickness of window borders in pixels.                                      |
+| `focused_border_colour` | Hex     | `#c0cbff`  | Border color for the currently focused window.                              |
 | `unfocused_border_colour`| Hex     | `#555555` | Border color for unfocused windows.                                         |
-| `swap_border_colour`    | Hex     | `#fff4c0` | Border color highlight when selecting a window to swap with (`MOD+Shift+Drag`).|
-| `master_width`          | Integer | `60`      | Percentage (%) of the screen width the master window should occupy.         |
-| `resize_master_amount`  | Integer | `1`       | Percentage (%) to increase/decrease the master width when resizing.         |
-| `snap_distance`         | Integer | `5`       | Pixels from screen edge before a floating window snaps to the edge.         |
-| `motion_throttle`       | Integer | `60`      | Target updates per second for mouse drag operations (move/resize/swap). Set close to your monitor's refresh rate for smoother visuals. |
-| `should_float`         | String  | `""`      | A window to always flaot (eg. `st`). For multiple windows, add multiple options.|
+| `swap_border_colour`    | Hex     | `#fff4c0`  | Border color highlight when selecting a window to swap with (`MOD+Shift+Drag`).|
+| `master_width`          | Integer | `60`       | Percentage (%) of the screen width the master window should occupy.         |
+| `resize_master_amount`  | Integer | `1`        | Percentage (%) to increase/decrease the master width when resizing.         |
+| `snap_distance`         | Integer | `5`        | Pixels from screen edge before a floating window snaps to the edge.         |
+| `motion_throttle`       | Integer | `60`       | Target updates per second for mouse drag operations (move/resize/swap). Set close to your monitor's refresh rate for smoother visuals. |
+| `should_float`         | String   | `st`       | A window to always float (eg. `st`). For multiple windows, add multiple options.|
 
 ### Keybindings
 
