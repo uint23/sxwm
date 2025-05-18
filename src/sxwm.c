@@ -131,6 +131,8 @@ int reserve_right = 0;
 int reserve_top = 0;
 int reserve_bottom = 0;
 
+Bool next_should_float = False;
+
 Client *add_client(Window w, int ws)
 {
 	Client *c = malloc(sizeof(Client));
@@ -188,6 +190,7 @@ Client *add_client(Window w, int ws)
 
 	c->fixed = False;
 	c->floating = False;
+
 	c->fullscreen = False;
 
 	if (global_floating) {
@@ -588,6 +591,12 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
+					for (int j = 0; j < 256; j++) {
+						if (user_config.should_float[j] && !strcmp(user_config.should_float[j], b->action.cmd[0])) {
+							next_should_float = True;
+							break;
+						}
+					}
 					break;
 				case TYPE_FUNC:
 					if (b->action.fn)
@@ -723,7 +732,35 @@ void hdl_map_req(XEvent *xev)
 		should_float = True;
 		c->fixed = True;
 	}
-	c->floating = should_float || global_floating;
+	
+	if (should_float || global_floating || next_should_float) {
+		c->floating = True;
+
+		if (next_should_float) {
+			if (c->floating) {
+				XWindowAttributes wa;
+				XGetWindowAttributes(dpy, c->win, &wa);
+				c->x = wa.x;
+				c->y = wa.y;
+				c->w = wa.width;
+				c->h = wa.height;
+
+				XConfigureWindow(
+					dpy, c->win, CWX | CWY | CWWidth | CWHeight,
+					&(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
+			}
+
+			tile();
+			update_borders();
+
+			if (c->floating) {
+				XRaiseWindow(dpy, c->win);
+				XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+			}
+			next_should_float = False;
+		}
+	} 
+		
 
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
@@ -1695,6 +1732,7 @@ int main(int ac, char **av)
 		}
 	}
 	setup();
+	printf("sxwm: starting...\n");
 	run();
 	return 0;
 }
