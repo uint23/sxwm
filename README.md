@@ -184,6 +184,60 @@ bind : mod + shift + 5 : moveto_ws5
 - `Xinerama`
 - GCC or Clang & Make
 
+<details>
+<summary>Debian / Ubuntu / Linux Mint</summary>
+<pre><code>sudo apt update
+sudo apt install libx11-dev libxinerama-dev build-essential</code></pre>
+</details>
+
+<details>
+<summary>Arch Linux / Manjaro</summary>
+<pre><code>sudo pacman -Syu
+sudo pacman -S libx11 libxinerama gcc make</code></pre>
+</details>
+
+<details>
+<summary>Gentoo</summary>
+<pre><code>sudo emerge --ask x11-libs/libX11 x11-libs/libXinerama sys-devel/gcc sys-devel/make</code></pre>
+</details>
+
+<details>
+<summary>Void Linux</summary>
+<pre><code>sudo xbps-install -S
+sudo xbps-install libX11-devel libXinerama-devel gcc make</code></pre>
+</details>
+
+<details>
+<summary>Fedora / RHEL / AlmaLinux / Rocky</summary>
+<pre><code>sudo dnf install libX11-devel libXinerama-devel gcc make</code></pre>
+</details>
+
+<details>
+<summary>openSUSE (Leap / Tumbleweed)</summary>
+<pre><code>sudo zypper refresh
+sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
+</details>
+
+<details>
+<summary>Alpine Linux</summary>
+<pre><code>sudo apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
+</details>
+
+<details>
+<summary>NixOS</summary>
+<pre><code>buildInputs = [
+  pkgs.xorg.libX11
+  pkgs.xorg.libXinerama
+  pkgs.gcc
+  pkgs.make
+];</code></pre>
+</details>
+
+<details>
+<summary>Slackware</summary>
+<pre><code>slackpkg install gcc make libX11 libXinerama</code></pre>
+</details>
+
 ---
 
 ## Build & Install
