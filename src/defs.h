@@ -87,6 +87,7 @@ typedef struct {
 	int snap_distance;
 	int bindsn;
 	Binding binds[256];
+	char *should_float[256];
 } Config;
 
 typedef struct {

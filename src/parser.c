@@ -169,6 +169,12 @@ found:
 
 	char line[512];
 	int lineno = 0;
+	int should_floatn = 0;
+
+	for (int i = 0; i < 256; i++) {
+		cfg->should_float[i] = NULL;
+	}
+
 	while (fgets(line, sizeof line, f)) {
 		lineno++;
 		char *s = strip(line);
@@ -220,6 +226,25 @@ found:
 		}
 		else if (!strcmp(key, "snap_distance")) {
 			cfg->snap_distance = atoi(rest);
+		}
+		else if (!strcmp(key, "should_float")) {
+			// should_float: <window>
+			
+			if (should_floatn >= 256) {
+				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
+				continue;
+			}
+
+			char *win = strip(rest);
+
+			cfg->should_float[should_floatn] = malloc(strlen(win) + 1);
+			if (!cfg->should_float[should_floatn]) {
+				fprintf(stderr, "sxwmrc:%d: out of memory\n", lineno);
+				break;
+			}
+
+			strcpy(cfg->should_float[should_floatn], win);
+			should_floatn++;
 		}
 		else if (!strcmp(key, "call") || !strcmp(key, "bind")) {
 			char *mid = strchr(rest, ':');

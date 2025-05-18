@@ -193,7 +193,7 @@ Client *add_client(Window w, int ws)
 
 	c->fullscreen = False;
 
-	if (global_floating || next_should_float) {
+	if (global_floating) {
 		c->floating = True;
 	}
 
@@ -591,11 +591,12 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
-					if (!strcmp(b->action.cmd[0], "firefox")) {
-						next_should_float = True;
-						printf("next will float\n");
+					for (int j = 0; j < 256; j++) {
+						if (user_config.should_float[j] && !strcmp(user_config.should_float[j], b->action.cmd[0])) {
+							next_should_float = True;
+							break;
+						}
 					}
-					printf("spawn %s\n", b->action.cmd[0]);
 					break;
 				case TYPE_FUNC:
 					if (b->action.fn)
@@ -732,9 +733,34 @@ void hdl_map_req(XEvent *xev)
 		c->fixed = True;
 	}
 	
-	if (next_should_float || should_float || global_floating) {
+	if (should_float || global_floating || next_should_float) {
 		c->floating = True;
+
+		if (next_should_float) {
+			if (c->floating) {
+				XWindowAttributes wa;
+				XGetWindowAttributes(dpy, c->win, &wa);
+				c->x = wa.x;
+				c->y = wa.y;
+				c->w = wa.width;
+				c->h = wa.height;
+
+				XConfigureWindow(
+					dpy, c->win, CWX | CWY | CWWidth | CWHeight,
+					&(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
+			}
+
+			tile();
+			update_borders();
+
+			if (c->floating) {
+				XRaiseWindow(dpy, c->win);
+				XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+			}
+			next_should_float = False;
+		}
 	} 
+		
 
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
@@ -753,7 +779,7 @@ void hdl_map_req(XEvent *xev)
 	/* map & borders */
 	XMapWindow(dpy, w);
 	update_net_client_list();
-	if (!global_floating && !c->floating && !next_should_float)
+	if (!global_floating && !c->floating)
 		tile();
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
