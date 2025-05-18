@@ -90,6 +90,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `resize_master_amount`  | Integer | `1`       | Percentage (%) to increase/decrease the master width when resizing.         |
 | `snap_distance`         | Integer | `5`       | Pixels from screen edge before a floating window snaps to the edge.         |
 | `motion_throttle`       | Integer | `60`      | Target updates per second for mouse drag operations (move/resize/swap). Set close to your monitor's refresh rate for smoother visuals. |
+| `should_float`         | String  | `""`      | A window to always flaot (eg. `st`). For multiple windows, add multiple options.|
 
 ### Keybindings
 
