@@ -1,8 +1,9 @@
-### I WON'T BE UPDATING THIS PROJECT FOR A MONTH OR SO DUE TO EXAMS
-### ISSUES PR's ETC WELCOME, JUST DON'T EXPECT A SOLUTION FROM ME QUICKLY 🥀🥀
+> ⚠️ **Note:** I won’t be updating this project for a month or so due to exams.  
+> Issues & PRs are welcome, just don't expect a quick response 🥀🥀
 
 <div align="center">
-  <h1 ><img src="images/sxwm_logo.png" width="50%"></h1>
+  <img src="images/sxwm_logo.png" width="50%">
+  <br>
   <b>Minimal. Fast. Configurable. Tiling Window Manager for X11</b>
   <br>
   <sub>Abhinav Prasai (2025)</sub>
@@ -13,13 +14,27 @@
 
 ---
 
+## Table of Contents
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Configuration](#configuration)
+- [Keybindings](#keybindings)
+  - [Example Bindings](#example-bindings)
+  - [Default Keybindings](#default-keybindings)
+- [Dependencies](#dependencies)
+- [Build & Install](#build--install)
+- [Makefile Targets](#makefile-targets)
+- [Thanks & Inspiration](#thanks--inspiration)
+
+---
+
 ## Features
 
 - **Tiling & Floating**: Switch seamlessly between layouts.
 - **Workspaces**: 9 workspaces, fully integrated with your bar.
 - **Live Config Reload**: Change your config and reload instantly with a keybind.
 - **Easy Configuration**: Human-friendly `sxwmrc` file, no C required.
-- **Master-Stack Layout**: Productive, DWM-inspired workflow.
+- **Master-Stack Layout**: DWM-inspired productive workflow.
 - **Mouse Support**: Move, swap, resize, and focus windows with the mouse.
 - **Zero Dependencies**: Only `libX11` and `Xinerama` required.
 - **Lightweight**: Single C file, minimal headers, compiles in seconds.
@@ -31,119 +46,83 @@
 
 ## Screenshots
 
-<a href="1"><img src="images/1.png" width="100%" align="right"></a>
-<a href="2"><img src="images/x.png" width="100%" align="left"></a>
-<a href="3"><img src="images/3.png" width="100%" align="right"></a>
-<a href="4"><img src="images/4.png" width="100%" align="left"></a>
-
-<br clear="right">
+<img src="images/1.png" width="100%">
+<img src="images/x.png" width="100%">
+<img src="images/3.png" width="100%">
+<img src="images/4.png" width="100%">
 
 ---
 
-## Patch Notes
+## Configuration
 
-<details>
-<summary><strong>Click to expand</strong></summary>
-
-#### v1.5 - Ready for Release
-
-- **NEW**: Using XCursor instead of cursor font && new logo.
-- **FIXED**: Proper bind resetting on refresh config. && Multi-arg binds now work due to new and improved spawn function
-- **CHANGE**: No longer using INIT_WORKSPACE macro, proper workspace handling. New sxwmrc
-
-#### v1.4
-- **CHANGE**: Added motion throttle && master width general options
-
-#### v1.3
-- **CHANGE**: ulong, u_char uint are gone
-
-#### v1.2
-- **NEW**: Parser support
-- **FIXED**: Quit syntax && Freeing cursor on exit
-
-#### v1.1
-- **NEW**: Xinerama support, swap windows with Mod + Shift + Drag
-- **FIXED**: New windows in `global_floating` mode spawn centered
-
-</details>
-
----
-
-## Configuration (`~/.config/sxwmrc`)
-
-`sxwm` is configured via a simple text file located at `~/.config/sxwmrc`. Changes can be applied instantly by reloading the configuration (default keybind: `MOD + r`).
+`sxwm` is configured via a simple text file located at `~/.config/sxwmrc`. Changes can be applied instantly by reloading the configuration (`MOD + r`).
 
 The file uses a `key : value` format. Lines starting with `#` are ignored.
 
 ### General Options
 
-| Option                  | Type    | Default    | Description                                                                 |
-| ----------------------- | ------- | -----------| --------------------------------------------------------------------------- |
-| `mod_key`               | String  | `super`    | Sets the primary modifier key (`alt`, `super`, `ctrl`).                     |
-| `gaps`                  | Integer | `10`       | Pixels between windows and screen edges.                                    |
-| `border_width`          | Integer | `1`        | Thickness of window borders in pixels.                                      |
-| `focused_border_colour` | Hex     | `#c0cbff`  | Border color for the currently focused window.                              |
+| Option                   | Type    | Default   | Description                                                                 |
+|--------------------------|---------|-----------|-----------------------------------------------------------------------------|
+| `mod_key`                | String  | `super`   | Sets the primary modifier key (`alt`, `super`, `ctrl`).                     |
+| `gaps`                   | Integer | `10`      | Pixels between windows and screen edges.                                    |
+| `border_width`           | Integer | `1`       | Thickness of window borders in pixels.                                      |
+| `focused_border_colour`  | Hex     | `#c0cbff` | Border color for the currently focused window.                              |
 | `unfocused_border_colour`| Hex     | `#555555` | Border color for unfocused windows.                                         |
-| `swap_border_colour`    | Hex     | `#fff4c0`  | Border color highlight when selecting a window to swap with (`MOD+Shift+Drag`).|
-| `master_width`          | Integer | `60`       | Percentage (%) of the screen width the master window should occupy.         |
-| `resize_master_amount`  | Integer | `1`        | Percentage (%) to increase/decrease the master width when resizing.         |
-| `snap_distance`         | Integer | `5`        | Pixels from screen edge before a floating window snaps to the edge.         |
-| `motion_throttle`       | Integer | `60`       | Target updates per second for mouse drag operations (move/resize/swap). Set close to your monitor's refresh rate for smoother visuals. |
-| `should_float`         | String   | `st`       | A window to always float (eg. `st`). For multiple windows, add multiple options.|
+| `swap_border_colour`     | Hex     | `#fff4c0` | Border color when selecting a window to swap (`MOD+Shift+Drag`).           |
+| `master_width`           | Integer | `60`      | Percentage of the screen width for the master window.                       |
+| `resize_master_amount`   | Integer | `1`       | Percent to increase/decrease master width.                                  |
+| `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
+| `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
+| `should_float`           | String  | `st`      | Always-float rule (can list multiple).                                      |
 
-### Keybindings
+---
 
-Keybindings associate key combinations with actions (either running external commands or internal `sxwm` functions).
+## Keybindings
 
-**Syntax:**
+### Syntax
 
-``` sh
+```sh
 bind : modifier + modifier + ... + key : action
 ```
 
--   **`bind`**: Keyword to define a keybinding.
--   **`[...]`**: Contains the key combination.
-    -   **Modifiers**: `mod` (uses the key set by `mod_key`), `shift`, `ctrl`, `alt`, `super`. Use `+` to combine multiple modifiers.
-    -   **`key`**: The final key name (e.g., `Return`, `q`, `1`, `equal`, `space`). Key names generally follow X11 keysym names but are case-insensitive in the config.
--   **`:`**: Separator.
--   **`action`**:
-    -   **Command**: An external command enclosed in double quotes (`"`). Arguments are separated by spaces (e.g., `"st -e vim"`).
-    -   **Function**: The name of an internal `sxwm` function (see list below).
+- **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
+- **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
+- **Action**: Either an external command (in quotes) or internal function.
 
-**Available Functions:**
+### Available Functions
 
-| Function Name        | Action                                                      |
-| -------------------- | ----------------------------------------------------------- |
-| `close_window`       | Closes the currently focused window.                        |
-| `decrease_gaps`      | Decreases the gap size between windows.                     |
-| `focus_next`         | Shifts focus to the next window in the stack/list.          |
-| `focus_previous`     | Shifts focus to the previous window in the stack/list.      |
-| `increase_gaps`      | Increases the gap size between windows.                     |
-| `master_next`        | Moves the focused window down the master/stack order.       |
-| `master_previous`    | Moves the focused window up the master/stack order.         |
-| `quit`               | Exits `sxwm`.                                               |
-| `reload_config`      | Reloads the `sxwmrc` configuration file.                    |
-| `master_increase`    | Increases the width allocated to the master area.           |
-| `master_decrease`    | Decreases the width allocated to the master area.           |
-| `toggle_floating`    | Toggles the floating state of the focused window.           |
-| `global_floating`    | Toggles the floating state for *all* windows on the current workspace. |
-| `fullscreen`         | Toggles fullscreen mode for the focused window.             |
-| `change_ws(1-9)`     | Switches focus to the specified workspace (1-9).            |
-| `moveto_ws(1-9)`     | Moves the focused window to the specified workspace (1-9).  |
+| Function Name        | Description                                                  |
+|----------------------|--------------------------------------------------------------|
+| `close_window`       | Closes the focused window.                                   |
+| `decrease_gaps`      | Shrinks gaps.                                                |
+| `focus_next`         | Moves focus forward in the stack.                            |
+| `focus_previous`     | Moves focus backward in the stack.                           |
+| `increase_gaps`      | Expands gaps.                                                |
+| `master_next`        | Moves focused window down in master/stack order.             |
+| `master_previous`    | Moves focused window up in master/stack order.               |
+| `quit`               | Exits `sxwm`.                                                |
+| `reload_config`      | Reloads config.                                              |
+| `master_increase`    | Expands master width.                                        |
+| `master_decrease`    | Shrinks master width.                                        |
+| `toggle_floating`    | Toggles floating state of current window.                    |
+| `global_floating`    | Toggles floating state for all windows.                      |
+| `fullscreen`         | Fullscreen toggle.                                           |
+| `change_wsX`         | Switches to workspace `X` (1–9).                             |
+| `moveto_wsX`         | Moves current window to workspace `X` (1–9).                 |
 
-**Example Bindings:**
+### Example Bindings
 
 ```yaml
-# Launch terminal with Mod + Enter
+# Launch terminal
 bind : mod + Return : "st"
 
-# Close focused window with Mod + Shift + Q
+# Close window
 bind : mod + shift + q : close_window
 
-# Switch to workspace 3 with Mod + 3
+# Switch workspace
 bind : mod + 3 : change_ws3
 
-# Move focused window to workspace 5 with Mod + Shift + 5
+# Move window to workspace
 bind : mod + shift + 5 : moveto_ws5
 ```
 
@@ -265,18 +244,17 @@ exec sxwm
 ```
 
 ---
-
 ## Makefile Targets
 
-| Target                | Description                                         |
-| --------------------- | --------------------------------------------------- |
-| `make` / `make all`   | Build the `sxwm` binary                            |
-| `make clean`          | Remove object files and build artifacts             |
-| `make install`        | Install `sxwm` to `$(PREFIX)/bin` (default `/usr/local/bin`) |
-| `make uninstall`      | Remove the installed binary                         |
-| `make clean install`  | Clean and then install                              |
+| Target                | Description                                              |
+|-----------------------|----------------------------------------------------------|
+| `make` / `make all`   | Build the `sxwm` binary                                  |
+| `make clean`          | Remove build artifacts                                   |
+| `make install`        | Install `sxwm` to `$(PREFIX)/bin` (default `/usr/local`) |
+| `make uninstall`      | Remove installed binary                                  |
+| `make clean install`  | Clean then install                                       |
 
-> Override install directory with `PREFIX` or `DESTDIR`:
+> Override install directory with `PREFIX`:
 > ```sh
 > make install PREFIX=$HOME/.local
 > ```
