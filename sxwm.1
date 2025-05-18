@@ -1,0 +1,243 @@
+.TH SXWM 1 "May 2025" "sxwm 1.5" "User Commands"
+
+.SH NAME
+sxwm \- minimal, fast, and configurable tiling window manager for X11
+
+.SH SYNOPSIS
+.B sxwm
+
+.SH DESCRIPTION
+sxwm is a lightweight and efficient tiling window manager for X11, designed to be fast, minimal, and easy to configure. It supports workspaces, floating windows, mouse operations, and dynamic configuration reloading.
+
+.SH FEATURES
+Tiling and floating layouts.
+Nine workspaces with full bar support.
+Live configuration reload without restart.
+Human-friendly configuration file requiring no recompilation.
+DWM-style master-stack layout.
+Mouse support for moving, resizing, focusing, and swapping windows.
+Depends only on libX11 and Xinerama.
+Extremely lightweight (single C file).
+Multi-monitor support via Xinerama.
+Works well with external bars such as sxbar.
+
+.SH CONFIGURATION
+The configuration file is located at
+.B ~/.config/sxwmrc
+
+It uses a simple key : value format. Lines starting with `#` are treated as comments.
+
+General options include:
+
+.TP
+.B mod_key
+Sets the primary modifier key (for example, "alt", "super", or "ctrl"). Default is "super".
+
+.TP
+.B gaps
+Pixels between windows and screen edges. Default is 10.
+
+.TP
+.B border_width
+Thickness of window borders in pixels. Default is 1.
+
+.TP
+.B focused_border_colour
+Border color for the focused window. Default is "#c0cbff".
+
+.TP
+.B unfocused_border_colour
+Border color for unfocused windows. Default is "#555555".
+
+.TP
+.B swap_border_colour
+Border color highlight when selecting a window to swap with. Default is "#fff4c0".
+
+.TP
+.B master_width
+Percentage of screen width allocated to the master window. Default is 60.
+
+.TP
+.B resize_master_amount
+Percentage to increase or decrease master width when resizing. Default is 1.
+
+.TP
+.B snap_distance
+Pixels from screen edge before a floating window snaps to the edge. Default is 5.
+
+.TP
+.B motion_throttle
+Target updates per second for mouse drag operations (move, resize, swap). Default is 60.
+
+.SH KEYBINDINGS
+Keybindings associate key combinations with actions, either running external commands or internal sxwm functions.
+
+They follow this syntax:
+
+.TP
+.B bind : [modifier + modifier + ... + key] : action
+
+Modifiers can be mod, shift, ctrl, alt, or super. The key is the final key name (e.g., Return, q, 1, equal, space).
+
+Actions can be either a quoted external command or an internal function name.
+
+Example bindings:
+
+.TP
+.B bind : [mod + Return] : "st"
+
+Open the st terminal.
+
+.TP
+.B bind : [mod + shift + q] : close_window
+
+Close any window that is selected.
+
+.TP
+.B bind : [mod + 3] : change_ws3
+
+Go to workspace 3.
+
+.TP
+.B bind : [mod + shift + 5] : moveto_ws5
+
+Move selected window to workspace 5.
+
+.SH AVAILABLE FUNCTIONS
+The following internal functions are available for keybindings:
+
+.TP
+.B close_window
+Closes the currently focused window.
+
+.TP
+.B decrease_gaps
+Decreases the gap size between windows.
+
+.TP
+.B focus_next
+Shifts focus to the next window in the stack.
+
+.TP
+.B focus_previous
+Shifts focus to the previous window in the stack.
+
+.TP
+.B increase_gaps
+Increases the gap size between windows.
+
+.TP
+.B master_next
+Moves the focused window down the master/stack order.
+
+.TP
+.B master_previous
+Moves the focused window up the master/stack order.
+
+.TP
+.B quit
+Exits sxwm.
+
+.TP
+.B reload_config
+Reloads the sxwmrc configuration file.
+
+.TP
+.B master_increase
+Increases the width allocated to the master area.
+
+.TP
+.B master_decrease
+Decreases the width allocated to the master area.
+
+.TP
+.B toggle_floating
+Toggles the floating state of the focused window.
+
+.TP
+.B global_floating
+Toggles the floating state for all windows on the current workspace.
+
+.TP
+.B fullscreen
+Toggles fullscreen mode for the focused window.
+
+.TP
+.B change_ws1 ... change_ws9
+Switches focus to the specified workspace (1 to 9).
+
+.TP
+.B moveto_ws1 ... moveto_ws9
+Moves the focused window to the specified workspace (1 to 9).
+
+.SH DEFAULT KEYBINDINGS
+Window Management:
+
+.TP
+.B MOD + Return
+Launch terminal (default: st).
+
+.TP
+.B MOD + b
+Launch browser (default: firefox).
+
+.TP
+.B MOD + p
+Run launcher (default: dmenu_run).
+
+.TP
+.B MOD + q
+Close focused window.
+
+.TP
+.B MOD + 1 to 9
+Switch to workspace 1 through 9.
+
+.TP
+.B MOD + Shift + 1 to 9
+Move focused window to workspace 1 through 9.
+
+.TP
+.B MOD + j / k
+Focus next or previous window.
+
+.TP
+.B MOD + Shift + j / k
+Move window up or down in the master stack.
+
+.TP
+.B MOD + Space
+Toggle floating mode for focused window.
+
+.TP
+.B MOD + Shift + Space
+Toggle floating mode for all windows.
+
+.TP
+.B MOD + = / -
+Increase or decrease gaps.
+
+.TP
+.B MOD + f
+Toggle fullscreen mode.
+
+.TP
+.B MOD + Left Mouse
+Move window with mouse.
+
+.TP
+.B MOD + Right Mouse
+Resize window with mouse.
+
+.SH FILES
+Configuration file:
+.B ~/.config/sxwmrc
+
+.SH AUTHOR
+Written by El Bachir (elbachir-one), 2025.
+
+.SH SEE ALSO
+sxbar(1), dmenu(1), st(1), X(7)
+
+.SH LICENSE
+MIT License. See the LICENSE file for full details.
