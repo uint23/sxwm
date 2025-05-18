@@ -131,6 +131,8 @@ int reserve_right = 0;
 int reserve_top = 0;
 int reserve_bottom = 0;
 
+Bool next_should_float = False;
+
 Client *add_client(Window w, int ws)
 {
 	Client *c = malloc(sizeof(Client));
@@ -188,9 +190,10 @@ Client *add_client(Window w, int ws)
 
 	c->fixed = False;
 	c->floating = False;
+
 	c->fullscreen = False;
 
-	if (global_floating) {
+	if (global_floating || next_should_float) {
 		c->floating = True;
 	}
 
@@ -588,6 +591,11 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
+					if (!strcmp(b->action.cmd[0], "firefox")) {
+						next_should_float = True;
+						printf("next will float\n");
+					}
+					printf("spawn %s\n", b->action.cmd[0]);
 					break;
 				case TYPE_FUNC:
 					if (b->action.fn)
@@ -723,7 +731,10 @@ void hdl_map_req(XEvent *xev)
 		should_float = True;
 		c->fixed = True;
 	}
-	c->floating = should_float || global_floating;
+	
+	if (next_should_float || should_float || global_floating) {
+		c->floating = True;
+	} 
 
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
@@ -742,7 +753,7 @@ void hdl_map_req(XEvent *xev)
 	/* map & borders */
 	XMapWindow(dpy, w);
 	update_net_client_list();
-	if (!global_floating && !c->floating)
+	if (!global_floating && !c->floating && !next_should_float)
 		tile();
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
@@ -1695,6 +1706,7 @@ int main(int ac, char **av)
 		}
 	}
 	setup();
+	printf("sxwm: starting...\n");
 	run();
 	return 0;
 }
