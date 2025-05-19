@@ -227,6 +227,19 @@ sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
 yay -S sxwm
 ```
 
+### NixOS
+
+Temporarily install with nix-shell
+```sh
+nix-shell -p sxwm
+```
+or add `sxwm` to your configuration.nix packages.
+
+To enable this package as a window manager in your system, add this line to your configuration.nix
+```
+services.xserver.windowManager.sxwm.enable = true;
+```
+
 ### Build from Source
 
 ```sh
