@@ -228,7 +228,7 @@ found:
 			cfg->snap_distance = atoi(rest);
 		}
 		else if (!strcmp(key, "should_float")) {
-			// should_float: <window>
+			// should_float: binary --arg,binary2 parameter --arg,binary3
 			
 			if (should_floatn >= 256) {
 				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
@@ -237,13 +237,31 @@ found:
 
 			char *win = strip(rest);
 
-			cfg->should_float[should_floatn] = malloc(strlen(win) + 1);
-			if (!cfg->should_float[should_floatn]) {
-				fprintf(stderr, "sxwmrc:%d: out of memory\n", lineno);
-				break;
+			int count = 0;
+			for (char *p = win; *p; p++) {
+				if (*p == ',') {
+					count++;
+				}
+			}
+			
+			cfg->should_float[should_floatn] = malloc((count + 2) * sizeof(char *));
+
+			// split by commas
+			char *comma = strtok(win, ",");
+
+			int i = 0;
+
+			while (comma) {
+				if (should_floatn < 256) {
+					cfg->should_float[should_floatn][i] = strdup(comma);
+					i++;
+				} else {
+					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
+					break;
+				}
+				comma = strtok(NULL, ",");
 			}
 
-			strcpy(cfg->should_float[should_floatn], win);
 			should_floatn++;
 		}
 		else if (!strcmp(key, "call") || !strcmp(key, "bind")) {

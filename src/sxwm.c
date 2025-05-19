@@ -591,8 +591,15 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
-					for (int j = 0; j < 256; j++) {
-						if (user_config.should_float[j] && !strcmp(user_config.should_float[j], b->action.cmd[0])) {
+					for (int j = 0; j < 256; j++) {						
+						Bool valid = False;
+						for (int k = 0; user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
+							if (!strcmp(b->action.cmd[k], user_config.should_float[j][k])) {
+								valid = True;
+								break;
+							}
+						}
+						if (valid) {
 							next_should_float = True;
 							break;
 						}
