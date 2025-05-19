@@ -160,6 +160,11 @@ int parser(Config *cfg)
         goto found;
     }
 
+	snprintf(path, sizeof path, "/usr/local/share/sxwmrc");
+	if (access(path, R_OK) == 0) {
+		goto found;
+	}
+
 found:
     FILE *f = fopen(path, "r");
     if (!f) {
