@@ -236,31 +236,45 @@ found:
 			}
 
 			char *win = strip(rest);
-
-			int count = 0;
-			for (char *p = win; *p; p++) {
-				if (*p == ',') {
-					count++;
-				}
-			}
 			
-			cfg->should_float[should_floatn] = malloc((count + 2) * sizeof(char *));
+			cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
 
-			// split by commas
-			char *comma = strtok(win, ",");
-
-			int i = 0;
+			char *comma_ptr, *space_ptr;
+			char *comma = strtok_r(win, ",", &comma_ptr);
 
 			while (comma) {
 				if (should_floatn < 256) {
-					cfg->should_float[should_floatn][i] = strdup(comma);
-					i++;
+					// if comma starts and ends with quotes, remove them
+					if (*comma == '"') {
+						comma++;
+					}
+					char *end = comma + strlen(comma) - 1;
+					if (*end == '"') {
+						*end = '\0';
+					}
+
+					printf("comma: %s\n", comma);
+					char *argv = strtok_r(comma, " ", &space_ptr);
+					int i = 0;
+
+
+					while (argv) {
+						printf("argv: %s\n", argv);
+						cfg->should_float[should_floatn][i] = strdup(argv);
+						argv = strtok_r(NULL, " ", &space_ptr);
+						i++;
+					}
+
+					should_floatn++;
+					cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
+
 				} else {
 					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 					break;
 				}
-				comma = strtok(NULL, ",");
+				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
+
 
 			should_floatn++;
 		}
@@ -343,6 +357,15 @@ found:
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
+	}
+
+	// print should_float
+	for (int i = 0; i < should_floatn; i++) {
+		fprintf(stderr, "sxwmrc: should_float[%d]: ", i);
+		for (int j = 0; cfg->should_float[i][j]; j++) {
+			fprintf(stderr, "%s ", cfg->should_float[i][j]);
+		}
+		fprintf(stderr, "\n");
 	}
 
 	fclose(f);
