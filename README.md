@@ -73,7 +73,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `resize_master_amount`   | Integer | `1`       | Percent to increase/decrease master width.                                  |
 | `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
 | `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
-| `should_float`           | String  | `st`      | Always-float rule (can list multiple).                                      |
+| `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
 
 ---
 
