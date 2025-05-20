@@ -207,8 +207,8 @@ sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
 <pre><code>buildInputs = [
   pkgs.xorg.libX11
   pkgs.xorg.libXinerama
-  pkgs.gcc
-  pkgs.make
+  pkgs.libgcc
+  pkgs.gnumake
 ];</code></pre>
 </details>
 
