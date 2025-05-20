@@ -42,6 +42,9 @@ install: all
 	@echo "Installing man page to $(DESTDIR)$(MAN_DIR)..."
 	@mkdir -p $(DESTDIR)$(MAN_DIR)
 	@install -m 644 $(MAN) $(DESTDIR)$(MAN_DIR)/
+	@echo "Copying default configuration to $(DESTDIR)$(PREFIX)/share/sxwmrc..."
+	@mkdir -p "$(DESTDIR)$(PREFIX)/share"
+	@install -m 644 default_sxrc "$(DESTDIR)$(PREFIX)/share/sxwmrc"
 	@echo "Installation complete."
 
 uninstall:
