@@ -177,7 +177,9 @@ sudo pacman -S libx11 libxinerama gcc make</code></pre>
 
 <details>
 <summary>Gentoo</summary>
-<pre><code>sudo emerge --ask x11-libs/libX11 x11-libs/libXinerama sys-devel/gcc sys-devel/make</code></pre>
+<pre><code>sudo emerge --ask x11-libs/libX11 x11-libs/libXinerama sys-devel/gcc sys-devel/make
+sudo emaint -a sync
+</code></pre>
 </details>
 
 <details>
