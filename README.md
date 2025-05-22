@@ -171,7 +171,7 @@ sudo apt install libx11-dev libxinerama-dev build-essential</code></pre>
 
 <details>
 <summary>Arch Linux / Manjaro</summary>
-<pre><code>sudo pacman -Syu
+<pre><code>sudo pacman -S
 sudo pacman -S libx11 libxinerama gcc make</code></pre>
 </details>
 
@@ -188,18 +188,20 @@ sudo xbps-install libX11-devel libXinerama-devel gcc make</code></pre>
 
 <details>
 <summary>Fedora / RHEL / AlmaLinux / Rocky</summary>
-<pre><code>sudo dnf install libX11-devel libXinerama-devel gcc make</code></pre>
+<pre><code>sudo dnf update
+sudo dnf install libX11-devel libXinerama-devel gcc make</code></pre>
 </details>
 
 <details>
-<summary>openSUSE (Leap / Tumbleweed)</summary>
+<summary>OpenSUSE (Leap / Tumbleweed)</summary>
 <pre><code>sudo zypper refresh
 sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
 </details>
 
 <details>
 <summary>Alpine Linux</summary>
-<pre><code>sudo apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
+<pre><code>doas apk update
+doas apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
 </details>
 
 <details>
@@ -214,7 +216,8 @@ sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
 
 <details>
 <summary>Slackware</summary>
-<pre><code>slackpkg install gcc make libX11 libXinerama</code></pre>
+<pre><code>slackpkg update
+slackpkg install gcc make libX11 libXinerama</code></pre>
 </details>
 
 ---
