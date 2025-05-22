@@ -155,10 +155,6 @@ Client *add_client(Window w, int ws)
 		tail->next = c;
 	}
 
-	if (ws == current_ws && !focused) {
-		focused = c;
-	}
-
 	open_windows++;
 	XSelectInput(dpy, w,
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask);
@@ -195,6 +191,10 @@ Client *add_client(Window w, int ws)
 
 	if (global_floating) {
 		c->floating = True;
+	}
+
+	if (ws == current_ws && !focused) {
+		focused = c;
 	}
 
 	XRaiseWindow(dpy, w);
