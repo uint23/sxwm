@@ -14,6 +14,8 @@
  *	  (C) Abhinav Prasai 2025
  */
 
+#define _POSIX_C_SOURCE 200809L
+
 #include <err.h>
 #include <stdio.h>
 #include <limits.h>
@@ -1114,36 +1116,60 @@ void quit(void)
 	XFreeCursor(dpy, c_move);
 	XFreeCursor(dpy, c_normal);
 	XFreeCursor(dpy, c_resize);
+
+	if (user_config.autostart_path) {
+		free(user_config.autostart_path);
+		user_config.autostart_path = NULL;
+	}
+
 	errx(0, "quitting...");
 }
 
 void reload_config(void)
 {
 	puts("sxwm: reloading config...");
-	memset(&user_config, 0, sizeof(user_config));
 
 	for (int i = 0; i < user_config.bindsn; i++) {
-		free(user_config.binds[i].action.cmd);
-		user_config.binds[i].action.cmd = NULL;
-
-		user_config.binds[i].action.fn = NULL;
-		user_config.binds[i].type = -1;
-		user_config.binds[i].keysym = 0;
-		user_config.binds[i].mods = 0;
+		if (user_config.binds[i].type == TYPE_CMD && user_config.binds[i].action.cmd) {
+			for (int j = 0; user_config.binds[i].action.cmd[j]; j++) {
+				free((char *)user_config.binds[i].action.cmd[j]);
+			}
+			free(user_config.binds[i].action.cmd);
+			user_config.binds[i].action.cmd = NULL;
+		}
 	}
+
+	for (int i = 0; i < 256 && user_config.should_float[i]; i++) {
+		for (int j = 0; user_config.should_float[i][j]; j++) {
+			free(user_config.should_float[i][j]);
+		}
+		free(user_config.should_float[i]);
+		user_config.should_float[i] = NULL;
+	}
+
+	if (user_config.autostart_path) {
+		free(user_config.autostart_path);
+		user_config.autostart_path = NULL;
+	}
+
+	memset(&user_config, 0, sizeof(user_config));
 
 	init_defaults();
 	if (parser(&user_config)) {
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
+
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
-	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	XGrabButton(dpy, Button1, user_config.modkey, root, True,
+	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
-	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	            GrabModeAsync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button3, user_config.modkey, root, True,
+	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XSync(dpy, False);
 
@@ -1176,6 +1202,55 @@ void run(void)
 		XNextEvent(dpy, &xev);
 		xev_case(&xev);
 	}
+}
+
+void run_autostart(void) {
+	FILE *fp;
+	char *line = NULL;
+	size_t len = 0;
+
+	const char *home = getenv("HOME");
+	if (!home) {
+		fprintf(stderr, "sxwm: HOME not set\n");
+		return;
+	}
+
+	char config_path[PATH_MAX];
+	snprintf(config_path, sizeof(config_path), "%s/.config/sxwm/sxwmrc", home);
+
+	fp = fopen(config_path, "r");
+	if (!fp) {
+		fprintf(stderr, "sxwm: could not open %s\n", config_path);
+		return;
+	}
+
+	const char *prefix = "autostart : ";
+
+	while (getline(&line, &len, fp) != -1) {
+		line[strcspn(line, "\n")] = 0;
+
+		if (line[0] == '#' || line[0] == '\0')
+			continue;
+
+		if (strncmp(line, prefix, strlen(prefix)) == 0) {
+			const char *cmd = line + strlen(prefix);
+			char fullcmd[PATH_MAX];
+			if (cmd[0] == '~') {
+				snprintf(fullcmd, sizeof(fullcmd), "%s%s", home, cmd + 1);
+				cmd = fullcmd;
+			}
+
+			if (fork() == 0) {
+				setsid();
+				execlp("sh", "sh", "-c", cmd, (char *)NULL);
+				fprintf(stderr, "sxwm: failed to exec %s\n", cmd);
+				_exit(EXIT_FAILURE);
+			}
+		}
+	}
+
+	free(line);
+	fclose(fp);
 }
 
 void scan_existing_windows(void)
@@ -1748,6 +1823,7 @@ int main(int ac, char **av)
 		}
 	}
 	setup();
+	run_autostart();
 	printf("sxwm: starting...\n");
 	run();
 	return 0;

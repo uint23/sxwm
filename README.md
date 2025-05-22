@@ -20,6 +20,7 @@
 - [Configuration](#configuration)
 - [Keybindings](#keybindings)
   - [Example Bindings](#example-bindings)
+  - [Autostart Example](#autostart-example)
   - [Default Keybindings](#default-keybindings)
 - [Dependencies](#dependencies)
 - [Build & Install](#build--install)
@@ -109,10 +110,15 @@ bind : modifier + modifier + ... + key : action
 | `fullscreen`         | Fullscreen toggle.                                           |
 | `change_wsX`         | Switches to workspace `X` (1–9).                             |
 | `moveto_wsX`         | Moves current window to workspace `X` (1–9).                 |
+| `run_autostart`      | Autostart applications.                                      |
 
 ### Example Bindings
 
 ```yaml
+
+# Autostart applications
+autostart : "$HOME/.autostart"
+
 # Launch terminal
 bind : mod + Return : "st"
 
@@ -125,6 +131,39 @@ bind : mod + 3 : change_ws3
 # Move window to workspace
 bind : mod + shift + 5 : moveto_ws5
 ```
+---
+
+### Autostart Example
+
+To automatically launch programs when `sxwm` starts, follow these steps:
+
+1. **Create the autostart script**
+
+Create the file:
+```sh
+touch ~/.autostart
+```
+
+Open it in a text editor:
+```sh
+nano ~/.autostart
+```
+
+Add your startup commands:
+```sh
+#!/bin/sh
+st &
+feh --bg-fill "$HOME/wall/windows_xp.jpg" &
+picom --no-vsync
+```
+
+2. **Make the script executable**
+
+```sh
+chmod +x ~/.autostart
+```
+
+That's it — your programs will now start automatically with `sxwm`.
 
 ---
 
