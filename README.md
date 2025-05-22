@@ -211,7 +211,9 @@ doas apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
   pkgs.xorg.libXinerama
   pkgs.libgcc
   pkgs.gnumake
-];</code></pre>
+];
+sudo nixos-rebuild switch
+</code></pre>
 </details>
 
 <details>
