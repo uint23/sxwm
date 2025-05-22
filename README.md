@@ -171,7 +171,7 @@ sudo apt install libx11-dev libxinerama-dev build-essential</code></pre>
 
 <details>
 <summary>Arch Linux / Manjaro</summary>
-<pre><code>sudo pacman -S
+<pre><code>sudo pacman -Syy
 sudo pacman -S libx11 libxinerama gcc make</code></pre>
 </details>
 
