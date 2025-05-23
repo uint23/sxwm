@@ -1,5 +1,7 @@
 > ⚠️ **Note:** I won’t be updating this project for a month or so due to exams.  
 > Issues & PRs are welcome, just don't expect a quick response 🥀🥀
+> **24/05/25:** I have very _little_ time but I am able to develop some features
+> Thank you to the wonderful people who have sumbitted fixes and other PR's
 
 <div align="center">
   <img src="images/sxwm_logo.png" width="50%">
