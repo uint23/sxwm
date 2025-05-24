@@ -88,6 +88,8 @@ typedef struct {
 	int bindsn;
 	Binding binds[256];
 	char **should_float[256];
+	char **autostart_cmd;
+	char *autostart_path;
 } Config;
 
 typedef struct {

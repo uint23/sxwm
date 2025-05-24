@@ -1,3 +1,6 @@
+# Autostart applications
+autostart : "$HOME/.autostart"
+
 # Colour Themes:
 focused_border_colour    : #c0cbff
 unfocused_border_colour  : #555555

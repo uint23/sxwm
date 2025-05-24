@@ -324,6 +324,9 @@ found:
 				}
 			}
 		}
+		else if (!strcmp(key, "autostart")) {
+			cfg->autostart_path = strdup(strip_quotes(rest));
+		}
 		else if (!strcmp(key, "workspace")) {
 			char *mid = strchr(rest, ':');
 			if (!mid) {
