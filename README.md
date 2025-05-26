@@ -52,6 +52,7 @@
 <img src="images/x.png" width="100%">
 <img src="images/3.png" width="100%">
 <img src="images/4.png" width="100%">
+<img src="images/rice.png" width="100">
 
 ---
 
