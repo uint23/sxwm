@@ -166,6 +166,7 @@ int parser(Config *cfg)
 	}
 
 found:
+    if (0) {} // label followed by declaration is a C23 extension
     FILE *f = fopen(path, "r");
     if (!f) {
         fprintf(stderr, "sxwmrc: cannot open %s\n", path);
