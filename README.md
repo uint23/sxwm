@@ -230,7 +230,7 @@ slackpkg install gcc make libX11 libXinerama</code></pre>
 <summary>OpenBSD</summary>
 <pre><code>doas pkg_add gmake</code></pre>
 You will also need the X sets (<code>xbase</code>, <code>xfonts</code>, <code>xserv</code> and <code>xshare</code>) installed.
-When you make the code, use <code>gmake</code> instead of <code>make</code> (which will be BSD make). Use the following command to build: <code>gmake CFLAGS+="-I/usr/X11R6/include -Wall -Wextra -O3" -Isrc-j12 LDFLAGS="-L/usr/X11R6/lib -lX11 -lXinerama -lXcursor"</code>
+When you make the code, use <code>gmake</code> instead of <code>make</code> (which will be BSD make). Use the following command to build: <code>gmake CFLAGS="-I/usr/X11R6/include -Wall -Wextra -O3 -Isrc" LDFLAGS="-L/usr/X11R6/lib -lX11 -lXinerama -lXcursor"</code>
 </details>
 
 ---
