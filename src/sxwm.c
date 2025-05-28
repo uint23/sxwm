@@ -591,19 +591,31 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
-					for (int j = 0; j < 256; j++) {						
-						Bool valid = False;
-						for (int k = 0; user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
-							if (!strcmp(b->action.cmd[k], user_config.should_float[j][k])) {
-								valid = True;
-								break;
-							}
-						}
-						if (valid) {
+					next_should_float = False;
+					for (int j = 0; j < 256; j++) {
+						Bool all_matching = True;
+                        for (int k = 0; k < 256; k++) {
+                            if (!user_config.should_float[j] || !b->action.cmd)
+                                continue;
+
+                            if (!user_config.should_float[j][k] || !b->action.cmd[k]) {
+                                all_matching = (!user_config.should_float[j][k] && !b->action.cmd[k]);
+                                break;
+                            }
+                            // confirm these two entries match
+                            if (strcmp(user_config.should_float[j][k], b->action.cmd[k]) != 0) {
+                                all_matching = False;
+                                printf("%s != %s\n", user_config.should_float[j][k], b->action.cmd[k]);
+                                break;
+                            }
+                        }
+						if (all_matching) {
 							next_should_float = True;
 							break;
 						}
 					}
+
+				end:
 					break;
 				case TYPE_FUNC:
 					if (b->action.fn)
@@ -739,7 +751,7 @@ void hdl_map_req(XEvent *xev)
 		should_float = True;
 		c->fixed = True;
 	}
-	
+
 	if (should_float || global_floating || next_should_float) {
 		c->floating = True;
 
@@ -752,9 +764,8 @@ void hdl_map_req(XEvent *xev)
 				c->w = wa.width;
 				c->h = wa.height;
 
-				XConfigureWindow(
-					dpy, c->win, CWX | CWY | CWWidth | CWHeight,
-					&(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
+				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight,
+				                 &(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
 			}
 
 			tile();
@@ -766,8 +777,7 @@ void hdl_map_req(XEvent *xev)
 			}
 			next_should_float = False;
 		}
-	} 
-		
+	}
 
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
@@ -1551,15 +1561,8 @@ void toggle_floating(void)
 			focused->h = wa.height;
 
 			XConfigureWindow(
-				dpy, focused->win,
-				CWX | CWY | CWWidth | CWHeight,
-				&(XWindowChanges){
-					.x = focused->x,
-					.y = focused->y,
-					.width = focused->w,
-					.height = focused->h
-				}
-			);
+			    dpy, focused->win, CWX | CWY | CWWidth | CWHeight,
+			    &(XWindowChanges){.x = focused->x, .y = focused->y, .width = focused->w, .height = focused->h});
 		}
 	}
 

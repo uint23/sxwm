@@ -143,22 +143,22 @@ int parser(Config *cfg)
 	// check $XDG_CONFIG_HOME/sxwmrc, then $XDG_CONFIG_HOME/sxwm/sxwmrc, then $HOME/.config/sxwmrc
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 
-    if (xdg_config_home) {
-        snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
-        if (access(path, R_OK) == 0) {
-            goto found;
-        }
+	if (xdg_config_home) {
+		snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
+		if (access(path, R_OK) == 0) {
+			goto found;
+		}
 
-        snprintf(path, sizeof path, "%s/sxwm/sxwmrc", xdg_config_home);
-        if (access(path, R_OK) == 0) {
-            goto found;
-        }
-    }
+		snprintf(path, sizeof path, "%s/sxwm/sxwmrc", xdg_config_home);
+		if (access(path, R_OK) == 0) {
+			goto found;
+		}
+	}
 
-    snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
-    if (access(path, R_OK) == 0) {
-        goto found;
-    }
+	snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
+	if (access(path, R_OK) == 0) {
+		goto found;
+	}
 
 	snprintf(path, sizeof path, "/usr/local/share/sxwmrc");
 	if (access(path, R_OK) == 0) {
@@ -166,19 +166,20 @@ int parser(Config *cfg)
 	}
 
 found:
-    if (0) {} // label followed by declaration is a C23 extension
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        fprintf(stderr, "sxwmrc: cannot open %s\n", path);
-        return -1;
-    }
+	if (0) {
+	} // label followed by declaration is a C23 extension
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
+		return -1;
+	}
 
 	char line[512];
 	int lineno = 0;
 	int should_floatn = 0;
 
-	for (int i = 0; i < 256; i++) {
-		cfg->should_float[i] = NULL;
+	for (int j = 0; j < 256; j++) {
+		cfg->should_float[j] = calloc(256, sizeof(char *)); // allocate array of 256 strings
 	}
 
 	while (fgets(line, sizeof line, f)) {
@@ -235,18 +236,28 @@ found:
 		}
 		else if (!strcmp(key, "should_float")) {
 			// should_float: binary --arg,binary2 parameter --arg,binary3
-			
+
 			if (should_floatn >= 256) {
 				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 				continue;
 			}
 
 			char *win = strip(rest);
-			
-			cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
 
+            // remove comments
+            char *nocom = malloc(strlen(win) + 1);
+            char *comment = strchr(win, '#');
+            if (comment) {
+                strncpy(nocom, win, comment - win);
+                nocom[comment - win] = '\0';
+            } else {
+                strcpy(nocom, win);
+            }
+
+            char *final = strip(nocom);
+            
 			char *comma_ptr, *space_ptr;
-			char *comma = strtok_r(win, ",", &comma_ptr);
+			char *comma = strtok_r(final, ",", &comma_ptr);
 
 			while (comma) {
 				if (should_floatn < 256) {
@@ -263,7 +274,6 @@ found:
 					char *argv = strtok_r(comma, " ", &space_ptr);
 					int i = 0;
 
-
 					while (argv) {
 						printf("argv: %s\n", argv);
 						cfg->should_float[should_floatn][i] = strdup(argv);
@@ -272,15 +282,13 @@ found:
 					}
 
 					should_floatn++;
-					cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
-
-				} else {
+				}
+				else {
 					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 					break;
 				}
 				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
-
 
 			should_floatn++;
 		}
@@ -363,15 +371,6 @@ found:
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
-	}
-
-	// print should_float
-	for (int i = 0; i < should_floatn; i++) {
-		fprintf(stderr, "sxwmrc: should_float[%d]: ", i);
-		for (int j = 0; cfg->should_float[i][j]; j++) {
-			fprintf(stderr, "%s ", cfg->should_float[i][j]);
-		}
-		fprintf(stderr, "\n");
 	}
 
 	fclose(f);
