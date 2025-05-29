@@ -168,7 +168,7 @@ bind : mod + shift + 5 : moveto_ws5
 <details>
 <summary>Debian / Ubuntu / Linux Mint</summary>
 <pre><code>sudo apt update
-sudo apt install libx11-dev libxinerama-dev build-essential</code></pre>
+sudo apt install libx11-dev libxcursor-dev libxinerama-dev build-essential</code></pre>
 </details>
 
 <details>
