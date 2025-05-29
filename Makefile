@@ -44,7 +44,7 @@ install: all
 	@install -m 644 $(MAN) $(DESTDIR)$(MAN_DIR)/
 	@echo "Copying default configuration to $(DESTDIR)$(PREFIX)/share/sxwmrc..."
 	@mkdir -p "$(DESTDIR)$(PREFIX)/share"
-	@install -m 644 default_sxrc "$(DESTDIR)$(PREFIX)/share/sxwmrc"
+	@install -m 644 default_sxwmrc "$(DESTDIR)$(PREFIX)/share/sxwmrc"
 	@echo "Installation complete."
 
 uninstall:
