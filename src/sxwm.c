@@ -1436,55 +1436,22 @@ void spawn(const char **argv)
 
 void tile(void)
 {
-	long *wa_prop = NULL;
-	Atom actual;
-	int fmt;
-	unsigned long n, after;
-	int wa_x = 0, wa_y = 0, wa_w = scr_width, wa_h = scr_height;
-
 	update_struts();
-	/* read workarea */
-	if (XGetWindowProperty(dpy, root, atom_net_workarea, 0, 4, False, XA_CARDINAL, &actual, &fmt, &n, &after,
-	                       (unsigned char **)&wa_prop) == Success &&
-	    wa_prop && n >= 4) {
-		wa_x = wa_prop[0];
-		wa_y = wa_prop[1];
-		wa_w = wa_prop[2];
-		wa_h = wa_prop[3];
-		XFree(wa_prop);
-	}
-
-	/* subtract any docks */
-	wa_x += reserve_left;
-	wa_y += reserve_top;
-	wa_w -= reserve_left + reserve_right;
-	wa_h -= reserve_top + reserve_bottom;
-	if (wa_w < 1)
-		wa_w = 1;
-	if (wa_h < 1)
-		wa_h = 1;
 
 	Client *head = workspaces[current_ws];
-	int total_tiled_count = 0;
 
+	/* count total non-floating, non-fullscreen windows */
+	int total_tiled_count = 0;
 	for (Client *c = head; c; c = c->next) {
-		if (!c->floating) {
-			if (!c->fullscreen) {
-				total_tiled_count++;
-			}
-		}
+		if (!c->floating && !c->fullscreen)
+			total_tiled_count++;
 	}
 
+	/* If exactly one tiled window and it's fullscreen, do nothing */
 	if (total_tiled_count == 1) {
-		Client *single = NULL;
 		for (Client *c = head; c; c = c->next) {
-			if (!c->floating) {
-				single = c;
-				break;
-			}
-		}
-		if (single && single->fullscreen) {
-			return;
+			if (!c->floating && c->fullscreen)
+				return;
 		}
 	}
 
@@ -1494,34 +1461,24 @@ void tile(void)
 		int mon_w = mons[m].w;
 		int mon_h = mons[m].h;
 
-		int usable_x = MAX(mon_x, wa_x);
-		int usable_y = MAX(mon_y, wa_y);
-		int usable_r = MIN(mon_x + mon_w, wa_x + wa_w);
-		int usable_b = MIN(mon_y + mon_h, wa_y + wa_h);
-
-		int usable_w = usable_r - usable_x;
-		int usable_h = usable_b - usable_y;
-
 		int mon_tiled_count = 0;
 		for (Client *c = head; c; c = c->next) {
-			if (!c->floating && !c->fullscreen && c->mon == m) {
+			if (!c->floating && !c->fullscreen && c->mon == m)
 				mon_tiled_count++;
-			}
 		}
-
-		if (mon_tiled_count == 0 || usable_w <= 0 || usable_h <= 0) {
+		if (mon_tiled_count == 0)
 			continue;
-		}
 
-		int tile_x = usable_x + user_config.gaps;
-		int tile_y = usable_y + user_config.gaps;
-		int tile_w = usable_w - 2 * user_config.gaps;
-		int tile_h = usable_h - 2 * user_config.gaps;
+		int tile_x = mon_x + user_config.gaps;
+		int tile_y = mon_y + user_config.gaps;
+		int tile_w = mon_w - 2 * user_config.gaps;
+		int tile_h = mon_h - 2 * user_config.gaps;
 		if (tile_w < 1)
 			tile_w = 1;
 		if (tile_h < 1)
 			tile_h = 1;
 
+		/* master-stack split */
 		float mfact = user_config.master_width[m];
 		if (mfact < MF_MIN)
 			mfact = MF_MIN;
@@ -1530,43 +1487,41 @@ void tile(void)
 
 		int master_w = (mon_tiled_count > 1) ? (int)(tile_w * mfact) : tile_w;
 		int stack_w = tile_w - master_w - ((mon_tiled_count > 1) ? user_config.gaps : 0);
-		int stack_h = ((mon_tiled_count - 1) > 0)
-		                  ? (tile_h - ((mon_tiled_count - 1) * user_config.gaps)) / (mon_tiled_count - 1)
-		                  : 0;
+		int stack_h =
+		    (mon_tiled_count > 1) ? (tile_h - ((mon_tiled_count - 1) * user_config.gaps)) / (mon_tiled_count - 1) : 0;
 
-		int i = 0, stack_y = tile_y;
+		int i = 0;
+		int stack_y = tile_y;
 		for (Client *c = head; c; c = c->next) {
 			if (c->floating || c->fullscreen || c->mon != m)
 				continue;
 
 			XWindowChanges wc = {.border_width = user_config.border_width};
-			int adj = 2 * user_config.border_width;
+			int bw2 = 2 * user_config.border_width;
 
 			if (i == 0) {
+				/* master */
 				wc.x = tile_x;
 				wc.y = tile_y;
-				wc.width = (master_w > adj) ? master_w - adj : 1;
-				wc.height = (tile_h > adj) ? tile_h - adj : 1;
+				wc.width = MAX(1, master_w - bw2);
+				wc.height = MAX(1, tile_h - bw2);
 			}
 			else {
+				/* stack */
 				wc.x = tile_x + master_w + user_config.gaps;
 				wc.y = stack_y;
 				int this_h = (i == mon_tiled_count - 1) ? (tile_y + tile_h - stack_y) : stack_h;
-				wc.width = (stack_w > adj) ? stack_w - adj : 1;
-				wc.height = (this_h > adj) ? this_h - adj : 1;
+				wc.width = MAX(1, stack_w - bw2);
+				wc.height = MAX(1, this_h - bw2);
 				stack_y += this_h + user_config.gaps;
 			}
-
-			if (wc.width < 1)
-				wc.width = 1;
-			if (wc.height < 1)
-				wc.height = 1;
 
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 			c->x = wc.x;
 			c->y = wc.y;
 			c->w = wc.width;
 			c->h = wc.height;
+
 			i++;
 		}
 	}
