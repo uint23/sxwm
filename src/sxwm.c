@@ -56,6 +56,7 @@ void hdl_keypress(XEvent *xev);
 void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
 void hdl_root_property(XEvent *xev);
+void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
 /* void move_master_next(void); */
@@ -591,7 +592,7 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
-					for (int j = 0; j < 256; j++) {						
+					for (int j = 0; j < 256; j++) {
 						Bool valid = False;
 						for (int k = 0; user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
 							if (!strcmp(b->action.cmd[k], user_config.should_float[j][k])) {
@@ -739,7 +740,7 @@ void hdl_map_req(XEvent *xev)
 		should_float = True;
 		c->fixed = True;
 	}
-	
+
 	if (should_float || global_floating || next_should_float) {
 		c->floating = True;
 
@@ -754,7 +755,7 @@ void hdl_map_req(XEvent *xev)
 
 				XConfigureWindow(
 					dpy, c->win, CWX | CWY | CWWidth | CWHeight,
-					&(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
+				                 &(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
 			}
 
 			tile();
@@ -766,8 +767,7 @@ void hdl_map_req(XEvent *xev)
 			}
 			next_should_float = False;
 		}
-	} 
-		
+	}
 
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
@@ -901,6 +901,39 @@ void hdl_root_property(XEvent *xev)
 		update_struts();
 		tile();
 		update_borders();
+	}
+}
+
+void hdl_unmap_ntf(XEvent *xev)
+{
+	Window w = xev->xunmap.window;
+
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		Client *prev = NULL, *c = workspaces[ws];
+		while (c && c->win != w) {
+			prev = c;
+			c = c->next;
+		}
+		if (c) {
+			if (focused == c) {
+				if (c->next)
+					focused = c->next;
+				else if (prev)
+					focused = prev;
+				else
+					focused = NULL;
+			}
+			if (!prev)
+				workspaces[ws] = c->next;
+			else
+				prev->next = c->next;
+			free(c);
+			open_windows--;
+			update_net_client_list();
+			tile();
+			update_borders();
+			break;
+		}
 	}
 }
 
@@ -1274,6 +1307,7 @@ void setup(void)
 	evtable[MapRequest] = hdl_map_req;
 	evtable[MotionNotify] = hdl_motion;
 	evtable[PropertyNotify] = hdl_root_property;
+	evtable[UnmapNotify] = hdl_unmap_ntf;
 	scan_existing_windows();
 
 	signal(SIGCHLD, SIG_IGN); /* Prevent child processes from becoming zombies */
