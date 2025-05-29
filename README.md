@@ -226,6 +226,13 @@ sudo nixos-rebuild switch
 slackpkg install gcc make libX11 libXinerama</code></pre>
 </details>
 
+<details>
+<summary>FreeBSD</summary>
+<pre><code># If you use doas or su instead of sudo, modify the following commands accordingly.
+sudo pkg update
+sudo pkg install gcc gmake libX11 libXinerama</code></pre>
+</details>
+
 ---
 
 ## Build & Install
@@ -241,6 +248,7 @@ yay -S sxwm
 ```sh
 git clone --depth=1 https://github.com/uint23/sxwm.git
 cd sxwm/
+# Replace make with gmake on FreeBSD
 make
 sudo make clean install
 ```
