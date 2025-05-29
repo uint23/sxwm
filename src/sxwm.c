@@ -784,12 +784,12 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	/* map & borders */
-	XMapWindow(dpy, w);
 	update_net_client_list();
 	if (!global_floating && !c->floating)
 		tile();
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
+	XMapWindow(dpy, w);
 	update_borders();
 }
 
