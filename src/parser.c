@@ -33,14 +33,6 @@ static const struct {
 static void remap_and_dedupe_binds(Config *cfg)
 {
 	for (int i = 0; i < cfg->bindsn; i++) {
-		Binding *b = &cfg->binds[i];
-		if (b->mods & (Mod1Mask | Mod4Mask)) {
-			unsigned others = b->mods & ~(Mod1Mask | Mod4Mask);
-			b->mods = others | cfg->modkey;
-		}
-	}
-
-	for (int i = 0; i < cfg->bindsn; i++) {
 		for (int j = i + 1; j < cfg->bindsn; j++) {
 			if (cfg->binds[i].mods == cfg->binds[j].mods && cfg->binds[i].keysym == cfg->binds[j].keysym) {
 				memmove(&cfg->binds[j], &cfg->binds[j + 1], sizeof(Binding) * (cfg->bindsn - j - 1));
@@ -168,6 +160,7 @@ int parser(Config *cfg)
 found:
 	if (0) {
 	} // label followed by declaration is a C23 extension
+
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
@@ -223,7 +216,10 @@ found:
 			cfg->border_swap_col = parse_col(rest);
 		}
 		else if (!strcmp(key, "master_width")) {
-			cfg->master_width = atoi(rest) / 100.0f;
+			float mf = atoi(rest) / 100.0f;
+			for (int i = 0; i < MAX_MONITORS; i++) {
+				cfg->master_width[i] = mf;
+			}
 		}
 		else if (!strcmp(key, "motion_throttle")) {
 			cfg->motion_throttle = atoi(rest);

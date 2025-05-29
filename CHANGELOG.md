@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+#### v1.6 (current)
+- **NEW**: True multi-monitor support
+- **FIXED**: Invisible windows of minimized programs
+- **FIXED**: Zombie processes spawned from apps
+- **FIXED**: Invalid sample config
+- **FIXED**: Undefined behaviour in `parse_col`
+
 #### v1.5
 - **NEW**: Using XCursor instead of cursor font && new logo.
 - **FIXED**: Proper bind resetting on refresh config. && Multi-arg binds now work due to new and improved spawn function

@@ -168,7 +168,7 @@ bind : mod + shift + 5 : moveto_ws5
 <details>
 <summary>Debian / Ubuntu / Linux Mint</summary>
 <pre><code>sudo apt update
-sudo apt install libx11-dev libxinerama-dev build-essential</code></pre>
+sudo apt install libx11-dev libxcursor-dev libxinerama-dev build-essential</code></pre>
 </details>
 
 <details>
@@ -233,6 +233,13 @@ You will also need the X sets (<code>xbase</code>, <code>xfonts</code>, <code>xs
 When you make the code, use <code>gmake</code> instead of <code>make</code> (which will be BSD make). Use the following command to build: <code>gmake CFLAGS="-I/usr/X11R6/include -Wall -Wextra -O3 -Isrc" LDFLAGS="-L/usr/X11R6/lib -lX11 -lXinerama -lXcursor"</code>
 </details>
 
+<details>
+<summary>FreeBSD</summary>
+<pre><code># If you use doas or su instead of sudo, modify the following commands accordingly.
+sudo pkg update
+sudo pkg install gcc gmake libX11 libXinerama</code></pre>
+</details>
+
 ---
 
 ## Build & Install
@@ -248,6 +255,7 @@ yay -S sxwm
 ```sh
 git clone --depth=1 https://github.com/uint23/sxwm.git
 cd sxwm/
+# Replace make with gmake on FreeBSD
 make
 sudo make clean install
 ```

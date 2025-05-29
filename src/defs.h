@@ -13,10 +13,12 @@
 #define OUT_IN (2 * BORDER_WIDTH)
 #define MF_MIN 0.05f
 #define MF_MAX 0.95f
+#define MAX_MONITORS 32
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define UDIST(a,b) abs((int)(a) - (int)(b))
+# define CLAMP(x, lo, hi) (( (x) < (lo) ) ? (lo) : ( (x) > (hi) ) ? (hi) : (x))
 #define MAXCLIENTS	99
 #define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
 #define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }
@@ -71,6 +73,7 @@ typedef struct Client{
 	Bool fixed;
 	Bool floating;
 	Bool fullscreen;
+	Bool mapped;
 	struct Client *next;
 } Client;
 
@@ -81,7 +84,7 @@ typedef struct {
 	long border_foc_col;
 	long border_ufoc_col;
 	long border_swap_col;
-	float master_width;
+	float master_width[MAX_MONITORS];
 	int motion_throttle;
 	int resize_master_amt;
 	int snap_distance;
