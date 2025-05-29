@@ -170,24 +170,25 @@ Client *add_client(Window w, int ws)
 	c->w = wa.width;
 	c->h = wa.height;
 
-	if (focused) {
-		c->mon = focused->mon;
-	}
-	else {
-		/* need better way to determine mon */
-		int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
-		c->mon = 0;
+	/* set monitor based on pointer location */
+	Window root_ret, child_ret;
+	int root_x, root_y, win_x, win_y;
+	unsigned int mask;
+	int pointer_mon = 0;
+
+	if (XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &mask)) {
 		for (int i = 0; i < monsn; i++) {
-			if (cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= mons[i].y && cy < mons[i].y + mons[i].h) {
-				c->mon = i;
+			if (root_x >= mons[i].x && root_x < mons[i].x + mons[i].w && root_y >= mons[i].y &&
+			    root_y < mons[i].y + mons[i].h) {
+				pointer_mon = i;
 				break;
 			}
 		}
 	}
 
+	c->mon = pointer_mon;
 	c->fixed = False;
 	c->floating = False;
-
 	c->fullscreen = False;
 
 	if (global_floating) {
@@ -594,7 +595,8 @@ void hdl_keypress(XEvent *xev)
 					spawn(b->action.cmd);
 					for (int j = 0; j < 256; j++) {
 						Bool valid = False;
-						for (int k = 0; user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
+						for (int k = 0;
+						     user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
 							if (!strcmp(b->action.cmd[k], user_config.should_float[j][k])) {
 								valid = True;
 								break;
@@ -724,7 +726,7 @@ void hdl_map_req(XEvent *xev)
 		return;
 	}
 
-	/* ad client to list */
+	/* add client to list */
 	Client *c = add_client(w, current_ws);
 	if (!c)
 		return;
@@ -753,8 +755,7 @@ void hdl_map_req(XEvent *xev)
 				c->w = wa.width;
 				c->h = wa.height;
 
-				XConfigureWindow(
-					dpy, c->win, CWX | CWY | CWWidth | CWHeight,
+				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight,
 				                 &(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
 			}
 
@@ -1011,7 +1012,9 @@ void init_defaults(void)
 	default_config.border_foc_col = parse_col("#c0cbff");
 	default_config.border_ufoc_col = parse_col("#555555");
 	default_config.border_swap_col = parse_col("#fff4c0");
-	default_config.master_width = 50 / 100.0f;
+	for (int i = 0; i < MAX_MONITORS; i++)
+		default_config.master_width[i] = 50 / 100.0f;
+
 	default_config.motion_throttle = 60;
 	default_config.resize_master_amt = 5;
 	default_config.snap_distance = 5;
@@ -1131,6 +1134,7 @@ long parse_col(const char *hex)
 	}
 
 	/* return col.pixel |= 0xff << 24; */
+	/* This is a fix for picom making the borders transparent. DANGEROUS */
 	return col.pixel;
 }
 
@@ -1186,8 +1190,12 @@ void reload_config(void)
 
 void resize_master_add(void)
 {
-	if (user_config.master_width < MF_MAX - 0.001f) {
-		user_config.master_width += ((float)user_config.resize_master_amt / 100);
+	/* pick the monitor of the focused window (or 0 if none) */
+	int m = focused ? focused->mon : 0;
+	float *mw = &user_config.master_width[m];
+
+	if (*mw < MF_MAX - 0.001f) {
+		*mw += ((float)user_config.resize_master_amt / 100);
 	}
 	tile();
 	update_borders();
@@ -1195,8 +1203,12 @@ void resize_master_add(void)
 
 void resize_master_sub(void)
 {
-	if (user_config.master_width > MF_MIN + 0.001f) {
-		user_config.master_width -= ((float)user_config.resize_master_amt / 100);
+	/* pick the monitor of the focused window (or 0 if none) */
+	int m = focused ? focused->mon : 0;
+	float *mw = &user_config.master_width[m];
+
+	if (*mw > MF_MIN + 0.001f) {
+		*mw -= ((float)user_config.resize_master_amt / 100);
 	}
 	tile();
 	update_borders();
@@ -1310,7 +1322,7 @@ void setup(void)
 	evtable[UnmapNotify] = hdl_unmap_ntf;
 	scan_existing_windows();
 
-	signal(SIGCHLD, SIG_IGN); /* Prevent child processes from becoming zombies */
+	signal(SIGCHLD, SIG_IGN); /* prevent child processes from becoming zombies */
 }
 
 void setup_atoms(void)
@@ -1457,7 +1469,6 @@ void tile(void)
 
 	for (Client *c = head; c; c = c->next) {
 		if (!c->floating) {
-			c->mon = get_monitor_for(c);
 			if (!c->fullscreen) {
 				total_tiled_count++;
 			}
@@ -1511,7 +1522,7 @@ void tile(void)
 		if (tile_h < 1)
 			tile_h = 1;
 
-		float mfact = user_config.master_width;
+		float mfact = user_config.master_width[m];
 		if (mfact < MF_MIN)
 			mfact = MF_MIN;
 		if (mfact > MF_MAX)
@@ -1585,22 +1596,21 @@ void toggle_floating(void)
 			focused->h = wa.height;
 
 			XConfigureWindow(
-				dpy, focused->win,
-				CWX | CWY | CWWidth | CWHeight,
-				&(XWindowChanges){
-					.x = focused->x,
-					.y = focused->y,
-					.width = focused->w,
-					.height = focused->h
-				}
-			);
+			    dpy, focused->win, CWX | CWY | CWWidth | CWHeight,
+			    &(XWindowChanges){.x = focused->x, .y = focused->y, .width = focused->w, .height = focused->h});
 		}
 	}
+	else {
+		focused->mon = get_monitor_for(focused);
+	}
 
+	if (!focused->floating) {
+		focused->mon = get_monitor_for(focused);
+	}
 	tile();
 	update_borders();
 
-	/* Raise and refocus floating window */
+	/* raise and refocus floating window */
 	if (focused->floating) {
 		XRaiseWindow(dpy, focused->win);
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
@@ -1671,6 +1681,10 @@ void toggle_fullscreen(void)
 	else {
 		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
 		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
+
+		if (!focused->floating) {
+			focused->mon = get_monitor_for(focused);
+		}
 		tile();
 		update_borders();
 	}

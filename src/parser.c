@@ -143,22 +143,22 @@ int parser(Config *cfg)
 	// check $XDG_CONFIG_HOME/sxwmrc, then $XDG_CONFIG_HOME/sxwm/sxwmrc, then $HOME/.config/sxwmrc
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 
-    if (xdg_config_home) {
-        snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
-        if (access(path, R_OK) == 0) {
-            goto found;
-        }
+	if (xdg_config_home) {
+		snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
+		if (access(path, R_OK) == 0) {
+			goto found;
+		}
 
-        snprintf(path, sizeof path, "%s/sxwm/sxwmrc", xdg_config_home);
-        if (access(path, R_OK) == 0) {
-            goto found;
-        }
-    }
+		snprintf(path, sizeof path, "%s/sxwm/sxwmrc", xdg_config_home);
+		if (access(path, R_OK) == 0) {
+			goto found;
+		}
+	}
 
-    snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
-    if (access(path, R_OK) == 0) {
-        goto found;
-    }
+	snprintf(path, sizeof path, "%s/.config/sxwmrc", home);
+	if (access(path, R_OK) == 0) {
+		goto found;
+	}
 
 	snprintf(path, sizeof path, "/usr/local/share/sxwmrc");
 	if (access(path, R_OK) == 0) {
@@ -166,11 +166,11 @@ int parser(Config *cfg)
 	}
 
 found:
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        fprintf(stderr, "sxwmrc: cannot open %s\n", path);
-        return -1;
-    }
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
+		return -1;
+	}
 
 	char line[512];
 	int lineno = 0;
@@ -221,7 +221,10 @@ found:
 			cfg->border_swap_col = parse_col(rest);
 		}
 		else if (!strcmp(key, "master_width")) {
-			cfg->master_width = atoi(rest) / 100.0f;
+			float mf = atoi(rest) / 100.0f;
+			for (int i = 0; i < MAX_MONITORS; i++) {
+				cfg->master_width[i] = mf;
+			}
 		}
 		else if (!strcmp(key, "motion_throttle")) {
 			cfg->motion_throttle = atoi(rest);
@@ -234,14 +237,14 @@ found:
 		}
 		else if (!strcmp(key, "should_float")) {
 			// should_float: binary --arg,binary2 parameter --arg,binary3
-			
+
 			if (should_floatn >= 256) {
 				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 				continue;
 			}
 
 			char *win = strip(rest);
-			
+
 			cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
 
 			char *comma_ptr, *space_ptr;
@@ -262,7 +265,6 @@ found:
 					char *argv = strtok_r(comma, " ", &space_ptr);
 					int i = 0;
 
-
 					while (argv) {
 						printf("argv: %s\n", argv);
 						cfg->should_float[should_floatn][i] = strdup(argv);
@@ -272,14 +274,13 @@ found:
 
 					should_floatn++;
 					cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
-
-				} else {
+				}
+				else {
 					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 					break;
 				}
 				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
-
 
 			should_floatn++;
 		}

@@ -13,6 +13,7 @@
 #define OUT_IN (2 * BORDER_WIDTH)
 #define MF_MIN 0.05f
 #define MF_MAX 0.95f
+#define MAX_MONITORS 32
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LENGTH(X) (sizeof X / sizeof X[0])
@@ -81,7 +82,7 @@ typedef struct {
 	long border_foc_col;
 	long border_ufoc_col;
 	long border_swap_col;
-	float master_width;
+	float master_width[MAX_MONITORS];
 	int motion_throttle;
 	int resize_master_amt;
 	int snap_distance;
