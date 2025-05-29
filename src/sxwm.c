@@ -614,20 +614,33 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
+
+					next_should_float = False;
 					for (int j = 0; j < 256; j++) {
-						Bool valid = False;
-						for (int k = 0;
-						     user_config.should_float[j] && user_config.should_float[j][k] && b->action.cmd[k]; k++) {
-							if (!strcmp(b->action.cmd[k], user_config.should_float[j][k])) {
-								valid = True;
-								break;
-							}
-						}
-						if (valid) {
+						Bool all_matching = True;
+                        for (int k = 0; k < 256; k++) {
+                            if (!user_config.should_float[j] || !b->action.cmd)
+                                continue;
+
+                            if (!user_config.should_float[j][k] || !b->action.cmd[k]) {
+                                all_matching = (!user_config.should_float[j][k] && !b->action.cmd[k]);
+                                break;
+                            }
+                            // confirm these two entries match
+                            if (strcmp(user_config.should_float[j][k], b->action.cmd[k]) != 0) {
+                                all_matching = False;
+                                printf("%s != %s\n", user_config.should_float[j][k], b->action.cmd[k]);
+                                break;
+                            }
+                        }
+						if (all_matching) {
+
 							next_should_float = True;
 							break;
 						}
 					}
+
+				end:
 					break;
 				case TYPE_FUNC:
 					if (b->action.fn)

@@ -158,6 +158,9 @@ int parser(Config *cfg)
 	}
 
 found:
+	if (0) {
+	} // label followed by declaration is a C23 extension
+
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
@@ -168,8 +171,8 @@ found:
 	int lineno = 0;
 	int should_floatn = 0;
 
-	for (int i = 0; i < 256; i++) {
-		cfg->should_float[i] = NULL;
+	for (int j = 0; j < 256; j++) {
+		cfg->should_float[j] = calloc(256, sizeof(char *)); // allocate array of 256 strings
 	}
 
 	while (fgets(line, sizeof line, f)) {
@@ -237,10 +240,20 @@ found:
 
 			char *win = strip(rest);
 
-			cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
+            // remove comments
+            char *nocom = malloc(strlen(win) + 1);
+            char *comment = strchr(win, '#');
+            if (comment) {
+                strncpy(nocom, win, comment - win);
+                nocom[comment - win] = '\0';
+            } else {
+                strcpy(nocom, win);
+            }
 
+            char *final = strip(nocom);
+            
 			char *comma_ptr, *space_ptr;
-			char *comma = strtok_r(win, ",", &comma_ptr);
+			char *comma = strtok_r(final, ",", &comma_ptr);
 
 			while (comma) {
 				if (should_floatn < 256) {
@@ -265,7 +278,6 @@ found:
 					}
 
 					should_floatn++;
-					cfg->should_float[should_floatn] = malloc(256 * sizeof(char *));
 				}
 				else {
 					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
@@ -355,15 +367,6 @@ found:
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
-	}
-
-	// print should_float
-	for (int i = 0; i < should_floatn; i++) {
-		fprintf(stderr, "sxwmrc: should_float[%d]: ", i);
-		for (int j = 0; cfg->should_float[i][j]; j++) {
-			fprintf(stderr, "%s ", cfg->should_float[i][j]);
-		}
-		fprintf(stderr, "\n");
 	}
 
 	fclose(f);
