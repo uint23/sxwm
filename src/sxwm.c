@@ -191,6 +191,7 @@ Client *add_client(Window w, int ws)
 	c->fixed = False;
 	c->floating = False;
 	c->fullscreen = False;
+	c->mapped = True;
 
 	if (global_floating) {
 		c->floating = True;
@@ -206,20 +207,24 @@ Client *add_client(Window w, int ws)
 
 void change_workspace(int ws)
 {
-	if (ws >= NUM_WORKSPACES || ws == current_ws) {
+	if (ws >= NUM_WORKSPACES || ws == current_ws)
 		return;
-	}
 
 	in_ws_switch = True;
 	XGrabServer(dpy);
 
+	/* unmap those still marked mapped */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		XUnmapWindow(dpy, c->win);
+		if (c->mapped)
+			XUnmapWindow(dpy, c->win);
 	}
 
 	current_ws = ws;
+
+	/* map those still marked mapped */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		XMapWindow(dpy, c->win);
+		if (c->mapped)
+			XMapWindow(dpy, c->win);
 	}
 
 	tile();
@@ -233,6 +238,7 @@ void change_workspace(int ws)
 	                (unsigned char *)&cd, 1);
 
 	XUngrabServer(dpy);
+	XSync(dpy, False);
 	in_ws_switch = False;
 }
 
@@ -674,16 +680,21 @@ void hdl_map_req(XEvent *xev)
 	XMapRequestEvent *me = &xev->xmaprequest;
 	Window w = me->window;
 
-	/* only manage if on current ws */
+	/* existing clients get remapped and marked as mapped */
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			if (c->win == w) {
+				c->mapped = True;
 				if (c->ws == current_ws)
 					XMapWindow(dpy, w);
+				update_net_client_list();
+				tile();
+				update_borders();
 				return;
 			}
 		}
 	}
+
 	XWindowAttributes wa;
 	if (!XGetWindowAttributes(dpy, w, &wa))
 		return;
@@ -794,6 +805,9 @@ void hdl_map_req(XEvent *xev)
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
 	XMapWindow(dpy, w);
+	for (Client *c = workspaces[current_ws]; c; c = c->next)
+		if (c->win == w)
+			c->mapped = True;
 	update_borders();
 }
 
@@ -910,39 +924,19 @@ void hdl_root_property(XEvent *xev)
 
 void hdl_unmap_ntf(XEvent *xev)
 {
-	if (in_ws_switch) {
-		return;
-	}
-
-	Window w = xev->xunmap.window;
-
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		Client *prev = NULL, *c = workspaces[ws];
-		while (c && c->win != w) {
-			prev = c;
-			c = c->next;
-		}
-		if (c) {
-			if (focused == c) {
-				if (c->next)
-					focused = c->next;
-				else if (prev)
-					focused = prev;
-				else
-					focused = NULL;
+	if (!in_ws_switch) {
+		Window w = xev->xunmap.window;
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			if (c->win == w) {
+				c->mapped = False;
+				break;
 			}
-			if (!prev)
-				workspaces[ws] = c->next;
-			else
-				prev->next = c->next;
-			free(c);
-			open_windows--;
-			update_net_client_list();
-			tile();
-			update_borders();
-			break;
 		}
 	}
+
+	update_net_client_list();
+	tile();
+	update_borders();
 }
 
 void update_struts(void)
@@ -1443,19 +1437,18 @@ void spawn(const char **argv)
 
 void tile(void)
 {
-	update_struts();
+	update_struts(); /* fills reserve_top, reserve_bottom */
 
 	Client *head = workspaces[current_ws];
 
-	/* count total non-floating, non-fullscreen windows */
-	int total_tiled_count = 0;
+	int total = 0;
 	for (Client *c = head; c; c = c->next) {
-		if (!c->floating && !c->fullscreen)
-			total_tiled_count++;
+		if (!c->mapped || c->floating || c->fullscreen)
+			continue;
+		total++;
 	}
 
-	/* If exactly one tiled window and it's fullscreen, do nothing */
-	if (total_tiled_count == 1) {
+	if (total == 1) {
 		for (Client *c = head; c; c = c->next) {
 			if (!c->floating && c->fullscreen)
 				return;
@@ -1464,43 +1457,43 @@ void tile(void)
 
 	for (int m = 0; m < monsn; m++) {
 		int mon_x = mons[m].x;
-		int mon_y = mons[m].y;
+		int mon_y = mons[m].y + reserve_top;
 		int mon_w = mons[m].w;
-		int mon_h = mons[m].h;
+		int mon_h = mons[m].h - reserve_top - reserve_bottom;
 
-		int mon_tiled_count = 0;
+		int cnt = 0;
 		for (Client *c = head; c; c = c->next) {
-			if (!c->floating && !c->fullscreen && c->mon == m)
-				mon_tiled_count++;
+			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
+				continue;
+			cnt++;
 		}
-		if (mon_tiled_count == 0)
+		if (!cnt)
 			continue;
 
-		int tile_x = mon_x + user_config.gaps;
-		int tile_y = mon_y + user_config.gaps;
-		int tile_w = mon_w - 2 * user_config.gaps;
-		int tile_h = mon_h - 2 * user_config.gaps;
+		int gx = user_config.gaps;
+		int gy = user_config.gaps;
+		int tile_x = mon_x + gx;
+		int tile_y = mon_y + gy;
+		int tile_w = mon_w - 2 * gx;
+		int tile_h = mon_h - 2 * gy;
 		if (tile_w < 1)
 			tile_w = 1;
 		if (tile_h < 1)
 			tile_h = 1;
 
-		/* master-stack split */
-		float mfact = user_config.master_width[m];
-		if (mfact < MF_MIN)
-			mfact = MF_MIN;
-		if (mfact > MF_MAX)
-			mfact = MF_MAX;
+		/* master‐stack split */
+		float mf = user_config.master_width[m];
+		if (mf < MF_MIN)
+			mf = MF_MIN;
+		if (mf > MF_MAX)
+			mf = MF_MAX;
+		int master_w = (cnt > 1) ? (int)(tile_w * mf) : tile_w;
+		int stack_w = tile_w - master_w - ((cnt > 1) ? gx : 0);
+		int stack_h = (cnt > 1) ? (tile_h - (cnt - 1) * gy) / (cnt - 1) : 0;
 
-		int master_w = (mon_tiled_count > 1) ? (int)(tile_w * mfact) : tile_w;
-		int stack_w = tile_w - master_w - ((mon_tiled_count > 1) ? user_config.gaps : 0);
-		int stack_h =
-		    (mon_tiled_count > 1) ? (tile_h - ((mon_tiled_count - 1) * user_config.gaps)) / (mon_tiled_count - 1) : 0;
-
-		int i = 0;
-		int stack_y = tile_y;
+		int i = 0, sy = tile_y;
 		for (Client *c = head; c; c = c->next) {
-			if (c->floating || c->fullscreen || c->mon != m)
+			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
 				continue;
 
 			XWindowChanges wc = {.border_width = user_config.border_width};
@@ -1515,12 +1508,12 @@ void tile(void)
 			}
 			else {
 				/* stack */
-				wc.x = tile_x + master_w + user_config.gaps;
-				wc.y = stack_y;
-				int this_h = (i == mon_tiled_count - 1) ? (tile_y + tile_h - stack_y) : stack_h;
+				wc.x = tile_x + master_w + gx;
+				wc.y = sy;
+				int h = (i == cnt - 1) ? (tile_y + tile_h - sy) : stack_h;
 				wc.width = MAX(1, stack_w - bw2);
-				wc.height = MAX(1, this_h - bw2);
-				stack_y += this_h + user_config.gaps;
+				wc.height = MAX(1, h - bw2);
+				sy += h + gy;
 			}
 
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
@@ -1528,10 +1521,10 @@ void tile(void)
 			c->y = wc.y;
 			c->w = wc.width;
 			c->h = wc.height;
-
 			i++;
 		}
 	}
+
 	update_borders();
 }
 
