@@ -537,42 +537,54 @@ void hdl_destroy_ntf(XEvent *xev)
 {
 	Window w = xev->xdestroywindow.window;
 
-	Client *prev = NULL, *c = workspaces[current_ws];
-	while (c && c->win != w) {
-		prev = c;
-		c = c->next;
-	}
-	if (c) {
-		if (focused == c) {
-			if (c->next) {
-				focused = c->next;
+	// Search all workspaces, not just current one
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		Client *prev = NULL, *c = workspaces[ws];
+		while (c && c->win != w) {
+			prev = c;
+			c = c->next;
+		}
+		if (c) {
+			// Update focused if this was the focused client
+			if (focused == c) {
+				if (c->next) {
+					focused = c->next;
+				}
+				else if (prev) {
+					focused = prev;
+				}
+				else {
+					// If this was the only client in current workspace, find next client
+					if (ws == current_ws) {
+						focused = NULL;
+					}
+				}
 			}
-			else if (prev) {
-				focused = prev;
+
+			// Remove from linked list
+			if (!prev) {
+				workspaces[ws] = c->next;
 			}
 			else {
-				focused = NULL;
+				prev->next = c->next;
 			}
+
+			free(c);
+			update_net_client_list();
+			open_windows--;
+
+			// Only tile and update borders if we're dealing with current workspace
+			if (ws == current_ws) {
+				tile();
+				update_borders();
+
+				if (focused) {
+					XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+					XRaiseWindow(dpy, focused->win);
+				}
+			}
+			return; // Found and removed the client, we're done
 		}
-
-		if (!prev) {
-			workspaces[current_ws] = c->next;
-		}
-		else {
-			prev->next = c->next;
-		}
-
-		free(c);
-		update_net_client_list();
-		open_windows--;
-	}
-
-	tile();
-	update_borders();
-
-	if (focused) {
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		XRaiseWindow(dpy, focused->win);
 	}
 }
 

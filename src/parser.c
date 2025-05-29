@@ -33,14 +33,6 @@ static const struct {
 static void remap_and_dedupe_binds(Config *cfg)
 {
 	for (int i = 0; i < cfg->bindsn; i++) {
-		Binding *b = &cfg->binds[i];
-		if (b->mods & (Mod1Mask | Mod4Mask)) {
-			unsigned others = b->mods & ~(Mod1Mask | Mod4Mask);
-			b->mods = others | cfg->modkey;
-		}
-	}
-
-	for (int i = 0; i < cfg->bindsn; i++) {
 		for (int j = i + 1; j < cfg->bindsn; j++) {
 			if (cfg->binds[i].mods == cfg->binds[j].mods && cfg->binds[i].keysym == cfg->binds[j].keysym) {
 				memmove(&cfg->binds[j], &cfg->binds[j + 1], sizeof(Binding) * (cfg->bindsn - j - 1));
