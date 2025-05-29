@@ -119,6 +119,7 @@ Window wm_check_win;
 Monitor *mons = NULL;
 int monsn = 0;
 Bool global_floating = False;
+Bool in_ws_switch = False;
 
 long last_motion_time = 0;
 int scr_width;
@@ -209,6 +210,7 @@ void change_workspace(int ws)
 		return;
 	}
 
+	in_ws_switch = True;
 	XGrabServer(dpy);
 
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -231,6 +233,7 @@ void change_workspace(int ws)
 	                (unsigned char *)&cd, 1);
 
 	XUngrabServer(dpy);
+	in_ws_switch = False;
 }
 
 int clean_mask(int mask)
@@ -907,6 +910,10 @@ void hdl_root_property(XEvent *xev)
 
 void hdl_unmap_ntf(XEvent *xev)
 {
+	if (in_ws_switch) {
+		return;
+	}
+
 	Window w = xev->xunmap.window;
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
