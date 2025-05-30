@@ -47,11 +47,7 @@
 ---
 
 ## Screenshots
-
-<img src="images/1.png" width="100%">
-<img src="images/x.png" width="100%">
-<img src="images/3.png" width="100%">
-<img src="images/4.png" width="100%">
+See on the [website](https://uint23.xyz/sxwm.html)
 
 ---
 
