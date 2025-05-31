@@ -72,6 +72,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
 | `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
 | `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
+| `new_win_focus`          | Bool    | `true`    | Whether openening new windows should also set focus to them or keep on current window.|
 
 ---
 
@@ -86,6 +87,16 @@ bind : modifier + modifier + ... + key : action
 - **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
 - **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
 - **Action**: Either an external command (in quotes) or internal function.
+
+```sh
+workspace : modifier + modifier + ... + key : move n
+workspace : modifier + modifier + ... + key : swap n
+```
+- **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
+- **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
+- **move**: Move to that worspace
+- **swap**: Swap window to that workspace
+- **n**: Workspace number
 
 ### Available Functions
 
@@ -105,23 +116,19 @@ bind : modifier + modifier + ... + key : action
 | `toggle_floating`    | Toggles floating state of current window.                    |
 | `global_floating`    | Toggles floating state for all windows.                      |
 | `fullscreen`         | Fullscreen toggle.                                           |
-| `change_wsX`         | Switches to workspace `X` (1–9).                             |
-| `moveto_wsX`         | Moves current window to workspace `X` (1–9).                 |
 
 ### Example Bindings
 
 ```yaml
 # Launch terminal
 bind : mod + Return : "st"
-
 # Close window
 bind : mod + shift + q : close_window
 
 # Switch workspace
-bind : mod + 3 : change_ws3
-
+workspace : mod + 3 : move 3
 # Move window to workspace
-bind : mod + shift + 5 : moveto_ws5
+workspace : mod + shift + 5 : swap 5
 ```
 
 ---
@@ -159,6 +166,7 @@ bind : mod + shift + 5 : moveto_ws5
 
 - `libX11` (Xorg client library)
 - `Xinerama`
+- `XCursor`
 - GCC or Clang & Make
 
 <details>
@@ -244,6 +252,8 @@ sudo pkg install gcc gmake libX11 libXinerama</code></pre>
 
 ```sh
 yay -S sxwm
+# OR for latest features:
+yay -S sxwm-git
 ```
 
 ### Build from Source
