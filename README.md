@@ -22,6 +22,7 @@
 - [Configuration](#configuration)
 - [Keybindings](#keybindings)
   - [Example Bindings](#example-bindings)
+  - [Example Autostart](#example-autostart)
   - [Default Keybindings](#default-keybindings)
 - [Dependencies](#dependencies)
 - [Build & Install](#build--install)
@@ -130,6 +131,36 @@ workspace : mod + 3 : move 3
 # Move window to workspace
 workspace : mod + shift + 5 : swap 5
 ```
+
+---
+
+### Example Autostart
+
+1. Create a file named `.autostart` and edit it:
+
+```sh
+touch ~/.autostart
+nano ~/.autostart
+```
+
+2. Add your startup commands:
+
+Example:
+```sh
+#!/bin/sh
+st &
+picom &
+feh --bg-fill "$HOME/Wallpaper/sxwm.png" &
+dunst
+```
+
+3. Make the script executable:
+
+```sh
+chmod +x ~/.autostart
+```
+
+These programs will start automatically.
 
 ---
 

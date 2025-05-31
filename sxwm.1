@@ -73,6 +73,45 @@ Target updates per second for mouse drag operations (move, resize, swap). Defaul
 .B should_float
 Lets you change which windows should float by default when opening them. Default is st
 
+.TP
+.B autostart
+Specifies programs to launch automatically when sxwm starts. Each entry points to an executable shell script.
+
+Example usage in
+.B ~/.config/sxwmrc:
+
+.RS
+.nf
+autostart: "$HOME/.autostart"
+.fi
+.RE
+
+To set this up:
+
+.I "1. Create the file:"
+
+touch ~/.autostart
+
+.I "2. Edit the file with your preferred text editor:"
+
+nano ~/.autostart
+
+.I "3. Add your startup commands:"
+
+.RS
+.nf
+#!/bin/sh
+st &
+feh --bg-fill "$HOME/wall/windows_xp.jpg" &
+picom --no-vsync
+.fi
+.RE
+
+.I "4. Make the script executable:"
+   chmod +x ~/.autostart
+
+These programs will now launch automatically with sxwm.
+
 .SH KEYBINDINGS
 Keybindings associate key combinations with actions, either running external commands or internal sxwm functions.
 

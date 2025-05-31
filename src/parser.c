@@ -245,6 +245,22 @@ found:;
 		else if (!strcmp(key, "snap_distance")) {
 			cfg->snap_distance = atoi(rest);
 		}
+		else if (!strcmp(key, "autostart")) {
+			if (rest[0] == '"') {
+				char *unquoted = strip_quotes(rest);
+				if (strncmp(unquoted, "$HOME/", 6) == 0 && home) {
+					char fullpath[PATH_MAX];
+					snprintf(fullpath, sizeof fullpath, "%s/%s", home, unquoted + 6);
+					cfg->autostart_path = strdup(fullpath);
+				}
+				else {
+					cfg->autostart_path = strdup(unquoted);
+				}
+			}
+			else {
+				cfg->autostart_path = strdup(rest);
+			}
+		}
 		else if (!strcmp(key, "should_float")) {
 			if (should_floatn >= 256) {
 				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
@@ -261,14 +277,29 @@ found:;
 			char *comma_ptr;
 			char *comma = strtok_r(final, ",", &comma_ptr);
 
-			/* store each comma separated value in a seperate row */
-			while (comma && should_floatn < 256) {
+			while (comma) {
+				if (should_floatn >= 256) {
+					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
+					break;
+				}
+
 				comma = strip(comma);
-				if (*comma == '"')
+				if (*comma == '"') {
 					comma++;
+				}
 				char *end = comma + strlen(comma) - 1;
-				if (*end == '"')
+				if (*end == '"') {
 					*end = '\0';
+				}
+
+				char *space_ptr;
+				char *argv = strtok_r(comma, " ", &space_ptr);
+				int i = 0;
+
+				while (argv && i < 256) {
+					cfg->should_float[should_floatn][i++] = strdup(argv);
+					argv = strtok_r(NULL, " ", &space_ptr);
+				}
 
 				/* store each programs name in its own row at index 0 */
 				cfg->should_float[should_floatn][0] = strdup(comma);
@@ -362,6 +393,17 @@ found:;
 
 	fclose(f);
 	remap_and_dedupe_binds(cfg);
+
+	// Run autostart script if defined
+	if (cfg->autostart_path) {
+		if (fork() == 0) {
+			setsid();
+			execlp("sh", "sh", cfg->autostart_path, (char *)NULL);
+			fprintf(stderr, "sxwm: failed to exec autostart script %s\n", cfg->autostart_path);
+			_exit(EXIT_FAILURE);
+		}
+	}
+
 	return 0;
 }
 
