@@ -261,12 +261,8 @@ found:;
 			char *comma_ptr;
 			char *comma = strtok_r(final, ",", &comma_ptr);
 
-			while (comma) {
-				if (should_floatn >= 256) {
-					fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
-					break;
-				}
-
+			/* store each comma separated value in a seperate row */
+			while (comma && should_floatn < 256) {
 				comma = strip(comma);
 				if (*comma == '"')
 					comma++;
@@ -274,15 +270,9 @@ found:;
 				if (*end == '"')
 					*end = '\0';
 
-				char *space_ptr;
-				char *argv = strtok_r(comma, " ", &space_ptr);
-				int i = 0;
-
-				while (argv && i < 256) {
-					cfg->should_float[should_floatn][i++] = strdup(argv);
-					argv = strtok_r(NULL, " ", &space_ptr);
-				}
-
+				/* store each programs name in its own row at index 0 */
+				cfg->should_float[should_floatn][0] = strdup(comma);
+				printf("DEBUG: should_float[%d][0] = '%s'\n", should_floatn, cfg->should_float[should_floatn][0]);
 				should_floatn++;
 				comma = strtok_r(NULL, ",", &comma_ptr);
 			}

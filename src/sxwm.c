@@ -75,6 +75,7 @@ void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
+Bool window_should_float(Window w);
 void spawn(const char **argv);
 void swap_clients(Client *a, Client *b);
 void tile(void);
@@ -538,7 +539,6 @@ void hdl_destroy_ntf(XEvent *xev)
 {
 	Window w = xev->xdestroywindow.window;
 
-	// Search all workspaces, not just current one
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		Client *prev = NULL, *c = workspaces[ws];
 		while (c && c->win != w) {
@@ -546,7 +546,6 @@ void hdl_destroy_ntf(XEvent *xev)
 			c = c->next;
 		}
 		if (c) {
-			// Update focused if this was the focused client
 			if (focused == c) {
 				if (c->next) {
 					focused = c->next;
@@ -555,14 +554,12 @@ void hdl_destroy_ntf(XEvent *xev)
 					focused = prev;
 				}
 				else {
-					// If this was the only client in current workspace, find next client
 					if (ws == current_ws) {
 						focused = NULL;
 					}
 				}
 			}
 
-			// Remove from linked list
 			if (!prev) {
 				workspaces[ws] = c->next;
 			}
@@ -574,7 +571,6 @@ void hdl_destroy_ntf(XEvent *xev)
 			update_net_client_list();
 			open_windows--;
 
-			// Only tile and update borders if we're dealing with current workspace
 			if (ws == current_ws) {
 				tile();
 				update_borders();
@@ -584,7 +580,7 @@ void hdl_destroy_ntf(XEvent *xev)
 					XRaiseWindow(dpy, focused->win);
 				}
 			}
-			return; // Found and removed the client, we're done
+			return;
 		}
 	}
 }
@@ -615,31 +611,6 @@ void hdl_keypress(XEvent *xev)
 			switch (b->type) {
 				case TYPE_CMD:
 					spawn(b->action.cmd);
-
-					next_should_float = False;
-					for (int j = 0; j < 256; j++) {
-						Bool all_matching = True;
-						for (int k = 0; k < 256; k++) {
-							if (!user_config.should_float[j] || !b->action.cmd)
-								continue;
-
-							if (!user_config.should_float[j][k] || !b->action.cmd[k]) {
-								all_matching = (!user_config.should_float[j][k] && !b->action.cmd[k]);
-								break;
-							}
-							// confirm these two entries match
-							if (strcmp(user_config.should_float[j][k], b->action.cmd[k]) != 0) {
-								all_matching = False;
-								printf("%s != %s\n", user_config.should_float[j][k], b->action.cmd[k]);
-								break;
-							}
-						}
-						if (all_matching) {
-
-							next_should_float = True;
-							break;
-						}
-					}
 					break;
 
 				case TYPE_FUNC:
@@ -702,27 +673,13 @@ void swap_clients(Client *a, Client *b)
 
 void hdl_map_req(XEvent *xev)
 {
-	XMapRequestEvent *me = &xev->xmaprequest;
-	Window w = me->window;
+	Window w = xev->xmaprequest.window;
+	XWindowAttributes wa;
 
-	/* existing clients get remapped and marked as mapped */
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
-			if (c->win == w) {
-				c->mapped = True;
-				if (c->ws == current_ws)
-					XMapWindow(dpy, w);
-				update_net_client_list();
-				tile();
-				update_borders();
-				return;
-			}
-		}
+	if (!XGetWindowAttributes(dpy, w, &wa)) {
+		return;
 	}
 
-	XWindowAttributes wa;
-	if (!XGetWindowAttributes(dpy, w, &wa))
-		return;
 	if (wa.override_redirect || wa.width <= 0 || wa.height <= 0) {
 		XMapWindow(dpy, w);
 		return;
@@ -748,7 +705,6 @@ void hdl_map_req(XEvent *xev)
 			if (types[i] == dock) {
 				XFree(types);
 				XMapWindow(dpy, w);
-				/* handle struts */
 				return;
 			}
 			if (types[i] == util || types[i] == dialog || types[i] == toolbar || types[i] == splash ||
@@ -760,17 +716,19 @@ void hdl_map_req(XEvent *xev)
 		XFree(types);
 	}
 
+	if (!should_float) {
+		should_float = window_should_float(w);
+	}
+
 	if (open_windows == MAXCLIENTS) {
 		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
-	/* add client to list */
 	Client *c = add_client(w, current_ws);
 	if (!c)
 		return;
 
-	/* transient/dialog or fixed‐size hint = floating */
 	Window tr;
 	if (!should_float && XGetTransientForHint(dpy, w, &tr))
 		should_float = True;
@@ -782,31 +740,8 @@ void hdl_map_req(XEvent *xev)
 		c->fixed = True;
 	}
 
-	if (should_float || global_floating || next_should_float) {
+	if (should_float || global_floating) {
 		c->floating = True;
-
-		if (next_should_float) {
-			if (c->floating) {
-				XWindowAttributes wa;
-				XGetWindowAttributes(dpy, c->win, &wa);
-				c->x = wa.x;
-				c->y = wa.y;
-				c->w = wa.width;
-				c->h = wa.height;
-
-				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight,
-				                 &(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
-			}
-
-			tile();
-			update_borders();
-
-			if (c->floating) {
-				XRaiseWindow(dpy, c->win);
-				XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-			}
-			next_should_float = False;
-		}
 	}
 
 	/* center floating windows & set border */
@@ -840,7 +775,6 @@ void hdl_map_req(XEvent *xev)
 	for (Client *c = workspaces[current_ws]; c; c = c->next)
 		if (c->win == w)
 			c->mapped = True;
-
 
 	update_borders();
 }
@@ -1414,6 +1348,34 @@ void setup_atoms(void)
 
 	XChangeProperty(dpy, root, atom_net_supported, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
 	                sizeof(support_list) / sizeof(Atom));
+}
+
+Bool window_should_float(Window w)
+{
+	XClassHint ch;
+	if (XGetClassHint(dpy, w, &ch)) {
+		for (int i = 0; i < 256; i++) {
+			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
+				break;
+			}
+
+			printf("[DEBUG] Checking window class '%s' and instance '%s' against should_float[%d][0] = '%s'\n",
+			       ch.res_class ? ch.res_class : "NULL", ch.res_name ? ch.res_name : "NULL", i,
+			       user_config.should_float[i][0]);
+
+			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
+			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
+				printf("[DEBUG] Window should float based on class/instance match\n");
+				XFree(ch.res_class);
+				XFree(ch.res_name);
+				return True;
+			}
+		}
+		XFree(ch.res_class);
+		XFree(ch.res_name);
+	}
+
+	return False;
 }
 
 void spawn(const char **argv)
