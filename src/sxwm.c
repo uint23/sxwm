@@ -14,6 +14,7 @@
  *	  (C) Abhinav Prasai 2025
  */
 
+#include <X11/X.h>
 #include <err.h>
 #include <stdio.h>
 #include <limits.h>
@@ -828,10 +829,19 @@ void hdl_map_req(XEvent *xev)
 		tile();
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
+
+	if (user_config.new_win_focus) {
+		focused = c;
+		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+		send_wm_take_focus(c->win);
+	}
+
 	XMapWindow(dpy, w);
 	for (Client *c = workspaces[current_ws]; c; c = c->next)
 		if (c->win == w)
 			c->mapped = True;
+
+
 	update_borders();
 }
 
@@ -1044,6 +1054,7 @@ void init_defaults(void)
 	default_config.resize_master_amt = 5;
 	default_config.snap_distance = 5;
 	default_config.bindsn = 0;
+	default_config.new_win_focus = True;
 
 	for (unsigned long i = 0; i < LENGTH(binds); i++) {
 		default_config.binds[i].mods = binds[i].mods;

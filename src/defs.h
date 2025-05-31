@@ -89,6 +89,7 @@ typedef struct {
 	int resize_master_amt;
 	int snap_distance;
 	int bindsn;
+	Bool new_win_focus;
 	Binding binds[256];
 	char **should_float[256];
 } Config;

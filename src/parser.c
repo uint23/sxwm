@@ -1,11 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
+#include <X11/Xlib.h>
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <X11/keysym.h>
 
 #include "parser.h"
@@ -211,6 +211,14 @@ found:; // label followed by declaration is a C23 extension
 		}
 		else if (!strcmp(key, "swap_border_colour")) {
 			cfg->border_swap_col = parse_col(rest);
+		}
+		else if (!strcmp(key, "new_win_focus")) {
+			if (!strcmp(rest, "true")) {
+				cfg->new_win_focus = True;
+			}
+			else {
+				cfg->new_win_focus = False;
+			}
 		}
 		else if (!strcmp(key, "master_width")) {
 			float mf = atoi(rest) / 100.0f;
