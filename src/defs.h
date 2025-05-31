@@ -92,6 +92,7 @@ typedef struct {
 	Bool new_win_focus;
 	Binding binds[256];
 	char **should_float[256];
+	char *autostart_path;
 } Config;
 
 typedef struct {
