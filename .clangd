@@ -5,7 +5,5 @@ CompileFlags:
     "-Wall",
     "-Wextra",
     "-O3",
-    "-Isrc",
-    "-lX11",
-    "-lXinerama"
+    "-Isrc"
   ]

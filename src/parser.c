@@ -160,7 +160,8 @@ int parser(Config *cfg)
 	fprintf(stderr, "sxwmrc: no configuration file found\n");
 	return -1;
 
-found:;
+found:
+	printf("sxwmrc: using configuration file %s\n", path);
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
@@ -353,6 +354,59 @@ found:;
 			}
 			else {
 				fprintf(stderr, "sxwmrc:%d: invalid workspace action '%s'\n", lineno, act);
+			}
+		}
+		else if (!strcmp(key, "exec")) {
+			char *comment = strchr(rest, '#');
+			size_t len = comment ? (size_t)(comment - rest) : strlen(rest);
+			char win[len + 1];
+			strncpy(win, rest, len);
+			win[len] = '\0';
+
+			char *final = strip(win);
+			char *comma_ptr;
+			printf("DEBUG: exec command: '%s'\n", final);
+
+			char *comma = strtok_r(final, ",", &comma_ptr);
+			while (comma) {
+				comma = strip(comma);
+				if (*comma == '"') {
+					comma++;
+				}
+				char *end = comma + strlen(comma) - 1;
+				if (*end == '"') {
+					*end = '\0';
+				}
+
+                char *cmd = strdup(comma);
+
+                // we have to fork and exec, because system() is blocking
+				pid_t pid = fork();
+				if (pid == 0) {
+					char *argv[64];
+                    char *argv_ptr;
+					int i = 0;
+					char *arg = strtok_r(cmd, " ", &argv_ptr);
+					while (arg && i < 63) {
+						argv[i++] = arg;
+						arg = strtok_r(NULL, " ", &argv_ptr);
+					}
+					argv[i] = NULL;
+
+					execvp(argv[0], argv);
+					perror("execvp");
+					_exit(127);
+				}
+				else if (pid > 0) {
+					// parent: don’t wait, just continue (background)
+				}
+				else {
+					perror("fork");
+				}
+
+				printf("DEBUG: exec command: '%s'\n", comma);
+
+				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
 		}
 		else {
