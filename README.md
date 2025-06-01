@@ -108,7 +108,7 @@ workspace : modifier + modifier + ... + key : swap n
 | `focus_previous`     | Moves focus backward in the stack.                           |
 | `increase_gaps`      | Expands gaps.                                                |
 | `master_next`        | Moves focused window down in master/stack order.             |
-| `master_previous`    | Moves focused window up in master/stack order.               |
+| `master_prev`        | Moves focused window up in master/stack order.               |
 | `quit`               | Exits `sxwm`.                                                |
 | `reload_config`      | Reloads config.                                              |
 | `master_increase`    | Expands master width.                                        |
