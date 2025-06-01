@@ -272,7 +272,6 @@ found:;
 
 				/* store each programs name in its own row at index 0 */
 				cfg->should_float[should_floatn][0] = strdup(comma);
-				printf("DEBUG: should_float[%d][0] = '%s'\n", should_floatn, cfg->should_float[should_floatn][0]);
 				should_floatn++;
 				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
