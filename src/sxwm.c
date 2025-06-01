@@ -1144,6 +1144,33 @@ void reload_config(void)
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
+    
+    for (int i = 0; i < 256; i++) {
+        if (user_config.torun[i]) {
+            printf("[DEBUG] executing %s\n", user_config.torun[i]);
+            pid_t pid = fork();
+			if (pid == 0) {
+				char *argv[256];
+				int j = 0;
+				char *arg = strtok(user_config.torun[i], " ");
+				while (arg && j < 256) {
+					argv[j++] = arg;
+					arg = strtok(NULL, " ");
+				}
+				argv[j] = NULL;
+				execvp(argv[0], argv);
+				perror("execvp");
+				_exit(127);
+			}
+			else if (pid > 0) {
+				// parent: don’t wait, just continue (background)
+			}
+			else {
+				perror("fork");
+			} 
+        }
+    }
+
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
@@ -1251,6 +1278,32 @@ void setup(void)
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
+    
+    for (int i = 0; i < 256; i++) {
+        if (user_config.torun[i]) {
+            printf("[DEBUG] executing %s\n", user_config.torun[i]);
+            pid_t pid = fork();
+			if (pid == 0) {
+				char *argv[256];
+				int j = 0;
+				char *arg = strtok(user_config.torun[i], " ");
+				while (arg && j < 256) {
+					argv[j++] = arg;
+					arg = strtok(NULL, " ");
+				}
+				argv[j] = NULL;
+				execvp(argv[0], argv);
+				perror("execvp");
+				_exit(127);
+			}
+			else if (pid > 0) {
+				// parent: don’t wait, just continue (background)
+			}
+			else {
+				perror("fork");
+			} 
+        }
+    }
 	grab_keys();
 
 	c_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");

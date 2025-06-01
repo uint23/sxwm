@@ -171,6 +171,7 @@ found:
 	char line[512];
 	int lineno = 0;
 	int should_floatn = 0;
+    int torun = 0;
 
 	// Initialize should_float matrix
 	for (int j = 0; j < 256; j++) {
@@ -365,55 +366,36 @@ found:
 
 			char *final = strip(win);
 			char *comma_ptr;
-			printf("DEBUG: exec command: '%s'\n", final);
 
-			char *comma = strtok_r(final, ",", &comma_ptr);
-			while (comma) {
-				comma = strip(comma);
-				if (*comma == '"') {
-					comma++;
-				}
-				char *end = comma + strlen(comma) - 1;
-				if (*end == '"') {
-					*end = '\0';
-				}
+			char *cmd = strip(final);
+			if (*cmd == '"') {
+				cmd++;
+			} else {
+                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+            }
 
-                char *cmd = strdup(comma);
 
-                // we have to fork and exec, because system() is blocking
-				pid_t pid = fork();
-				if (pid == 0) {
-					char *argv[64];
-                    char *argv_ptr;
-					int i = 0;
-					char *arg = strtok_r(cmd, " ", &argv_ptr);
-					while (arg && i < 63) {
-						argv[i++] = arg;
-						arg = strtok_r(NULL, " ", &argv_ptr);
-					}
-					argv[i] = NULL;
+			char *end = cmd + strlen(cmd) - 1;
+			if (*end == '"') {
+				*end = '\0';
+			} else {
+                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+            }
+            
+            printf("DEBUG: exec command '%s'\n", cmd);
+            cfg->torun[torun] = strdup(cmd);
 
-					execvp(argv[0], argv);
-					perror("execvp");
-					_exit(127);
-				}
-				else if (pid > 0) {
-					// parent: don’t wait, just continue (background)
-				}
-				else {
-					perror("fork");
-				}
-
-				printf("DEBUG: exec command: '%s'\n", comma);
-
-				comma = strtok_r(NULL, ",", &comma_ptr);
-			}
-		}
+            if (torun > 254) {
+                fprintf(stderr, "sxwmrc:%d: too many execs", lineno);
+            } else {
+                torun++;
+            }
+        }
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
 	}
-
+    
 	fclose(f);
 	remap_and_dedupe_binds(cfg);
 	return 0;
