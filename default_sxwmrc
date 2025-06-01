@@ -11,7 +11,7 @@ resize_master_amount    : 1
 snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 should_float            : st
-new_win_focus			: true
+new_win_focus			      : true # Focus window when opened
 
 # Keybinds:
 # Commands must be surrounded with ""
