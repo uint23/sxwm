@@ -90,6 +90,7 @@ typedef struct {
 	int snap_distance;
 	int bindsn;
 	Bool new_win_focus;
+	Bool warp_cursor;
 	Binding binds[256];
 	char **should_float[256];
 } Config;

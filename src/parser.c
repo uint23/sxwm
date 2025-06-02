@@ -230,6 +230,14 @@ found:;
 				cfg->new_win_focus = False;
 			}
 		}
+		else if (!strcmp(key, "warp_cursor")) {
+			if (!strcmp(rest, "true")) {
+				cfg->warp_cursor = True;
+			}
+			else {
+				cfg->warp_cursor = False;
+			}
+		}
 		else if (!strcmp(key, "master_width")) {
 			float mf = (float)atoi(rest) / 100.0f;
 			for (int i = 0; i < MAX_MONITORS; i++) {

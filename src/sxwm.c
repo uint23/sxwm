@@ -86,6 +86,7 @@ void update_borders(void);
 void update_monitors(void);
 void update_net_client_list(void);
 void update_struts(void);
+void warp_cursor(Client *c);
 int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
@@ -233,6 +234,9 @@ void change_workspace(int ws)
 	if (workspaces[current_ws]) {
 		focused = workspaces[current_ws];
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		if (user_config.warp_cursor) {
+			warp_cursor(focused);
+		}
 	}
 
 	long cd = current_ws;
@@ -295,6 +299,9 @@ void focus_next(void)
 	focused = (focused->next ? focused->next : workspaces[current_ws]);
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
 	update_borders();
 }
 
@@ -321,6 +328,9 @@ void focus_prev(void)
 
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
 	update_borders();
 }
 
@@ -769,6 +779,9 @@ void hdl_map_req(XEvent *xev)
 		focused = c;
 		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(c->win);
+		if (user_config.warp_cursor) {
+			warp_cursor(c);
+		}
 	}
 
 	XMapWindow(dpy, w);
@@ -989,6 +1002,7 @@ void init_defaults(void)
 	default_config.snap_distance = 5;
 	default_config.bindsn = 0;
 	default_config.new_win_focus = True;
+	default_config.warp_cursor = True;
 
 	for (unsigned long i = 0; i < LENGTH(binds); i++) {
 		default_config.binds[i].mods = binds[i].mods;
@@ -1700,6 +1714,19 @@ void update_net_client_list(void)
 	}
 	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	XChangeProperty(dpy, root, prop, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
+}
+
+void warp_cursor(Client *c)
+{
+	if (!c) {
+		return;
+	}
+
+	int center_x = c->x + (c->w / 2);
+	int center_y = c->y + (c->h / 2);
+
+	XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
+	XSync(dpy, False);
 }
 
 int xerr(Display *dpy, XErrorEvent *ee)
