@@ -12,6 +12,7 @@ snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 should_float            : st
 new_win_focus			: true
+warp_cursor             : true
 
 # Keybinds:
 # Commands must be surrounded with ""

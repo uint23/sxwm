@@ -69,13 +69,14 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `border_width`           | Integer | `1`       | Thickness of window borders in pixels.                                      |
 | `focused_border_colour`  | Hex     | `#c0cbff` | Border color for the currently focused window.                              |
 | `unfocused_border_colour`| Hex     | `#555555` | Border color for unfocused windows.                                         |
-| `swap_border_colour`     | Hex     | `#fff4c0` | Border color when selecting a window to swap (`MOD+Shift+Drag`).           |
+| `swap_border_colour`     | Hex     | `#fff4c0` | Border color when selecting a window to swap (`MOD+Shift+Drag`).            |
 | `master_width`           | Integer | `60`      | Percentage of the screen width for the master window.                       |
 | `resize_master_amount`   | Integer | `1`       | Percent to increase/decrease master width.                                  |
 | `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
 | `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
 | `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
 | `new_win_focus`          | Bool    | `true`    | Whether openening new windows should also set focus to them or keep on current window.|
+| `warp_cursor`            | Bool    | `true`    | Warp the cursor to the middle of newly focused windows                      |
 
 ---
 
