@@ -200,7 +200,7 @@ found:;
 
 		if (!strcmp(key, "mod_key")) {
 			unsigned m = parse_mods(rest, cfg);
-			if (m & (Mod1Mask | Mod4Mask)) {
+			if (m & (Mod1Mask | Mod4Mask | ShiftMask | ControlMask)) {
 				cfg->modkey = m;
 			}
 			else {
