@@ -1373,13 +1373,8 @@ Bool window_should_float(Window w)
 				break;
 			}
 
-			printf("[DEBUG] Checking window class '%s' and instance '%s' against should_float[%d][0] = '%s'\n",
-			       ch.res_class ? ch.res_class : "NULL", ch.res_name ? ch.res_name : "NULL", i,
-			       user_config.should_float[i][0]);
-
 			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
 			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
-				printf("[DEBUG] Window should float based on class/instance match\n");
 				XFree(ch.res_class);
 				XFree(ch.res_name);
 				return True;
