@@ -197,7 +197,7 @@ sudo xbps-install libX11-devel libXinerama-devel gcc make</code></pre>
 <details>
 <summary>Fedora / RHEL / AlmaLinux / Rocky</summary>
 <pre><code>sudo dnf update
-sudo dnf install libX11-devel libXinerama-devel gcc make</code></pre>
+sudo dnf install libX11-devel libXcursor-devel libXinerama-devel gcc make</code></pre>
 </details>
 
 <details>
