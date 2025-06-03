@@ -19,6 +19,9 @@ const Binding binds[] = {
     {Mod4Mask, XK_l, {.fn = resize_master_add}, TYPE_FUNC},
     {Mod4Mask, XK_h, {.fn = resize_master_sub}, TYPE_FUNC},
 
+    {Mod4Mask | ControlMask, XK_l, {.fn = resize_stack_add}, TYPE_FUNC},
+    {Mod4Mask | ControlMask, XK_h, {.fn = resize_stack_sub}, TYPE_FUNC},
+
     {Mod4Mask, XK_equal, {.fn = inc_gaps}, TYPE_FUNC},
     {Mod4Mask, XK_minus, {.fn = dec_gaps}, TYPE_FUNC},
 

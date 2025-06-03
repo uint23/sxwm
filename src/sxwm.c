@@ -70,6 +70,8 @@ int other_wm_err(Display *dpy, XErrorEvent *ee);
 /* void reload_config(void); */
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
+/* void resize_stack_add(void); */
+/* void resize_stack_sub(void); */
 void run(void);
 void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
@@ -195,6 +197,7 @@ Client *add_client(Window w, int ws)
 	c->floating = False;
 	c->fullscreen = False;
 	c->mapped = True;
+	c->custom_stack_height = 0;
 
 	if (global_floating) {
 		c->floating = True;
@@ -597,10 +600,12 @@ void hdl_destroy_ntf(XEvent *xev)
 
 void hdl_enter(XEvent *xev)
 {
-	Window w = xev->xcrossing.window;
+	if (drag_mode != DRAG_NONE) {
+		return;
+	}
 
-	Client *head = workspaces[current_ws];
-	for (Client *c = head; c; c = c->next) {
+	Window w = xev->xcrossing.window;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->win == w) {
 			focused = c;
 			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
@@ -999,6 +1004,7 @@ void init_defaults(void)
 
 	default_config.motion_throttle = 60;
 	default_config.resize_master_amt = 5;
+	default_config.resize_stack_amt = 20;
 	default_config.snap_distance = 5;
 	default_config.bindsn = 0;
 	default_config.new_win_focus = True;
@@ -1196,6 +1202,37 @@ void resize_master_sub(void)
 	}
 	tile();
 	update_borders();
+}
+
+void resize_stack_add(void)
+{
+	if (!focused || focused->floating || focused == workspaces[current_ws])
+		return;
+
+	int bw2 = 2 * user_config.border_width;
+	int raw_cur = (focused->custom_stack_height > 0) ? focused->custom_stack_height : (focused->h + bw2);
+
+	int raw_new = raw_cur + user_config.resize_stack_amt;
+	focused->custom_stack_height = raw_new;
+	tile();
+}
+
+void resize_stack_sub(void)
+{
+	if (!focused || focused->floating || focused == workspaces[current_ws])
+		return;
+
+	int bw2 = 2 * user_config.border_width;
+	int raw_cur = (focused->custom_stack_height > 0) ? focused->custom_stack_height : (focused->h + bw2);
+
+	int raw_new = raw_cur - user_config.resize_stack_amt;
+	int min_raw = bw2 + 1;
+
+	if (raw_new < min_raw) {
+		raw_new = min_raw;
+	}
+	focused->custom_stack_height = raw_new;
+	tile();
 }
 
 void run(void)
@@ -1443,7 +1480,8 @@ void spawn(const char **argv)
 
 void tile(void)
 {
-	update_struts(); /* fills reserve_top, reserve_bottom */
+	/* fills reserve_top, reserve_bottom */
+	update_struts();
 
 	Client *head = workspaces[current_ws];
 
@@ -1473,7 +1511,7 @@ void tile(void)
 				continue;
 			cnt++;
 		}
-		if (!cnt)
+		if (cnt == 0)
 			continue;
 
 		int gx = user_config.gaps;
@@ -1487,17 +1525,59 @@ void tile(void)
 		if (tile_h < 1)
 			tile_h = 1;
 
-		/* master‐stack split */
+		/* master/stack split ratio (clamped) */
 		float mf = user_config.master_width[m];
 		if (mf < MF_MIN)
 			mf = MF_MIN;
 		if (mf > MF_MAX)
 			mf = MF_MAX;
+
 		int master_w = (cnt > 1) ? (int)(tile_w * mf) : tile_w;
 		int stack_w = tile_w - master_w - ((cnt > 1) ? gx : 0);
-		int stack_h = (cnt > 1) ? (tile_h - (cnt - 1) * gy) / (cnt - 1) : 0;
 
-		int i = 0, sy = tile_y;
+		/* calc how much vertical space is claimed by custom_stack_height */
+		int total_custom = 0;
+		int custom_count = 0;
+		/* skip i==0 (master) bc it never uses custom_stack_height. */
+		for (Client *c = head; c; c = c->next) {
+			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
+				continue;
+		}
+
+		Client *first_tiled = NULL;
+		for (Client *c = head; c; c = c->next) {
+			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
+				continue;
+			first_tiled = c;
+			break;
+		}
+
+		/* sum up custom_stack_height for every tiled window except first_tiled */
+		for (Client *c = head; c; c = c->next) {
+			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
+				continue;
+			if (c == first_tiled)
+				continue;
+			if (c->custom_stack_height > 0) {
+				total_custom += c->custom_stack_height;
+				custom_count++;
+			}
+		}
+
+		int stack_count = cnt - 1; /* number of stack windows */
+		int total_vgaps = (stack_count > 1) ? (stack_count - 1) * gy : 0;
+		int available = tile_h - total_custom - total_vgaps;
+		if (available < 0)
+			available = 0;
+
+		int auto_count = stack_count - custom_count;
+		if (auto_count <= 0)
+			auto_count = 1; /* avoid division by zero */
+		int auto_h = available / auto_count;
+
+		/* place master (i==0) and then each stack window in order */
+		int i = 0;
+		int sy = tile_y;
 		for (Client *c = head; c; c = c->next) {
 			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
 				continue;
@@ -1514,12 +1594,24 @@ void tile(void)
 			}
 			else {
 				/* stack */
+				int desired_h;
+				if (c->custom_stack_height > 0) {
+					desired_h = c->custom_stack_height;
+				}
+				else {
+					desired_h = auto_h;
+				}
+
+				if (i == cnt - 1) {
+					desired_h = (tile_y + tile_h) - sy;
+				}
+
 				wc.x = tile_x + master_w + gx;
 				wc.y = sy;
-				int h = (i == cnt - 1) ? (tile_y + tile_h - sy) : stack_h;
 				wc.width = MAX(1, stack_w - bw2);
-				wc.height = MAX(1, h - bw2);
-				sy += h + gy;
+				wc.height = MAX(1, desired_h - bw2);
+
+				sy += desired_h + gy;
 			}
 
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);

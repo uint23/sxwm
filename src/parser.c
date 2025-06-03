@@ -25,6 +25,8 @@ static const struct {
                   {"reload_config", reload_config},
                   {"master_increase", resize_master_add},
                   {"master_decrease", resize_master_sub},
+                  {"stack_increase", resize_stack_add},
+                  {"stack_decrease", resize_stack_sub},
                   {"toggle_floating", toggle_floating},
                   {"global_floating", toggle_floating_global},
                   {"fullscreen", toggle_fullscreen},
@@ -249,6 +251,9 @@ found:;
 		}
 		else if (!strcmp(key, "resize_master_amount")) {
 			cfg->resize_master_amt = atoi(rest);
+		}
+		else if (!strcmp(key, "resize_stack_amount")) {
+			cfg->resize_stack_amt = atoi(rest);
 		}
 		else if (!strcmp(key, "snap_distance")) {
 			cfg->snap_distance = atoi(rest);

@@ -41,6 +41,9 @@ call : mod + shift + k : master_previous
 call : mod + l : master_increase
 call : mod + h : master_decrease
 
+call : mod + ctrl + l : stack_increase
+call : mod + ctrl + h : stack_decrease
+
 # Gaps 
 call : mod + equal : increase_gaps
 call : mod + minus : decrease_gaps

@@ -68,6 +68,7 @@ typedef struct Client{
 	Window win;
 	int x, y, h, w;
 	int orig_x, orig_y, orig_w, orig_h;
+	int custom_stack_height;
 	int mon;
 	int ws;
 	Bool fixed;
@@ -87,6 +88,7 @@ typedef struct {
 	float master_width[MAX_MONITORS];
 	int motion_throttle;
 	int resize_master_amt;
+	int resize_stack_amt;
 	int snap_distance;
 	int bindsn;
 	Bool new_win_focus;
@@ -112,6 +114,8 @@ extern void quit(void);
 extern void reload_config(void);
 extern void resize_master_add(void);
 extern void resize_master_sub(void);
+extern void resize_stack_add(void);
+extern void resize_stack_sub(void);
 extern void toggle_floating(void);
 extern void toggle_floating_global(void);
 extern void toggle_fullscreen(void);
