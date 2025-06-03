@@ -52,7 +52,6 @@ void hdl_config_ntf(XEvent *xev);
 void hdl_config_req(XEvent *xev);
 void hdl_dummy(XEvent *xev);
 void hdl_destroy_ntf(XEvent *xev);
-void hdl_enter(XEvent *xev);
 void hdl_keypress(XEvent *xev);
 void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
@@ -594,23 +593,6 @@ void hdl_destroy_ntf(XEvent *xev)
 				}
 			}
 			return;
-		}
-	}
-}
-
-void hdl_enter(XEvent *xev)
-{
-	if (drag_mode != DRAG_NONE) {
-		return;
-	}
-
-	Window w = xev->xcrossing.window;
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->win == w) {
-			focused = c;
-			XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
-			update_borders();
-			break;
 		}
 	}
 }
@@ -1335,7 +1317,6 @@ void setup(void)
 	evtable[ConfigureNotify] = hdl_config_ntf;
 	evtable[ConfigureRequest] = hdl_config_req;
 	evtable[DestroyNotify] = hdl_destroy_ntf;
-	evtable[EnterNotify] = hdl_enter;
 	evtable[KeyPress] = hdl_keypress;
 	evtable[MapRequest] = hdl_map_req;
 	evtable[MotionNotify] = hdl_motion;
