@@ -18,7 +18,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define UDIST(a,b) abs((int)(a) - (int)(b))
-# define CLAMP(x, lo, hi) (( (x) < (lo) ) ? (lo) : ( (x) > (hi) ) ? (hi) : (x))
+#define CLAMP(x, lo, hi) (( (x) < (lo) ) ? (lo) : ( (x) > (hi) ) ? (hi) : (x))
 #define MAXCLIENTS	99
 #define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
 #define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }

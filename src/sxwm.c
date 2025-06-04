@@ -1461,150 +1461,180 @@ void spawn(const char **argv)
 
 void tile(void)
 {
-	/* fills reserve_top, reserve_bottom */
 	update_struts();
-
 	Client *head = workspaces[current_ws];
 
 	int total = 0;
-	for (Client *c = head; c; c = c->next) {
-		if (!c->mapped || c->floating || c->fullscreen)
-			continue;
-		total++;
-	}
+	for (Client *c = head; c; c = c->next)
+		if (c->mapped && !c->floating && !c->fullscreen)
+			total++;
 
 	if (total == 1) {
-		for (Client *c = head; c; c = c->next) {
+		for (Client *c = head; c; c = c->next)
 			if (!c->floating && c->fullscreen)
 				return;
-		}
 	}
 
 	for (int m = 0; m < monsn; m++) {
-		int mon_x = mons[m].x;
-		int mon_y = mons[m].y + reserve_top;
-		int mon_w = mons[m].w;
-		int mon_h = mons[m].h - reserve_top - reserve_bottom;
+		int mon_x = mons[m].x, mon_y = mons[m].y + reserve_top;
+		int mon_w = mons[m].w, mon_h = mons[m].h - reserve_top - reserve_bottom;
 
-		int cnt = 0;
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
-				continue;
-			cnt++;
-		}
-		if (cnt == 0)
+		Client *stackers[MAXCLIENTS];
+		int N = 0;
+		for (Client *c = head; c; c = c->next)
+			if (c->mapped && !c->floating && !c->fullscreen && c->mon == m)
+				stackers[N++] = c;
+
+		if (N == 0)
 			continue;
 
-		int gx = user_config.gaps;
-		int gy = user_config.gaps;
-		int tile_x = mon_x + gx;
-		int tile_y = mon_y + gy;
-		int tile_w = mon_w - 2 * gx;
-		int tile_h = mon_h - 2 * gy;
-		if (tile_w < 1)
-			tile_w = 1;
-		if (tile_h < 1)
-			tile_h = 1;
+		int gx = user_config.gaps, gy = user_config.gaps;
+		int tile_x = mon_x + gx, tile_y = mon_y + gy;
+		int tile_w = MAX(1, mon_w - 2 * gx);
+		int tile_h = MAX(1, mon_h - 2 * gy);
+		float mf = CLAMP(user_config.master_width[m], MF_MIN, MF_MAX);
+		int master_w = (N > 1) ? (int)(tile_w * mf) : tile_w;
+		int stack_w = (N > 1) ? (tile_w - master_w - gx) : 0;
 
-		/* master/stack split ratio (clamped) */
-		float mf = user_config.master_width[m];
-		if (mf < MF_MIN)
-			mf = MF_MIN;
-		if (mf > MF_MAX)
-			mf = MF_MAX;
-
-		int master_w = (cnt > 1) ? (int)(tile_w * mf) : tile_w;
-		int stack_w = tile_w - master_w - ((cnt > 1) ? gx : 0);
-
-		/* calc how much vertical space is claimed by custom_stack_height */
-		int total_custom = 0;
-		int custom_count = 0;
-		/* skip i==0 (master) bc it never uses custom_stack_height. */
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
-				continue;
-		}
-
-		Client *first_tiled = NULL;
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
-				continue;
-			first_tiled = c;
-			break;
-		}
-
-		/* sum up custom_stack_height for every tiled window except first_tiled */
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
-				continue;
-			if (c == first_tiled)
-				continue;
-			if (c->custom_stack_height > 0) {
-				total_custom += c->custom_stack_height;
-				custom_count++;
-			}
-		}
-
-		int stack_count = cnt - 1; /* number of stack windows */
-		int total_vgaps = (stack_count > 1) ? (stack_count - 1) * gy : 0;
-		int available = tile_h - total_custom - total_vgaps;
-		if (available < 0)
-			available = 0;
-
-		int auto_count = stack_count - custom_count;
-		if (auto_count <= 0)
-			auto_count = 1; /* avoid division by zero */
-		int auto_h = available / auto_count;
-
-		/* place master (i==0) and then each stack window in order */
-		int i = 0;
-		int sy = tile_y;
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen || c->mon != m)
-				continue;
-
-			XWindowChanges wc = {.border_width = user_config.border_width};
+		{
+			Client *c = stackers[0];
 			int bw2 = 2 * user_config.border_width;
-
-			if (i == 0) {
-				/* master */
-				wc.x = tile_x;
-				wc.y = tile_y;
-				wc.width = MAX(1, master_w - bw2);
-				wc.height = MAX(1, tile_h - bw2);
-			}
-			else {
-				/* stack */
-				int desired_h;
-				if (c->custom_stack_height > 0) {
-					desired_h = c->custom_stack_height;
-				}
-				else {
-					desired_h = auto_h;
-				}
-
-				if (i == cnt - 1) {
-					desired_h = (tile_y + tile_h) - sy;
-				}
-
-				wc.x = tile_x + master_w + gx;
-				wc.y = sy;
-				wc.width = MAX(1, stack_w - bw2);
-				wc.height = MAX(1, desired_h - bw2);
-
-				sy += desired_h + gy;
-			}
-
+			XWindowChanges wc = {.x = tile_x,
+			                     .y = tile_y,
+			                     .width = MAX(1, master_w - bw2),
+			                     .height = MAX(1, tile_h - bw2),
+			                     .border_width = user_config.border_width};
 			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 			c->x = wc.x;
 			c->y = wc.y;
 			c->w = wc.width;
 			c->h = wc.height;
-			i++;
 		}
-	}
 
-	update_borders();
+		if (N == 1) {
+			update_borders();
+			continue;
+		}
+
+		int num_stack = N - 1;
+		int idx_focus = -1;
+		for (int i = 1; i < N; i++)
+			if (stackers[i] == focused)
+				idx_focus = i;
+
+		Bool is_fixed[MAXCLIENTS] = {0};
+		int bw2 = 2 * user_config.border_width;
+		for (int i = 1; i < N; i++)
+			if (stackers[i]->custom_stack_height > 0)
+				is_fixed[i] = True;
+		if (idx_focus >= 1 && stackers[idx_focus]->custom_stack_height > 0)
+			is_fixed[idx_focus] = True;
+
+		int total_fixed_heights = 0;
+		for (int i = 1; i < N; i++) {
+			if (!is_fixed[i])
+				continue;
+			int h = stackers[i]->custom_stack_height > 0 ? stackers[i]->custom_stack_height : stackers[i]->h + bw2;
+			total_fixed_heights += h;
+		}
+
+		int auto_count = 0;
+		for (int i = 1; i < N; i++)
+			if (!is_fixed[i])
+				auto_count++;
+
+		int total_vgaps = (num_stack - 1) * gy;
+		int remaining = tile_h - total_fixed_heights - total_vgaps;
+		int min_raw = bw2 + 1;
+		int heights_final[MAXCLIENTS] = {0};
+
+		if (auto_count > 0) {
+			if (remaining >= auto_count * min_raw) {
+				int auto_h = remaining / auto_count, used = 0, count = 0;
+				for (int i = 1; i < N; i++) {
+					if (!is_fixed[i]) {
+						count++;
+						heights_final[i] = (count < auto_count) ? auto_h : remaining - used;
+						used += auto_h;
+					}
+				}
+				for (int i = 1; i < N; i++)
+					if (is_fixed[i])
+						heights_final[i] = stackers[i]->custom_stack_height > 0 ? stackers[i]->custom_stack_height
+						                                                        : stackers[i]->h + bw2;
+			}
+			else {
+				for (int i = 1; i < N; i++)
+					heights_final[i] = is_fixed[i]
+					                       ? (stackers[i]->custom_stack_height > 0 ? stackers[i]->custom_stack_height
+					                                                               : stackers[i]->h + bw2)
+					                       : min_raw;
+			}
+		}
+		else {
+			int sum_raw = 0;
+			for (int i = 1; i < N; i++) {
+				sum_raw +=
+				    stackers[i]->custom_stack_height > 0 ? stackers[i]->custom_stack_height : stackers[i]->h + bw2;
+			}
+			int remaining_slack = tile_h - total_vgaps - sum_raw;
+			for (int i = 1; i < N; i++) {
+				int base_h =
+				    stackers[i]->custom_stack_height > 0 ? stackers[i]->custom_stack_height : stackers[i]->h + bw2;
+
+				// only grow the bottom window if it isn’t fixed
+				if (i == N - 1 && remaining_slack > 0 && stackers[i]->custom_stack_height == 0) {
+					heights_final[i] = base_h + remaining_slack;
+				}
+				else {
+					heights_final[i] = base_h;
+				}
+			}
+		}
+
+		int total_height = total_vgaps;
+		for (int i = 1; i < N; i++)
+			total_height += heights_final[i];
+
+		int overfill = total_height - tile_h;
+		if (overfill > 0) {
+			// shrink from top down, excluding bottom
+			for (int i = 1; i < N - 1 && overfill > 0; i++) {
+				int shrink = MIN(overfill, heights_final[i] - min_raw);
+				heights_final[i] -= shrink;
+				overfill -= shrink;
+			}
+		}
+
+		// if its not perfectly filled stretch bottom to absorb remainder
+		int actual_stack_height = total_vgaps;
+		for (int i = 1; i < N; i++)
+			actual_stack_height += heights_final[i];
+
+		int shortfall = tile_h - actual_stack_height;
+		if (shortfall > 0) {
+			heights_final[N - 1] += shortfall;
+		}
+
+		int sy = tile_y;
+		int bw = user_config.border_width;
+		for (int i = 1; i < N; i++) {
+			Client *c = stackers[i];
+			XWindowChanges wc = {.x = tile_x + master_w + gx,
+			                     .y = sy,
+			                     .width = MAX(1, stack_w - (2 * bw)),
+			                     .height = MAX(1, heights_final[i] - (2 * bw)),
+			                     .border_width = bw};
+			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
+			c->x = wc.x;
+			c->y = wc.y;
+			c->w = wc.width;
+			c->h = wc.height;
+			sy += heights_final[i] + gy;
+		}
+
+		update_borders();
+	}
 }
 
 void toggle_floating(void)
