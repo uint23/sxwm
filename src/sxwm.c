@@ -782,6 +782,12 @@ void hdl_map_req(XEvent *xev)
 		XRaiseWindow(dpy, w);
 	}
 
+	XMapWindow(dpy, w);
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		if (c->win == w) {
+			c->mapped = True;
+		} 
+	}
 	if (user_config.new_win_focus) {
 		focused = c;
 		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
@@ -789,13 +795,6 @@ void hdl_map_req(XEvent *xev)
 		if (user_config.warp_cursor) {
 			warp_cursor(c);
 		}
-	}
-
-	XMapWindow(dpy, w);
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->win == w) {
-			c->mapped = True;
-		} 
 	}
 	update_borders();
 }
