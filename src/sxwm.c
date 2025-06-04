@@ -124,6 +124,7 @@ Monitor *mons = NULL;
 int monsn = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
+Bool running = False;
 
 long last_motion_time = 0;
 int scr_width;
@@ -1146,7 +1147,8 @@ void quit(void)
 	XFreeCursor(dpy, c_move);
 	XFreeCursor(dpy, c_normal);
 	XFreeCursor(dpy, c_resize);
-	errx(0, "quitting...");
+	printf("quitting...\n");
+	running = False;
 }
 
 void reload_config(void)
@@ -1242,6 +1244,7 @@ void resize_stack_sub(void)
 
 void run(void)
 {
+	running = True;
 	XEvent xev;
 	for (;;) {
 		XNextEvent(dpy, &xev);
