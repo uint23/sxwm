@@ -71,7 +71,7 @@ float other_variable = 5;
 
 ## Documentation
 
-- If applicable, **update `sxwm.1`, `README.md` and `default_sxwmrc`**
+- If applicable, **update `sxwm.1`, `README.md` and `default_sxwmrc`**, update `CHANGELOG.md`
 
 ## Respect the Existing Structure
 
