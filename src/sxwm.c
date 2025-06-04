@@ -1155,7 +1155,6 @@ void reload_config(void)
 {
 	puts("sxwm: reloading config...");
 	memset(&user_config, 0, sizeof(user_config));
-
 	for (int i = 0; i < user_config.bindsn; i++) {
 		free(user_config.binds[i].action.cmd);
 		user_config.binds[i].action.cmd = NULL;

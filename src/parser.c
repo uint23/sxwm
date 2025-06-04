@@ -1,12 +1,13 @@
 #define _POSIX_C_SOURCE 200809L
-#include <X11/Xlib.h>
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
+#include <wordexp.h>
 #include <X11/keysym.h>
+#include <X11/Xlib.h>
 
 #include "parser.h"
 #include "defs.h"
@@ -315,7 +316,12 @@ found:;
 			if (*act == '"' && !strcmp(key, "bind")) {
 				b->type = TYPE_CMD;
 				b->action.cmd = build_argv(strip_quotes(act));
+				if (!b->action.cmd) {
+					fprintf(stderr, "sxwmrc:%d: failed to parse command: %s\n", lineno, act);
+					b->type = -1;
+				}
 			}
+
 			else {
 				b->type = TYPE_FUNC;
 				Bool found = False;
@@ -421,39 +427,23 @@ KeySym parse_keysym(const char *key)
 
 const char **build_argv(const char *cmd)
 {
-	char *dup = strdup(cmd);
-	char *saveptr = NULL;
-	const char **argv = malloc(MAX_ARGS * sizeof(*argv));
-	int i = 0;
-
-	char *tok = strtok_r(dup, " \t", &saveptr);
-	while (tok && i < MAX_ARGS - 1) {
-		if (*tok == '"') {
-			char *end = tok + strlen(tok) - 1;
-			if (*end == '"') {
-				*end = '\0';
-				argv[i++] = strdup(tok + 1);
-			}
-			else {
-				char *quoted = strdup(tok + 1);
-				while ((tok = strtok_r(NULL, " \t", &saveptr)) && *tok != '"') {
-					quoted = realloc(quoted, strlen(quoted) + strlen(tok) + 2);
-					strcat(quoted, " ");
-					strcat(quoted, tok);
-				}
-				if (tok && *tok == '"') {
-					quoted = realloc(quoted, strlen(quoted) + strlen(tok));
-					strcat(quoted, tok);
-				}
-				argv[i++] = quoted;
-			}
-		}
-		else {
-			argv[i++] = strdup(tok);
-		}
-		tok = strtok_r(NULL, " \t", &saveptr);
+	wordexp_t p;
+	if (wordexp(cmd, &p, 0) != 0 || p.we_wordc == 0) {
+		fprintf(stderr, "sxwm: wordexp failed for cmd: '%s'\n", cmd);
+		return NULL;
 	}
-	argv[i] = NULL;
-	free(dup);
+
+	const char **argv = malloc((p.we_wordc + 1) * sizeof(char *));
+	if (!argv) {
+		wordfree(&p);
+		return NULL;
+	}
+
+	for (size_t i = 0; i < p.we_wordc; i++) {
+		argv[i] = strdup(p.we_wordv[i]);
+	}
+	argv[p.we_wordc] = NULL;
+
+	wordfree(&p);
 	return argv;
 }
