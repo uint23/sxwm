@@ -41,6 +41,7 @@ call : mod + shift + k : master_previous
 call : mod + l : master_increase
 call : mod + h : master_decrease
 
+# Stack Window Resize
 call : mod + ctrl + l : stack_increase
 call : mod + ctrl + h : stack_decrease
 

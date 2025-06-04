@@ -1008,7 +1008,10 @@ void move_master_next(void)
 	if (!workspaces[current_ws] || !workspaces[current_ws]->next) {
 		return;
 	}
+
 	Client *first = workspaces[current_ws];
+	Client *old_focused = focused;
+
 	workspaces[current_ws] = first->next;
 	first->next = NULL;
 
@@ -1019,6 +1022,12 @@ void move_master_next(void)
 	tail->next = first;
 
 	tile();
+	if (user_config.warp_cursor && old_focused) {
+		warp_cursor(old_focused);
+	}
+	if (old_focused) {
+		send_wm_take_focus(old_focused->win);
+	}
 	update_borders();
 }
 
@@ -1027,15 +1036,29 @@ void move_master_prev(void)
 	if (!workspaces[current_ws] || !workspaces[current_ws]->next) {
 		return;
 	}
+
 	Client *prev = NULL, *cur = workspaces[current_ws];
+	Client *old_focused = focused;
+
 	while (cur->next) {
 		prev = cur;
 		cur = cur->next;
 	}
-	prev->next = NULL;
+
+	if (prev) {
+		prev->next = NULL;
+	}
+
 	cur->next = workspaces[current_ws];
 	workspaces[current_ws] = cur;
+
 	tile();
+	if (user_config.warp_cursor && old_focused) {
+		warp_cursor(old_focused);
+	}
+	if (old_focused) {
+		send_wm_take_focus(old_focused->win);
+	}
 	update_borders();
 }
 
