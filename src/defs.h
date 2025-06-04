@@ -95,6 +95,7 @@ typedef struct {
 	Bool warp_cursor;
 	Binding binds[256];
 	char **should_float[256];
+    char *torun[256];
 } Config;
 
 typedef struct {

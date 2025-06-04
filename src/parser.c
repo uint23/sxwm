@@ -163,7 +163,8 @@ int parser(Config *cfg)
 	fprintf(stderr, "sxwmrc: no configuration file found\n");
 	return -1;
 
-found:;
+found:
+	printf("sxwmrc: using configuration file %s\n", path);
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
@@ -173,6 +174,7 @@ found:;
 	char line[512];
 	int lineno = 0;
 	int should_floatn = 0;
+    int torun = 0;
 
 	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
@@ -375,11 +377,45 @@ found:;
 				fprintf(stderr, "sxwmrc:%d: invalid workspace action '%s'\n", lineno, act);
 			}
 		}
+		else if (!strcmp(key, "exec")) {
+			char *comment = strchr(rest, '#');
+			size_t len = comment ? (size_t)(comment - rest) : strlen(rest);
+			char win[len + 1];
+			strncpy(win, rest, len);
+			win[len] = '\0';
+
+			char *final = strip(win);
+			char *comma_ptr;
+
+			char *cmd = strip(final);
+			if (*cmd == '"') {
+				cmd++;
+			} else {
+                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+            }
+
+
+			char *end = cmd + strlen(cmd) - 1;
+			if (*end == '"') {
+				*end = '\0';
+			} else {
+                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+            }
+            
+            printf("DEBUG: exec command '%s'\n", cmd);
+            cfg->torun[torun] = strdup(cmd);
+
+            if (torun > 254) {
+                fprintf(stderr, "sxwmrc:%d: too many execs", lineno);
+            } else {
+                torun++;
+            }
+        }
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
 	}
-
+    
 	fclose(f);
 	remap_and_dedupe_binds(cfg);
 	return 0;
