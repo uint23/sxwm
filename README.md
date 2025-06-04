@@ -40,7 +40,7 @@
 - **Live Config Reload**: Change your config and reload instantly with a keybind.
 - **Easy Configuration**: Human-friendly `sxwmrc` file, no C required.
 - **Master-Stack Layout**: DWM-inspired productive workflow.
-- **Mouse Support**: Move, swap, resize, and focus windows with the mouse.
+- **Mouse Support**: Move, swap, and resize windows with the mouse.
 - **Zero Dependencies**: Only `libX11` and `Xinerama` required.
 - **Lightweight**: Single C file, minimal headers, compiles in seconds.
 - **Bar Friendly**: Works great with [sxbar](https://github.com/uint23/sxbar).
@@ -305,5 +305,5 @@ exec sxwm
 ---
 
 <p align="center">
-  <em>Contributions welcome! Open issues or submit PRs.</em>
+  <em>Contributions welcome, Please read CONTRIBUTIONS.md for more info!</em>
 </p>

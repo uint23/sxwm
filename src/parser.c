@@ -135,7 +135,7 @@ int parser(Config *cfg)
 		return -1;
 	}
 
-	// Determine config file path
+	/* determine config file path */
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 	if (xdg_config_home) {
 		snprintf(path, sizeof path, "%s/sxwmrc", xdg_config_home);
@@ -159,7 +159,7 @@ int parser(Config *cfg)
 		goto found;
 	}
 
-	// Nothing found
+	/* Nothing found */
 	fprintf(stderr, "sxwmrc: no configuration file found\n");
 	return -1;
 
@@ -174,7 +174,7 @@ found:;
 	int lineno = 0;
 	int should_floatn = 0;
 
-	// Initialize should_float matrix
+	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
 		cfg->should_float[j] = calloc(256, sizeof(char *));
 		if (!cfg->should_float[j]) {
@@ -278,11 +278,13 @@ found:;
 			/* store each comma separated value in a seperate row */
 			while (comma && should_floatn < 256) {
 				comma = strip(comma);
-				if (*comma == '"')
+				if (*comma == '"') {
 					comma++;
+				}
 				char *end = comma + strlen(comma) - 1;
-				if (*end == '"')
+				if (*end == '"') {
 					*end = '\0';
+				}
 
 				/* store each programs name in its own row at index 0 */
 				cfg->should_float[should_floatn][0] = strdup(comma);

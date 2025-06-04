@@ -1,4 +1,4 @@
-.TH SXWM 1 "May 2025" "sxwm 1.5" "User Commands"
+.TH sxwm 1 "June 2025" "sxwm 1.6" "User Commands"
 
 .SH NAME
 sxwm \- minimal, fast, and configurable tiling window manager for X11
@@ -15,7 +15,7 @@ Nine workspaces with full bar support.
 Live configuration reload without restart.
 Human-friendly configuration file requiring no recompilation.
 DWM-style master-stack layout.
-Mouse support for moving, resizing, focusing, and swapping windows.
+Mouse support for moving, resizing, and swapping windows.
 Depends only on libX11 and Xinerama.
 Extremely lightweight (single C file).
 Multi-monitor support via Xinerama.
@@ -72,6 +72,14 @@ Target updates per second for mouse drag operations (move, resize, swap). Defaul
 .TP
 .B should_float
 Lets you change which windows should float by default when opening them. Default is st
+
+.TP
+.B new_win_focus
+Whether newly opened windows should automatically gain focus. Default is true.
+
+.TP
+.B warp_cursor
+If true, warps the mouse cursor to the center of newly focused windows. Default is true.
 
 .SH KEYBINDINGS
 Keybindings associate key combinations with actions, either running external commands or internal sxwm functions.
@@ -155,6 +163,14 @@ Increases the width allocated to the master area.
 Decreases the width allocated to the master area.
 
 .TP
+.B stack_increase
+Increases the height of stack window.
+
+.TP
+.B stack_decrease
+Decreases the height of stack window.
+
+.TP
 .B toggle_floating
 Toggles the floating state of the focused window.
 
@@ -208,6 +224,14 @@ Focus next or previous window.
 .TP
 .B MOD + Shift + j / k
 Move window up or down in the master stack.
+
+.TP
+.B MOD + Shift + h / l
+Increase or decrease master size.
+
+.TP
+.B MOD + Ctrl  h / l
+Increase or decrease stack height.
 
 .TP
 .B MOD + Space

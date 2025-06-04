@@ -8,9 +8,10 @@ gaps                    : 10
 border_width            : 1
 master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
+resize_stack_amt        : 20
 snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
-should_float            : st
+should_float            : "pcmanfm"
 new_win_focus			: true
 warp_cursor             : true
 
