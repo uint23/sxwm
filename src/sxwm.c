@@ -1245,7 +1245,7 @@ void run(void)
 {
 	running = True;
 	XEvent xev;
-	for (;;) {
+	while (running) {
 		XNextEvent(dpy, &xev);
 		xev_case(&xev);
 	}
