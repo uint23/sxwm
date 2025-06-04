@@ -174,7 +174,7 @@ found:
 	char line[512];
 	int lineno = 0;
 	int should_floatn = 0;
-    int torun = 0;
+	int torun = 0;
 
 	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
@@ -385,37 +385,37 @@ found:
 			win[len] = '\0';
 
 			char *final = strip(win);
-			char *comma_ptr;
-
 			char *cmd = strip(final);
 			if (*cmd == '"') {
 				cmd++;
-			} else {
-                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
-            }
-
+			}
+			else {
+				fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+			}
 
 			char *end = cmd + strlen(cmd) - 1;
 			if (*end == '"') {
 				*end = '\0';
-			} else {
-                fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
-            }
-            
-            printf("DEBUG: exec command '%s'\n", cmd);
-            cfg->torun[torun] = strdup(cmd);
+			}
+			else {
+				fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+			}
 
-            if (torun > 254) {
-                fprintf(stderr, "sxwmrc:%d: too many execs", lineno);
-            } else {
-                torun++;
-            }
-        }
+			printf("DEBUG: exec command '%s'\n", cmd);
+			cfg->torun[torun] = strdup(cmd);
+
+			if (torun > 254) {
+				fprintf(stderr, "sxwmrc:%d: too many execs", lineno);
+			}
+			else {
+				torun++;
+			}
+		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}
 	}
-    
+
 	fclose(f);
 	remap_and_dedupe_binds(cfg);
 	return 0;
