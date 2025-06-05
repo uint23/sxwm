@@ -34,6 +34,10 @@ call : mod + shift + e : quit
 call : mod + j : focus_next
 call : mod + k : focus_prev
 
+# Monitor Focus:
+call : mod + comma : focus_prev_monitor
+call : mod + period : focus_next_monitor
+
 # Master/Stack Movement
 call : mod + shift + j : master_next
 call : mod + shift + k : master_previous

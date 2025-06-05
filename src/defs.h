@@ -107,6 +107,8 @@ extern void close_focused(void);
 extern void dec_gaps(void);
 extern void focus_next(void);
 extern void focus_prev(void);
+extern void focus_next_monitor(void);
+extern void focus_prev_monitor(void);
 extern void inc_gaps(void);
 extern void move_master_next(void);
 extern void move_master_prev(void);

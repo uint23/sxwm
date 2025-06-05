@@ -343,6 +343,78 @@ void focus_prev(void)
 	update_borders();
 }
 
+void focus_next_monitor(void)
+{
+	if (monsn <= 1) {
+		return; /* only one monitor, nothing to switch to */
+	}
+
+	int current_mon = focused ? focused->mon : 0;
+	int target_mon = (current_mon + 1) % monsn;
+
+	/* find the first window on the target monitor in current workspace */
+	Client *target_client = NULL;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		if (c->mon == target_mon && c->mapped && !c->fullscreen) {
+			target_client = c;
+			break;
+		}
+	}
+
+	if (target_client) {
+		/* focus the window on target monitor */
+		focused = target_client;
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		XRaiseWindow(dpy, focused->win);
+		if (user_config.warp_cursor) {
+			warp_cursor(focused);
+		}
+		update_borders();
+	} else {
+		/* no windows on target monitor, just move cursor to center */
+		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
+		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
+		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
+		XSync(dpy, False);
+	}
+}
+
+void focus_prev_monitor(void)
+{
+	if (monsn <= 1) {
+		return; /* only one monitor, nothing to switch to */
+	}
+
+	int current_mon = focused ? focused->mon : 0;
+	int target_mon = (current_mon - 1 + monsn) % monsn;
+
+	/* find the first window on the target monitor in current workspace */
+	Client *target_client = NULL;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		if (c->mon == target_mon && c->mapped && !c->fullscreen) {
+			target_client = c;
+			break;
+		}
+	}
+
+	if (target_client) {
+		/* focus the window on target monitor */
+		focused = target_client;
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		XRaiseWindow(dpy, focused->win);
+		if (user_config.warp_cursor) {
+			warp_cursor(focused);
+		}
+		update_borders();
+	} else {
+		/* no windows on target monitor, just move cursor to center */
+		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
+		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
+		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
+		XSync(dpy, False);
+	}
+}
+
 int get_monitor_for(Client *c)
 {
 	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;

@@ -13,6 +13,9 @@ const Binding binds[] = {
     {Mod4Mask, XK_j, {.fn = focus_next}, TYPE_FUNC},
     {Mod4Mask, XK_k, {.fn = focus_prev}, TYPE_FUNC},
 
+    {Mod4Mask, XK_comma, {.fn = focus_prev_monitor}, TYPE_FUNC},
+    {Mod4Mask, XK_period, {.fn = focus_next_monitor}, TYPE_FUNC},
+
     {Mod4Mask | ShiftMask, XK_j, {.fn = move_master_next}, TYPE_FUNC},
     {Mod4Mask | ShiftMask, XK_k, {.fn = move_master_prev}, TYPE_FUNC},
 
