@@ -122,6 +122,7 @@ Window root;
 Window wm_check_win;
 Monitor *mons = NULL;
 int monsn = 0;
+int current_monitor = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool running = False;
@@ -305,6 +306,7 @@ void focus_next(void)
 	}
 
 	focused = (focused->next ? focused->next : workspaces[current_ws]);
+	current_monitor = focused->mon;
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
 	if (user_config.warp_cursor) {
@@ -335,6 +337,7 @@ void focus_prev(void)
 		focused = prev;
 	}
 
+	current_monitor = focused->mon;
 	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, focused->win);
 	if (user_config.warp_cursor) {
@@ -343,13 +346,14 @@ void focus_prev(void)
 	update_borders();
 }
 
-void focus_next_monitor(void)
+void focus_next_mon(void)
 {
 	if (monsn <= 1) {
 		return; /* only one monitor, nothing to switch to */
 	}
 
-	int current_mon = focused ? focused->mon : 0;
+	/* use current_monitor if no focused window, otherwise use focused window's monitor */
+	int current_mon = focused ? focused->mon : current_monitor;
 	int target_mon = (current_mon + 1) % monsn;
 
 	/* find the first window on the target monitor in current workspace */
@@ -364,14 +368,17 @@ void focus_next_monitor(void)
 	if (target_client) {
 		/* focus the window on target monitor */
 		focused = target_client;
+		current_monitor = target_mon;
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 		XRaiseWindow(dpy, focused->win);
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
 		update_borders();
-	} else {
-		/* no windows on target monitor, just move cursor to center */
+	} 
+	else {
+		/* no windows on target monitor, just move cursor to center and update current_monitor */
+		current_monitor = target_mon;
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
@@ -379,13 +386,14 @@ void focus_next_monitor(void)
 	}
 }
 
-void focus_prev_monitor(void)
+void focus_prev_mon(void)
 {
 	if (monsn <= 1) {
 		return; /* only one monitor, nothing to switch to */
 	}
 
-	int current_mon = focused ? focused->mon : 0;
+	/* use current_monitor if no focused window, otherwise use focused window's monitor */
+	int current_mon = focused ? focused->mon : current_monitor;
 	int target_mon = (current_mon - 1 + monsn) % monsn;
 
 	/* find the first window on the target monitor in current workspace */
@@ -400,19 +408,104 @@ void focus_prev_monitor(void)
 	if (target_client) {
 		/* focus the window on target monitor */
 		focused = target_client;
+		current_monitor = target_mon;
 		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 		XRaiseWindow(dpy, focused->win);
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
 		update_borders();
-	} else {
-		/* no windows on target monitor, just move cursor to center */
+	} 
+	else {
+		/* no windows on target monitor, just move cursor to center and update current_monitor */
+		current_monitor = target_mon;
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 		XSync(dpy, False);
 	}
+}
+
+void move_next_mon(void)
+{
+	if (!focused || monsn <= 1) {
+		return; /* no focused window or only one monitor */
+	}
+
+	int target_mon = (focused->mon + 1) % monsn;
+	
+	/* update window's monitor assignment */
+	focused->mon = target_mon;
+	current_monitor = target_mon;
+
+	/* if window is floating, center it on the target monitor */
+	if (focused->floating) {
+		int mx = mons[target_mon].x, my = mons[target_mon].y;
+		int mw = mons[target_mon].w, mh = mons[target_mon].h;
+		int x = mx + (mw - focused->w) / 2;
+		int y = my + (mh - focused->h) / 2;
+		
+		/* ensure window stays within monitor bounds */
+		if (x < mx) x = mx;
+		if (y < my) y = my;
+		if (x + focused->w > mx + mw) x = mx + mw - focused->w;
+		if (y + focused->h > my + mh) y = my + mh - focused->h;
+		
+		focused->x = x;
+		focused->y = y;
+		XMoveWindow(dpy, focused->win, x, y);
+	}
+
+	/* retile to update layouts on both monitors */
+	tile();
+	
+	/* follow the window with cursor if enabled */
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
+	
+	update_borders();
+}
+
+void move_prev_mon(void)
+{
+	if (!focused || monsn <= 1) {
+		return; /* no focused window or only one monitor */
+	}
+
+	int target_mon = (focused->mon - 1 + monsn) % monsn;
+	
+	/* update window's monitor assignment */
+	focused->mon = target_mon;
+	current_monitor = target_mon;
+
+	/* if window is floating, center it on the target monitor */
+	if (focused->floating) {
+		int mx = mons[target_mon].x, my = mons[target_mon].y;
+		int mw = mons[target_mon].w, mh = mons[target_mon].h;
+		int x = mx + (mw - focused->w) / 2;
+		int y = my + (mh - focused->h) / 2;
+		
+		/* ensure window stays within monitor bounds */
+		if (x < mx) x = mx;
+		if (y < my) y = my;
+		if (x + focused->w > mx + mw) x = mx + mw - focused->w;
+		if (y + focused->h > my + mh) y = my + mh - focused->h;
+		
+		focused->x = x;
+		focused->y = y;
+		XMoveWindow(dpy, focused->win, x, y);
+	}
+
+	/* retile to update layouts on both monitors */
+	tile();
+	
+	/* follow the window with cursor if enabled */
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
+	
+	update_borders();
 }
 
 int get_monitor_for(Client *c)

@@ -110,8 +110,10 @@ workspace : modifier + modifier + ... + key : swap n
 | `decrease_gaps`      | Shrinks gaps.                                                |
 | `focus_next`         | Moves focus forward in the stack.                            |
 | `focus_previous`     | Moves focus backward in the stack.                           |
-| `focus_next_monitor` | Switches focus to the next monitor.                          |
-| `focus_prev_monitor` | Switches focus to the previous monitor.                      |
+| `focus_next_mon` | Switches focus to the next monitor.                          |
+| `focus_prev_mon` | Switches focus to the previous monitor.                      |
+| `move_next_mon` | Moves the focused window to the next monitor.       |
+| `move_prev_mon` | Moves the focused window to the previous monitor.   |
 | `increase_gaps`      | Expands gaps.                                                |
 | `master_next`        | Moves focused window down in master/stack order.             |
 | `master_prev`        | Moves focused window up in master/stack order.               |
@@ -150,6 +152,7 @@ workspace : mod + shift + 5 : swap 5
 | `MOD` + Right Mouse          | Resize window by mouse    |
 | `MOD` + `j` / `k`            | Focus next / previous     |
 | `MOD` + `,` / `.`            | Focus prev / next monitor |
+| `MOD` + `Shift` + `,` / `.`  | Move window to prev / next monitor |
 | `MOD` + `Shift` + `j` / `k`  | Move in master stack      |
 | `MOD` + `Space`              | Toggle floating           |
 | `MOD` + `Shift` + `Space`    | Toggle all floating       |
