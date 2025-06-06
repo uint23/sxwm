@@ -34,6 +34,14 @@ call : mod + shift + e : quit
 call : mod + j : focus_next
 call : mod + k : focus_prev
 
+# Monitor Focus:
+call : mod + comma : focus_prev_mon
+call : mod + period : focus_next_mon
+
+# Move Window Between Monitors:
+call : mod + shift + comma : swap_prev_mon
+call : mod + shift + period : swap_next_mon
+
 # Master/Stack Movement
 call : mod + shift + j : master_next
 call : mod + shift + k : master_previous
