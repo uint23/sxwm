@@ -378,38 +378,31 @@ found:
 			}
 		}
 		else if (!strcmp(key, "exec")) {
+			if (torun >= 256) {
+				fprintf(stderr, "sxwmrc:%d: too many exec commands\n", lineno);
+				continue;
+			}
+
 			char *comment = strchr(rest, '#');
-			size_t len = comment ? (size_t)(comment - rest) : strlen(rest);
-			char win[len + 1];
-			strncpy(win, rest, len);
-			win[len] = '\0';
-
-			char *final = strip(win);
-			char *cmd = strip(final);
-			if (*cmd == '"') {
-				cmd++;
-			}
-			else {
-				fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+			if (comment) {
+				*comment = '\0';
 			}
 
-			char *end = cmd + strlen(cmd) - 1;
-			if (*end == '"') {
-				*end = '\0';
-			}
-			else {
-				fprintf(stderr, "sxwmrc:%d: exec not enclosed in quotes", lineno);
+			char *cmd = strip(rest);
+			cmd = strip_quotes(cmd);
+
+			if (!*cmd) {
+				fprintf(stderr, "sxwmrc:%d: empty exec command\n", lineno);
+				continue;
 			}
 
-			printf("DEBUG: exec command '%s'\n", cmd);
 			cfg->torun[torun] = strdup(cmd);
+			if (!cfg->torun[torun]) {
+				fprintf(stderr, "sxwmrc:%d: failed to allocate memory for exec command\n", lineno);
+				continue;
+			}
 
-			if (torun > 254) {
-				fprintf(stderr, "sxwmrc:%d: too many execs", lineno);
-			}
-			else {
-				torun++;
-			}
+			torun++;
 		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);

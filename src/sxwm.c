@@ -41,6 +41,7 @@ void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
+void startup_exec(void);
 /* void focus_next(void); */
 /* void focus_prev(void); */
 int get_monitor_for(Client *c);
@@ -296,6 +297,22 @@ void dec_gaps(void)
 		user_config.gaps--;
 		tile();
 		update_borders();
+	}
+}
+
+void startup_exec(void)
+{
+	for (int i = 0; i < 256; i++) {
+		if (user_config.torun[i]) {
+			const char **argv = build_argv(user_config.torun[i]);
+			if (argv) {
+				spawn(argv);
+				for (int j = 0; argv[j]; j++) {
+					free((char *)argv[j]);
+				}
+				free(argv);
+			}
+		}
 	}
 }
 
@@ -1347,36 +1364,11 @@ void setup(void)
 	other_wm();
 	init_defaults();
 	if (parser(&user_config)) {
-		fprintf(stderr, "sxrc: error parsing config file\n");
+		fprintf(stderr, "sxwmrc: error parsing config file\n");
 		init_defaults();
 	}
-
-	for (int i = 0; i < 256; i++) {
-		if (user_config.torun[i]) {
-			printf("[DEBUG] executing %s\n", user_config.torun[i]);
-			pid_t pid = fork();
-			if (pid == 0) {
-				char *argv[256];
-				int j = 0;
-				char *arg = strtok(user_config.torun[i], " ");
-				while (arg && j < 256) {
-					argv[j++] = arg;
-					arg = strtok(NULL, " ");
-				}
-				argv[j] = NULL;
-				execvp(argv[0], argv);
-				perror("execvp");
-				_exit(127);
-			}
-			else if (pid > 0) {
-				// parent: don’t wait, just continue (background)
-			}
-			else {
-				perror("fork");
-			}
-		}
-	}
 	grab_keys();
+	startup_exec();
 
 	c_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
 	c_move = XcursorLibraryLoadCursor(dpy, "fleur");
@@ -1397,7 +1389,7 @@ void setup(void)
 	 * swapping,
 	 * resizing
 	 * windows in that order.
-	*/
+	 */
 	XGrabButton(dpy, Button1, 0, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
 	            GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
