@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 - **NEW**: Ctrl key as modifier
 - **NEW**: Focus window on creation
 - **NEW**: Copy config to `/usr/local/share/sxwmrc`
+- **NEW**: Can switch monitors via keyboard
+- **NEW**: Can move windows between monitors via keyboard
+- **NEW**: Can click on a window to set focus to it
 - **CHANGE**: Renamed `focus_previous` to `focus_prev`
 - **CHANGE**: Invalid sample config
 - **CHANGE**: Parser `$HOME` searching order. XDG Compliance
