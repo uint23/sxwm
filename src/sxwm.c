@@ -170,6 +170,12 @@ Client *add_client(Window w, int ws)
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
 	                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
+	XGrabButton(dpy, Button1, 0, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button1, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
+	            None, None);
+	XGrabButton(dpy, Button3, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+
 	Atom protos[] = {atom_wm_delete};
 	XSetWMProtocols(dpy, w, protos, 1);
 
@@ -393,7 +399,7 @@ void focus_next_mon(void)
 			warp_cursor(focused);
 		}
 		update_borders();
-	} 
+	}
 	else {
 		/* no windows on target monitor, just move cursor to center and update current_monitor */
 		current_monitor = target_mon;
@@ -433,7 +439,7 @@ void focus_prev_mon(void)
 			warp_cursor(focused);
 		}
 		update_borders();
-	} 
+	}
 	else {
 		/* no windows on target monitor, just move cursor to center and update current_monitor */
 		current_monitor = target_mon;
@@ -451,7 +457,7 @@ void move_next_mon(void)
 	}
 
 	int target_mon = (focused->mon + 1) % monsn;
-	
+
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
 	current_monitor = target_mon;
@@ -462,13 +468,17 @@ void move_next_mon(void)
 		int mw = mons[target_mon].w, mh = mons[target_mon].h;
 		int x = mx + (mw - focused->w) / 2;
 		int y = my + (mh - focused->h) / 2;
-		
+
 		/* ensure window stays within monitor bounds */
-		if (x < mx) x = mx;
-		if (y < my) y = my;
-		if (x + focused->w > mx + mw) x = mx + mw - focused->w;
-		if (y + focused->h > my + mh) y = my + mh - focused->h;
-		
+		if (x < mx)
+			x = mx;
+		if (y < my)
+			y = my;
+		if (x + focused->w > mx + mw)
+			x = mx + mw - focused->w;
+		if (y + focused->h > my + mh)
+			y = my + mh - focused->h;
+
 		focused->x = x;
 		focused->y = y;
 		XMoveWindow(dpy, focused->win, x, y);
@@ -476,12 +486,12 @@ void move_next_mon(void)
 
 	/* retile to update layouts on both monitors */
 	tile();
-	
+
 	/* follow the window with cursor if enabled */
 	if (user_config.warp_cursor) {
 		warp_cursor(focused);
 	}
-	
+
 	update_borders();
 }
 
@@ -492,7 +502,7 @@ void move_prev_mon(void)
 	}
 
 	int target_mon = (focused->mon - 1 + monsn) % monsn;
-	
+
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
 	current_monitor = target_mon;
@@ -503,13 +513,17 @@ void move_prev_mon(void)
 		int mw = mons[target_mon].w, mh = mons[target_mon].h;
 		int x = mx + (mw - focused->w) / 2;
 		int y = my + (mh - focused->h) / 2;
-		
+
 		/* ensure window stays within monitor bounds */
-		if (x < mx) x = mx;
-		if (y < my) y = my;
-		if (x + focused->w > mx + mw) x = mx + mw - focused->w;
-		if (y + focused->h > my + mh) y = my + mh - focused->h;
-		
+		if (x < mx)
+			x = mx;
+		if (y < my)
+			y = my;
+		if (x + focused->w > mx + mw)
+			x = mx + mw - focused->w;
+		if (y + focused->h > my + mh)
+			y = my + mh - focused->h;
+
 		focused->x = x;
 		focused->y = y;
 		XMoveWindow(dpy, focused->win, x, y);
@@ -517,12 +531,12 @@ void move_prev_mon(void)
 
 	/* retile to update layouts on both monitors */
 	tile();
-	
+
 	/* follow the window with cursor if enabled */
 	if (user_config.warp_cursor) {
 		warp_cursor(focused);
 	}
-	
+
 	update_borders();
 }
 
@@ -607,8 +621,7 @@ void hdl_button(XEvent *xev)
 			toggle_floating();
 		}
 
-		if ((!(e->state & user_config.modkey) && e->button == Button1) ||
-		    ((e->state & user_config.modkey) && e->button == Button2)) {
+		if (!(e->state & user_config.modkey) && e->button == Button1) {
 			focused = c;
 			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 			send_wm_take_focus(c->win);
@@ -1555,8 +1568,6 @@ void setup(void)
 	 * resizing
 	 * windows in that order.
 	 */
-	XGrabButton(dpy, Button1, 0, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-	            GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
