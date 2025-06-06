@@ -165,7 +165,8 @@ Client *add_client(Window w, int ws)
 
 	open_windows++;
 	XSelectInput(dpy, w,
-	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask);
+	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
+	                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
 	Atom protos[] = {atom_wm_delete};
 	XSetWMProtocols(dpy, w, protos, 1);
@@ -388,7 +389,8 @@ void grab_keys(void)
 void hdl_button(XEvent *xev)
 {
 	XButtonEvent *e = &xev->xbutton;
-	Window w = e->subwindow;
+	Window w = (e->subwindow != None) ? e->subwindow : e->window;
+	XAllowEvents(dpy, ReplayPointer, e->time);
 	if (!w) {
 		return;
 	}
@@ -421,6 +423,16 @@ void hdl_button(XEvent *xev)
 		if ((e->state & user_config.modkey) && (e->button == Button1 || e->button == Button3) && !c->floating) {
 			focused = c;
 			toggle_floating();
+		}
+
+		if ((!(e->state & user_config.modkey) && e->button == Button1) ||
+		    ((e->state & user_config.modkey) && e->button == Button2)) {
+			focused = c;
+			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+			send_wm_take_focus(c->win);
+			XRaiseWindow(dpy, c->win);
+			update_borders();
+			return;
 		}
 
 		if (!c->floating) {
@@ -786,7 +798,7 @@ void hdl_map_req(XEvent *xev)
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->win == w) {
 			c->mapped = True;
-		} 
+		}
 	}
 	if (user_config.new_win_focus) {
 		focused = c;
@@ -1196,6 +1208,9 @@ void reload_config(void)
 	}
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
+
+	XGrabButton(dpy, Button1, 0, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+	            GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
@@ -1335,11 +1350,11 @@ void setup(void)
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
-    
-    for (int i = 0; i < 256; i++) {
-        if (user_config.torun[i]) {
-            printf("[DEBUG] executing %s\n", user_config.torun[i]);
-            pid_t pid = fork();
+
+	for (int i = 0; i < 256; i++) {
+		if (user_config.torun[i]) {
+			printf("[DEBUG] executing %s\n", user_config.torun[i]);
+			pid_t pid = fork();
 			if (pid == 0) {
 				char *argv[256];
 				int j = 0;
@@ -1358,9 +1373,9 @@ void setup(void)
 			}
 			else {
 				perror("fork");
-			} 
-        	}
-    	}
+			}
+		}
+	}
 	grab_keys();
 
 	c_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
@@ -1376,6 +1391,15 @@ void setup(void)
 	             StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask |
 	                 PropertyChangeMask);
 
+	/* this is to grab the buttons for:
+	 * focusing,
+	 * moving,
+	 * swapping,
+	 * resizing
+	 * windows in that order.
+	*/
+	XGrabButton(dpy, Button1, 0, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+	            GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
