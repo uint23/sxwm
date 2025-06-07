@@ -178,7 +178,7 @@ found:
 
 	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
-		cfg->should_float[j] = calloc(256, sizeof(char *));
+		cfg->should_float[j] = calloc(1, sizeof(char *));
 		if (!cfg->should_float[j]) {
 			fprintf(stderr, "calloc failed\n");
 			fclose(f);
@@ -228,20 +228,10 @@ found:
 			cfg->border_swap_col = parse_col(rest);
 		}
 		else if (!strcmp(key, "new_win_focus")) {
-			if (!strcmp(rest, "true")) {
-				cfg->new_win_focus = True;
-			}
-			else {
-				cfg->new_win_focus = False;
-			}
+			cfg->new_win_focus = !strcmp(rest, "true") ? True : False;
 		}
 		else if (!strcmp(key, "warp_cursor")) {
-			if (!strcmp(rest, "true")) {
-				cfg->warp_cursor = True;
-			}
-			else {
-				cfg->warp_cursor = False;
-			}
+			cfg->warp_cursor = !strcmp(rest, "true") ? True : False;
 		}
 		else if (!strcmp(key, "master_width")) {
 			float mf = (float)atoi(rest) / 100.0f;
@@ -269,9 +259,12 @@ found:
 
 			char *comment = strchr(rest, '#');
 			size_t len = comment ? (size_t)(comment - rest) : strlen(rest);
-			char win[len + 1];
-			strncpy(win, rest, len);
-			win[len] = '\0';
+			if (len >= sizeof(line)) {
+				len = sizeof(line) - 1;
+			}
+
+			char win[sizeof(line)];
+			snprintf(win, sizeof(win), "%.*s", (int)len, rest);
 
 			char *final = strip(win);
 			char *comma_ptr;
@@ -288,8 +281,14 @@ found:
 					*end = '\0';
 				}
 
+				char *dup = strdup(comma);
+				if (!dup) {
+					fprintf(stderr, "sxwmrc:%d: failed to allocate memory\n", lineno);
+					goto cleanup_file;
+				}
+
 				/* store each programs name in its own row at index 0 */
-				cfg->should_float[should_floatn][0] = strdup(comma);
+				cfg->should_float[should_floatn][0] = dup;
 				should_floatn++;
 				comma = strtok_r(NULL, ",", &comma_ptr);
 			}
@@ -314,7 +313,7 @@ found:
 			Binding *b = alloc_bind(cfg, mods, ks);
 			if (!b) {
 				fputs("sxwm: too many binds\n", stderr);
-				break;
+				goto cleanup_file;
 			}
 
 			if (*act == '"' && !strcmp(key, "bind")) {
@@ -325,7 +324,6 @@ found:
 					b->type = -1;
 				}
 			}
-
 			else {
 				b->type = TYPE_FUNC;
 				Bool found = False;
@@ -399,9 +397,8 @@ found:
 			cfg->torun[torun] = strdup(cmd);
 			if (!cfg->torun[torun]) {
 				fprintf(stderr, "sxwmrc:%d: failed to allocate memory for exec command\n", lineno);
-				continue;
+				goto cleanup_file;
 			}
-
 			torun++;
 		}
 		else {
@@ -412,6 +409,21 @@ found:
 	fclose(f);
 	remap_and_dedupe_binds(cfg);
 	return 0;
+
+cleanup_file:
+	if (f) {
+		fclose(f);
+	}
+	for (int j = 0; j < 256; j++) {
+		if (cfg->should_float[j]) {
+			free(cfg->should_float[j][0]);
+			free(cfg->should_float[j]);
+		}
+	}
+	for (int i = 0; i < torun; i++) {
+		free(cfg->torun[i]);
+	}
+	return -1;
 }
 
 int parse_mods(const char *mods, Config *cfg)
