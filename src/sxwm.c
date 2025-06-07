@@ -42,6 +42,7 @@ int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
 void startup_exec(void);
+Window find_toplevel(Window w);
 /* void focus_next(void); */
 /* void focus_prev(void); */
 int get_monitor_for(Client *c);
@@ -323,6 +324,29 @@ void startup_exec(void)
 	}
 }
 
+Window find_toplevel(Window w)
+{
+	Window root = None;
+	Window parent;
+	Window *kids;
+	unsigned nkids;
+
+	while (True) {
+		if (w == root) {
+			break;
+		}
+		if (XQueryTree(dpy, w, &root, &parent, &kids, &nkids) == 0) {
+			break;
+		}
+		XFree(kids);
+		if (parent == root || parent == None) {
+			break;
+		}
+		w = parent;
+	}
+	return w;
+}
+
 void focus_next(void)
 {
 	if (!focused || !workspaces[current_ws]) {
@@ -586,6 +610,8 @@ void hdl_button(XEvent *xev)
 {
 	XButtonEvent *e = &xev->xbutton;
 	Window w = (e->subwindow != None) ? e->subwindow : e->window;
+	w = find_toplevel(w);
+
 	XAllowEvents(dpy, ReplayPointer, e->time);
 	if (!w) {
 		return;
