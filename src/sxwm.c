@@ -250,7 +250,8 @@ void change_workspace(int ws)
 	tile();
 	if (workspaces[current_ws]) {
 		focused = workspaces[current_ws];
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		Window focused_win = find_toplevel(focused->win);
+		XSetInputFocus(dpy, focused_win, RevertToPointerRoot, CurrentTime);
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
