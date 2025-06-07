@@ -1403,17 +1403,14 @@ void reload_config(void)
 	}
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
-
-	XGrabButton(dpy, Button1, 0, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-	            GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
-	XSync(dpy, False);
 
+	XSync(dpy, False);
 	tile();
 	update_borders();
 }
@@ -1561,13 +1558,6 @@ void setup(void)
 	             StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask |
 	                 PropertyChangeMask);
 
-	/* this is to grab the buttons for:
-	 * focusing,
-	 * moving,
-	 * swapping,
-	 * resizing
-	 * windows in that order.
-	 */
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
