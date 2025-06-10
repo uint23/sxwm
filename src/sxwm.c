@@ -86,9 +86,11 @@ void tile(void);
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
 void update_borders(void);
+void update_client_desktop_properties(void);
 void update_monitors(void);
 void update_net_client_list(void);
 void update_struts(void);
+void update_workarea(void);
 void warp_cursor(Client *c);
 int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
@@ -108,6 +110,8 @@ Atom atom_wm_strut_partial;
 Atom atom_net_supporting_wm_check;
 Atom atom_net_wm_name;
 Atom atom_utf8_string;
+Atom atom_net_wm_desktop;
+Atom atom_net_client_list;
 
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = {NULL};
@@ -218,6 +222,10 @@ Client *add_client(Window w, int ws)
 		focused = c;
 	}
 
+	long desktop = ws;
+	XChangeProperty(dpy, w, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+	                (unsigned char *)&desktop, 1);
+
 	XRaiseWindow(dpy, w);
 	return c;
 }
@@ -266,6 +274,7 @@ void change_workspace(int ws)
 	long cd = current_ws;
 	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
 	                (unsigned char *)&cd, 1);
+	update_client_desktop_properties();
 
 	XUngrabServer(dpy);
 	XSync(dpy, False);
@@ -1229,6 +1238,20 @@ void update_struts(void)
 	XFree(children);
 }
 
+void update_workarea(void)
+{
+	long workarea[4 * MAX_MONITORS];
+
+	for (int i = 0; i < monsn && i < MAX_MONITORS; i++) {
+		workarea[i * 4 + 0] = mons[i].x + reserve_left;
+		workarea[i * 4 + 1] = mons[i].y + reserve_top;
+		workarea[i * 4 + 2] = mons[i].w - reserve_left - reserve_right;
+		workarea[i * 4 + 3] = mons[i].h - reserve_top - reserve_bottom;
+	}
+	XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea,
+	                monsn * 4);
+}
+
 void inc_gaps(void)
 {
 	user_config.gaps++;
@@ -1351,6 +1374,10 @@ void move_to_workspace(int ws)
 	/* push to target list */
 	focused->next = workspaces[ws];
 	workspaces[ws] = focused;
+	focused->ws = ws;
+	long desktop = ws;
+	XChangeProperty(dpy, focused->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+	                (unsigned char *)&desktop, 1);
 
 	/* tile current ws */
 	tile();
@@ -1436,12 +1463,34 @@ void reload_config(void)
 	}
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
+
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
+		}
+	}
+
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
+
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			XGrabButton(dpy, Button1, 0, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+			XGrabButton(dpy, Button1, user_config.modkey, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
+			            None, None);
+			XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, c->win, False, ButtonPressMask, GrabModeSync,
+			            GrabModeAsync, None, None);
+			XGrabButton(dpy, Button3, user_config.modkey, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
+			            None, None);
+		}
+	}
+
+	update_client_desktop_properties();
+	update_net_client_list();
 
 	XSync(dpy, False);
 	tile();
@@ -1639,6 +1688,8 @@ void setup_atoms(void)
 	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
 	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
+	atom_net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	atom_net_client_list = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 
 	Atom support_list[] = {
 	    atom_net_current_desktop,
@@ -1655,6 +1706,8 @@ void setup_atoms(void)
 	    atom_net_supporting_wm_check,
 	    atom_net_wm_name,
 	    atom_utf8_string,
+	    atom_net_wm_desktop,
+	    atom_net_client_list,
 	};
 
 	long num = NUM_WORKSPACES;
@@ -1672,6 +1725,8 @@ void setup_atoms(void)
 
 	XChangeProperty(dpy, root, atom_net_supported, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
 	                sizeof(support_list) / sizeof(Atom));
+
+	update_workarea();
 }
 
 Bool window_should_float(Window w)
@@ -2075,6 +2130,17 @@ void update_borders(void)
 	if (focused) {
 		Window w = focused->win;
 		XChangeProperty(dpy, root, atom_net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&w, 1);
+	}
+}
+
+void update_client_desktop_properties(void)
+{
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			long desktop = ws;
+			XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+			                (unsigned char *)&desktop, 1);
+		}
 	}
 }
 
