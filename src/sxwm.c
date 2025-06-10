@@ -131,6 +131,7 @@ int monsn = 0;
 int current_monitor = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
+Bool backup_binds = False;
 Bool running = False;
 
 long last_motion_time = 0;
@@ -1279,12 +1280,14 @@ void init_defaults(void)
 	default_config.new_win_focus = True;
 	default_config.warp_cursor = True;
 
-	for (unsigned long i = 0; i < LENGTH(binds); i++) {
-		default_config.binds[i].mods = binds[i].mods;
-		default_config.binds[i].keysym = binds[i].keysym;
-		default_config.binds[i].action.cmd = binds[i].action.cmd;
-		default_config.binds[i].type = binds[i].type;
-		default_config.bindsn++;
+	if (backup_binds) {
+		for (unsigned long i = 0; i < LENGTH(binds); i++) {
+			default_config.binds[i].mods = binds[i].mods;
+			default_config.binds[i].keysym = binds[i].keysym;
+			default_config.binds[i].action.cmd = binds[i].action.cmd;
+			default_config.binds[i].type = binds[i].type;
+			default_config.bindsn++;
+		}
 	}
 
 	user_config = default_config;
@@ -2243,11 +2246,17 @@ int main(int ac, char **av)
 {
 	if (ac > 1) {
 		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0) {
-			printf("%s\n%s\n%s", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
+			printf("%s\n%s\n%s\n", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
 			exit(0);
 		}
+		else if (strcmp(av[1], "-b") == 0 || strcmp(av[1], "--backup") == 0) {
+			puts("sxwm: using backup keybinds");
+			backup_binds = True;
+		}
 		else {
-			printf("usage:\n[-v || --version]: See the version of sxwm");
+			puts("usege:\n");
+			puts("\t[-v || --version]: See the version of sxwm\n");
+			puts("\t[-b || --backup]: Use backup set of keybinds with sxwm\n");
 			exit(0);
 		}
 	}

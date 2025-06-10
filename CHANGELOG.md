@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **CHANGE**: Renamed `focus_previous` to `focus_prev`
 - **CHANGE**: Invalid sample config
 - **CHANGE**: Parser `$HOME` searching order. XDG Compliance
+- **CHANGE**: `-b` or `--backup` option for using backup keybinds
 - **FIXED**: Improved parsing now supporting commands with `"` and `'`
 - **FIXED**: (mouse warping) Switching to master doesn't automatically shift cursor to it
 - **FIXED**: `ctrl` and `shift` key works as a modifier
