@@ -39,8 +39,8 @@ call : mod + comma : focus_prev_mon
 call : mod + period : focus_next_mon
 
 # Move Window Between Monitors:
-call : mod + shift + comma : swap_prev_mon
-call : mod + shift + period : swap_next_mon
+call : mod + shift + comma : move_prev_mon
+call : mod + shift + period : move_next_mon
 
 # Master/Stack Movement
 call : mod + shift + j : master_next
