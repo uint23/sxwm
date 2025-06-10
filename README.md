@@ -20,6 +20,7 @@
 ---
 
 ## Table of Contents
+- [Launch Args](#launch-args)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Configuration](#configuration)
@@ -30,6 +31,16 @@
 - [Build & Install](#build--install)
 - [Makefile Targets](#makefile-targets)
 - [Thanks & Inspiration](#thanks--inspiration)
+
+---
+
+## Launch Args
+
+### `-v` or `--version`
+Displays the version of `sxwm`
+
+### `-b` or `--backup`
+Allows user to use backup keybinds with `sxwm`
 
 ---
 
