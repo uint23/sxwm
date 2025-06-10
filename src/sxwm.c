@@ -744,25 +744,6 @@ void hdl_client_msg(XEvent *xev)
 		}
 		return;
 	}
-
-	if (xev->xclient.message_type == XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False)) {
-		Window target = xev->xclient.data.l[0];
-		for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-			for (Client *c = workspaces[ws]; c; c = c->next) {
-				if (c->win == target) {
-					/* do NOT move to current ws */
-					if (ws == current_ws) {
-						focused = c;
-						send_wm_take_focus(c->win);
-						XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-						XRaiseWindow(dpy, c->win);
-						update_borders();
-					}
-					return;
-				}
-			}
-		}
-	}
 }
 
 void hdl_config_ntf(XEvent *xev)
@@ -948,6 +929,30 @@ void hdl_map_req(XEvent *xev)
 		return;
 	}
 
+	/* check if this window is already managed on any workspace */
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			if (c->win == w) {
+				if (ws == current_ws) {
+					if (!c->mapped) {
+						XMapWindow(dpy, w);
+						c->mapped = True;
+					}
+					if (user_config.new_win_focus) {
+						focused = c;
+						XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+						send_wm_take_focus(c->win);
+						if (user_config.warp_cursor) {
+							warp_cursor(c);
+						}
+					}
+					update_borders();
+				}
+				return;
+			}
+		}
+	}
+
 	Atom type;
 	int format;
 	unsigned long nitems, after;
@@ -1033,11 +1038,8 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	XMapWindow(dpy, w);
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->win == w) {
-			c->mapped = True;
-		}
-	}
+	c->mapped = True;
+
 	if (user_config.new_win_focus) {
 		focused = c;
 		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
