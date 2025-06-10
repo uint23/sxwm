@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **FIXED**: Invisible windows of minimized programs
 - **FIXED**: Zombie processes spawned from apps
 - **FIXED**: Undefined behaviour in `parse_col`
+- **FIXED**: Added monitor switching functions to call_table (#95)
 
 #### v1.5 (current)
 - **NEW**: Using XCursor instead of cursor font && new logo.
