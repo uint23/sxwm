@@ -104,9 +104,6 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 	}
 	buf[sizeof buf - 1] = '\0';
 	for (char *tok = strtok(buf, "+"); tok; tok = strtok(NULL, "+")) {
-		for (char *q = tok; *q; q++) {
-			*q = tolower((unsigned char)*q);
-		}
 		if (!strcmp(tok, "mod")) {
 			m |= cfg->modkey;
 		}
@@ -123,6 +120,7 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 			m |= Mod4Mask;
 		}
 		else {
+			ks = XStringToKeysym(tok);
 			ks = parse_keysym(tok);
 		}
 	}
