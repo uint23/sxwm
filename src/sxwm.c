@@ -366,47 +366,73 @@ Window find_toplevel(Window w)
 
 void focus_next(void)
 {
-	if (!focused || !workspaces[current_ws]) {
+	if (!workspaces[current_ws]) {
 		return;
 	}
 
-	focused = (focused->next ? focused->next : workspaces[current_ws]);
-	current_monitor = focused->mon;
-	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-	XRaiseWindow(dpy, focused->win);
-	if (user_config.warp_cursor) {
-		warp_cursor(focused);
+	Client *start = focused ? focused : workspaces[current_ws];
+	Client *c = start;
+
+	/* loop until we find a mapped client or return to start */
+	do {
+		c = c->next ? c->next : workspaces[current_ws];
+	} while (!c->mapped && c != start);
+
+	/* this stops invisible windows being detected or focused */
+	if (!c->mapped) {
+		return;
 	}
+
+	focused = c;
+	current_monitor = c->mon;
+	XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+	XRaiseWindow(dpy, c->win);
+	if (user_config.warp_cursor)
+		warp_cursor(c);
 	update_borders();
 }
 
 void focus_prev(void)
 {
-	if (!focused || !workspaces[current_ws]) {
+	if (!workspaces[current_ws]) {
 		return;
 	}
 
-	Client *p = workspaces[current_ws], *prev = NULL;
-	while (p && p != focused) {
-		prev = p;
-		p = p->next;
-	}
+	Client *start = focused ? focused : workspaces[current_ws];
+	Client *c = start;
 
-	if (!prev) {
-		while (p->next) {
+	/* loop until we find a mapped client or return to start */
+	do {
+		Client *p = workspaces[current_ws], *prev = NULL;
+		while (p && p != c) {
+			prev = p;
 			p = p->next;
 		}
-		focused = p;
-	}
-	else {
-		focused = prev;
+
+		if (prev) {
+			c = prev;
+		}
+		else {
+			/* wrap to tail */
+			p = workspaces[current_ws];
+			while (p->next)
+				p = p->next;
+			c = p;
+		}
+	} while (!c->mapped && c != start);
+
+	/* this stops invisible windows being detected or focused */
+	if (!c->mapped) {
+		return;
 	}
 
-	current_monitor = focused->mon;
-	XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-	XRaiseWindow(dpy, focused->win);
+	focused = c;
+	current_monitor = c->mon;
+
+	XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+	XRaiseWindow(dpy, c->win);
 	if (user_config.warp_cursor) {
-		warp_cursor(focused);
+		warp_cursor(c);
 	}
 	update_borders();
 }
