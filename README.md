@@ -168,7 +168,7 @@ workspace : mod + shift + 5 : swap 5
 | `MOD` + `Space`              | Toggle floating           |
 | `MOD` + `Shift` + `Space`    | Toggle all floating       |
 | `MOD` + `=` / `-`            | Increase/Decrease gaps    |
-| `MOD` + `shift` + `f`        | Fullscreen toggle         |
+| `MOD` + `Shift` + `f`        | Fullscreen toggle         |
 | `MOD` + `q`                  | Close focused window      |
 | `MOD` + `1-9`                | Switch workspace 1–9      |
 | `MOD` + `Shift` + `1-9`      | Move window to WS 1–9     |
