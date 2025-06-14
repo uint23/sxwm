@@ -5,10 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef __linux__
 #include <wordexp.h>
+#endif
 #include <X11/keysym.h>
 #include <X11/Xlib.h>
-
 #include "parser.h"
 #include "defs.h"
 
@@ -470,15 +471,75 @@ KeySym parse_keysym(const char *key)
 	return NoSymbol;
 }
 
+#ifndef __linux__
+static char **split_cmd(const char *cmd, int *out_argc)
+{
+	enum { NORMAL, IN_QUOTE } state = NORMAL;
+	const char *p = cmd;
+	size_t cap = 8, argc = 0, toklen = 0;
+	char *token = malloc(strlen(cmd) + 1);
+	char **argv = malloc(cap * sizeof *argv);
+	if (!token || !argv) {
+		goto err;
+	}
+
+	while (*p) {
+		if (state == NORMAL && isspace((unsigned char)*p)) {
+			if (toklen) {
+				token[toklen] = '\0';
+				if (argc + 1 >= cap) {
+					cap *= 2;
+					argv = realloc(argv, cap * sizeof *argv);
+					if (!argv) {
+						goto err;
+					}
+				}
+				argv[argc++] = strdup(token);
+				toklen = 0;
+			}
+		}
+		else if (*p == '"') {
+			state = (state == NORMAL) ? IN_QUOTE : NORMAL;
+		}
+		else {
+			token[toklen++] = *p;
+		}
+		p++;
+	}
+
+	if (toklen) {
+		token[toklen] = '\0';
+		argv[argc++] = strdup(token);
+	}
+	argv[argc] = NULL;
+	*out_argc = argc;
+	free(token);
+	return argv;
+
+err:
+	if (token) {
+		free(token);
+	}
+	if (argv) {
+		for (size_t i = 0; i < argc; i++) {
+			free(argv[i]);
+		}
+		free(argv);
+	}
+	return NULL;
+}
+#endif
+
 const char **build_argv(const char *cmd)
 {
+#ifdef __linux__
 	wordexp_t p;
 	if (wordexp(cmd, &p, 0) != 0 || p.we_wordc == 0) {
 		fprintf(stderr, "sxwm: wordexp failed for cmd: '%s'\n", cmd);
 		return NULL;
 	}
 
-	const char **argv = malloc((p.we_wordc + 1) * sizeof(char *));
+	const char **argv = malloc((p.we_wordc + 1) * sizeof *argv);
 	if (!argv) {
 		wordfree(&p);
 		return NULL;
@@ -488,7 +549,29 @@ const char **build_argv(const char *cmd)
 		argv[i] = strdup(p.we_wordv[i]);
 	}
 	argv[p.we_wordc] = NULL;
-
 	wordfree(&p);
 	return argv;
+#else
+	int argc = 0;
+	char **tmp = split_cmd(cmd, &argc);
+	if (!tmp) {
+		return NULL;
+	}
+
+	const char **argv = malloc((argc + 1) * sizeof *argv);
+	if (!argv) {
+		for (int i = 0; i < argc; i++) {
+			free(tmp[i]);
+		}
+		free(tmp);
+		return NULL;
+	}
+
+	for (int i = 0; i < argc; i++) {
+		argv[i] = tmp[i];
+	}
+	argv[argc] = NULL;
+	free(tmp);
+	return argv;
+#endif
 }
