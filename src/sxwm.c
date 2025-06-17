@@ -1137,9 +1137,8 @@ void hdl_motion(XEvent *xev)
 		nx = snap_coordinate(nx, outer_w, scr_width, user_config.snap_distance);
 		ny = snap_coordinate(ny, outer_h, scr_height, user_config.snap_distance);
 
-		if (!drag_client->floating &&
-		    (UDIST(nx, drag_client->x) > user_config.snap_distance ||
-		     UDIST(ny, drag_client->y) > user_config.snap_distance)) {
+		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
+		                               UDIST(ny, drag_client->y) > user_config.snap_distance)) {
 			toggle_floating();
 		}
 
@@ -1353,7 +1352,8 @@ void move_master_prev(void)
 		return;
 	}
 
-	Client *prev = NULL, *cur = workspaces[current_ws];
+	Client *prev = NULL;
+	Client *cur = workspaces[current_ws];
 	Client *old_focused = focused;
 
 	while (cur->next) {
@@ -1474,25 +1474,26 @@ void quit(void)
 void reload_config(void)
 {
 	puts("sxwm: reloading config...");
-	memset(&user_config, 0, sizeof(user_config));
+
 	for (int i = 0; i < user_config.bindsn; i++) {
 		free(user_config.binds[i].action.cmd);
 		user_config.binds[i].action.cmd = NULL;
-
 		user_config.binds[i].action.fn = NULL;
 		user_config.binds[i].type = -1;
 		user_config.binds[i].keysym = 0;
 		user_config.binds[i].mods = 0;
 	}
 
+	memset(&user_config, 0, sizeof(user_config));
+
 	init_defaults();
 	if (parser(&user_config)) {
 		fprintf(stderr, "sxrc: error parsing config file\n");
 		init_defaults();
 	}
+
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
-
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
@@ -1501,8 +1502,10 @@ void reload_config(void)
 
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
+
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+
 	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 
