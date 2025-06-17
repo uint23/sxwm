@@ -36,6 +36,8 @@
 #include "defs.h"
 #include "parser.h"
 
+#define MIN_WINDOW_SIZE 20
+
 Client *add_client(Window w, int ws);
 void change_workspace(int ws);
 int clean_mask(int mask);
@@ -1077,6 +1079,16 @@ void hdl_map_req(XEvent *xev)
 	update_borders();
 }
 
+int snap_coordinate(int pos, int size, int screen_size, int snap_dist) {
+	if (UDIST(pos, 0) <= snap_dist) {
+		return 0;
+	}
+	if (UDIST(pos + size, screen_size) <= snap_dist) {
+		return screen_size - size;
+	}
+	return pos;
+}
+
 void hdl_motion(XEvent *xev)
 {
 	XMotionEvent *e = &xev->xmotion;
@@ -1093,7 +1105,7 @@ void hdl_motion(XEvent *xev)
 		unsigned int mask;
 		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
 
-		Client *last_swap_target = NULL;
+		static Client *last_swap_target = NULL;
 		Client *new_target = NULL;
 
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -1131,22 +1143,12 @@ void hdl_motion(XEvent *xev)
 		int outer_w = drag_client->w + 2 * user_config.border_width;
 		int outer_h = drag_client->h + 2 * user_config.border_width;
 
-		if (UDIST(nx, 0) <= user_config.snap_distance) {
-			nx = 0;
-		}
-		else if (UDIST(nx + outer_w, scr_width) <= user_config.snap_distance) {
-			nx = scr_width - outer_w;
-		}
+		nx = snap_coordinate(nx, outer_w, scr_width, user_config.snap_distance);
+		ny = snap_coordinate(ny, outer_h, scr_height, user_config.snap_distance);
 
-		if (UDIST(ny, 0) <= user_config.snap_distance) {
-			ny = 0;
-		}
-		else if (UDIST(ny + outer_h, scr_height) <= user_config.snap_distance) {
-			ny = scr_height - outer_h;
-		}
-
-		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
-		                               UDIST(ny, drag_client->y) > user_config.snap_distance)) {
+		if (!drag_client->floating &&
+		    (UDIST(nx, drag_client->x) > user_config.snap_distance ||
+		     UDIST(ny, drag_client->y) > user_config.snap_distance)) {
 			toggle_floating();
 		}
 
@@ -1160,8 +1162,13 @@ void hdl_motion(XEvent *xev)
 		int dy = e->y_root - drag_start_y;
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
-		drag_client->w = nw < 20 ? 20 : nw;
-		drag_client->h = nh < 20 ? 20 : nh;
+
+		int max_w = scr_width - drag_client->x;
+		int max_h = scr_height - drag_client->y;
+
+		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
+		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
+
 		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
 	}
 }
