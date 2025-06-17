@@ -43,7 +43,6 @@ void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
-void startup_exec(void);
 Window find_toplevel(Window w);
 /* void focus_next(void); */
 /* void focus_prev(void); */
@@ -80,8 +79,9 @@ void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
-Bool window_should_float(Window w);
+int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
+void startup_exec(void);
 void swap_clients(Client *a, Client *b);
 void tile(void);
 /* void toggle_floating(void); */
@@ -94,6 +94,7 @@ void update_net_client_list(void);
 void update_struts(void);
 void update_workarea(void);
 void warp_cursor(Client *c);
+Bool window_should_float(Window w);
 int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
@@ -1079,16 +1080,6 @@ void hdl_map_req(XEvent *xev)
 	update_borders();
 }
 
-int snap_coordinate(int pos, int size, int screen_size, int snap_dist) {
-	if (UDIST(pos, 0) <= snap_dist) {
-		return 0;
-	}
-	if (UDIST(pos + size, screen_size) <= snap_dist) {
-		return screen_size - size;
-	}
-	return pos;
-}
-
 void hdl_motion(XEvent *xev)
 {
 	XMotionEvent *e = &xev->xmotion;
@@ -1788,6 +1779,17 @@ Bool window_should_float(Window w)
 	}
 
 	return False;
+}
+
+int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
+{
+	if (UDIST(pos, 0) <= snap_dist) {
+		return 0;
+	}
+	if (UDIST(pos + size, screen_size) <= snap_dist) {
+		return screen_size - size;
+	}
+	return pos;
 }
 
 void spawn(const char **argv)
