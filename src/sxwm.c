@@ -1797,48 +1797,86 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 
 void spawn(const char **argv)
 {
+	int argc = 0;
+	while (argv[argc])
+		argc++;
+
+	char **args = malloc((argc + 1) * sizeof(char *));
+	if (!args) {
+		perror("malloc");
+		return;
+	}
+
+	for (int i = 0; i < argc; i++) {
+		args[i] = (char *)argv[i];
+	}
+	args[argc] = NULL;
+
 	int pipe_idx = -1;
-	for (int i = 0; argv[i]; i++) {
-		if (strcmp(argv[i], "|") == 0) {
+	for (int i = 0; args[i]; i++) {
+		if (strcmp(args[i], "|") == 0) {
 			pipe_idx = i;
 			break;
 		}
 	}
 
 	if (pipe_idx < 0) {
-		if (fork() == 0) {
+		pid_t pid = fork();
+		if (pid < 0) {
+			perror("fork");
+			free(args);
+			return;
+		}
+		if (pid == 0) {
 			close(ConnectionNumber(dpy));
 			setsid();
-			execvp(argv[0], (char *const *)argv);
-			fprintf(stderr, "sxwm: execvp '%s' failed\n", argv[0]);
+			execvp(args[0], args);
+			fprintf(stderr, "sxwm: execvp '%s' failed\n", args[0]);
 			exit(EXIT_FAILURE);
 		}
+		free(args);
 	}
 	else {
-		((char **)argv)[pipe_idx] = NULL;
-		const char **left = argv;
-		const char **right = argv + pipe_idx + 1;
+		args[pipe_idx] = NULL;
+		char **left = args;
+		char **right = &args[pipe_idx + 1];
+
 		int fd[2];
-		Bool x = pipe(fd);
-		(void)x;
+		if (pipe(fd) == -1) {
+			perror("pipe");
+			free(args);
+			return;
+		}
 
 		pid_t pid1 = fork();
+		if (pid1 < 0) {
+			perror("fork (left)");
+			free(args);
+			return;
+		}
 		if (pid1 == 0) {
+			close(ConnectionNumber(dpy));
 			dup2(fd[1], STDOUT_FILENO);
 			close(fd[0]);
 			close(fd[1]);
-			execvp(left[0], (char *const *)left);
-			perror("spawn left");
+			execvp(left[0], left);
+			perror("sxwm: execvp (left) failed");
 			exit(EXIT_FAILURE);
 		}
 
 		pid_t pid2 = fork();
+		if (pid2 < 0) {
+			perror("fork (right)");
+			free(args);
+			return;
+		}
 		if (pid2 == 0) {
+			close(ConnectionNumber(dpy));
 			dup2(fd[0], STDIN_FILENO);
 			close(fd[0]);
 			close(fd[1]);
-			execvp(right[0], (char *const *)right);
-			perror("spawn right");
+			execvp(right[0], right);
+			perror("sxwm: execvp (right) failed");
 			exit(EXIT_FAILURE);
 		}
 
@@ -1846,6 +1884,8 @@ void spawn(const char **argv)
 		close(fd[1]);
 		waitpid(pid1, NULL, 0);
 		waitpid(pid2, NULL, 0);
+
+		free(args);
 	}
 }
 
