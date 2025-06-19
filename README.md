@@ -75,6 +75,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `swap_border_colour`     | Hex     | `#fff4c0` | Border color when selecting a window to swap (`MOD+Shift+Drag`).            |
 | `master_width`           | Integer | `60`      | Percentage of the screen width for the master window.                       |
 | `resize_master_amount`   | Integer | `1`       | Percent to increase/decrease master width.                                  |
+| `resize_stack_amount`    | Integer | `20`      | How many pixels to increase/decrease stack windows by                       |
 | `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
 | `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
 | `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
@@ -113,10 +114,10 @@ workspace : modifier + modifier + ... + key : swap n
 | `decrease_gaps`      | Shrinks gaps.                                                |
 | `focus_next`         | Moves focus forward in the stack.                            |
 | `focus_previous`     | Moves focus backward in the stack.                           |
-| `focus_next_mon` | Switches focus to the next monitor.                          |
-| `focus_prev_mon` | Switches focus to the previous monitor.                      |
-| `move_next_mon` | Moves the focused window to the next monitor.       |
-| `move_prev_mon` | Moves the focused window to the previous monitor.   |
+| `focus_next_mon`     | Switches focus to the next monitor.                          |
+| `focus_prev_mon`     | Switches focus to the previous monitor.                      |
+| `move_next_mon`      | Moves the focused window to the next monitor.                |
+| `move_prev_mon`      | Moves the focused window to the previous monitor.            |
 | `increase_gaps`      | Expands gaps.                                                |
 | `master_next`        | Moves focused window down in master/stack order.             |
 | `master_prev`        | Moves focused window up in master/stack order.               |
@@ -147,31 +148,39 @@ workspace : mod + shift + 5 : swap 5
 ## Default Keybindings
 
 ### Window Management
+| Combo                       | Action                             |
+| --------------------------- | ---------------------------------- |
+| Mouse                       | Focus under cursor                 |
+| `MOD` + Left Mouse          | Move window with mouse             |
+| `MOD` + Right Mouse         | Resize window with mouse           |
+| `MOD` + `j` / `k`           | Focus next / previous              |
+| `MOD` + `Shift` + `j` / `k` | Move window in master stack        |
+| `MOD` + `,` / `.`           | Focus prev / next monitor          |
+| `MOD` + `Shift` + `,` / `.` | Move window to prev / next monitor |
+| `MOD` + `h` / `l`           | Resize master area (decr/incr)     |
+| `MOD` + `Ctrl` + `h` / `l`  | Resize stack area (decr/incr)      |
+| `MOD` + `=` / `-`           | Increase / decrease gaps           |
+| `MOD` + `Space`             | Toggle floating                    |
+| `MOD` + `Shift` + `Space`   | Toggle all floating                |
+| `MOD` + `Shift` + `f`       | Toggle fullscreen mode             |
+| `MOD` + `Shift` + `q`       | Close focused window               |
+| `MOD` + `Shift` + `e`       | Quit sxwm                          |
+| `MOD` + `r`                 | Reload configuration               |
 
-| Combo                        | Action                    |
-| ---------------------------- | ------------------------- |
-| Mouse                        | Focus under cursor        |
-| `MOD` + Left Mouse           | Move window by mouse      |
-| `MOD` + Right Mouse          | Resize window by mouse    |
-| `MOD` + `j` / `k`            | Focus next / previous     |
-| `MOD` + `,` / `.`            | Focus prev / next monitor |
-| `MOD` + `Shift` + `,` / `.`  | Move window to prev / next monitor |
-| `MOD` + `Shift` + `j` / `k`  | Move in master stack      |
-| `MOD` + `Space`              | Toggle floating           |
-| `MOD` + `Shift` + `Space`    | Toggle all floating       |
-| `MOD` + `=` / `-`            | Increase/Decrease gaps    |
-| `MOD` + `Shift` + `f`        | Fullscreen toggle         |
-| `MOD` + `q`                  | Close focused window      |
-| `MOD` + `1-9`                | Switch workspace 1–9      |
-| `MOD` + `Shift` + `1-9`      | Move window to WS 1–9     |
+### Workspaces
 
-### Programs
+| Combo                   | Action                       |
+| ----------------------- | ---------------------------- |
+| `MOD` + `1–9`           | Switch to workspace 1–9      |
+| `MOD` + `Shift` + `1–9` | Move window to workspace 1–9 |
 
-| Combo                | Action     | Program    |
-| -------------------- | ---------- | ---------- |
-| `MOD` + `Return`     | Terminal   | `st`       |
-| `MOD` + `b`          | Browser    | `firefox`  |
-| `MOD` + `p`          | Launcher   | `dmenu_run`|
+### Applications
+
+| Combo            | Action        | Program     |
+| ---------------- | ------------- | ----------- |
+| `MOD` + `Return` | Open terminal | `st`        |
+| `MOD` + `b`      | Open browser  | `firefox`   |
+| `MOD` + `p`      | Run launcher  | `dmenu_run` |
 
 ---
 
