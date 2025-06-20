@@ -17,10 +17,11 @@
 #include <X11/X.h>
 #include <err.h>
 #include <stdio.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -47,6 +48,7 @@ Window find_toplevel(Window w);
 /* void focus_next(void); */
 /* void focus_prev(void); */
 int get_monitor_for(Client *c);
+pid_t get_pid(Window w);
 void grab_keys(void);
 void hdl_button(XEvent *xev);
 void hdl_button_release(XEvent *xev);
@@ -62,6 +64,7 @@ void hdl_root_property(XEvent *xev);
 void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
+Bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
 void move_to_workspace(int ws);
@@ -82,11 +85,13 @@ void setup_atoms(void);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
 void startup_exec(void);
+void swallow_window(Client *swallower, Client *swallowed);
 void swap_clients(Client *a, Client *b);
 void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
+void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
 void update_monitors(void);
@@ -162,6 +167,9 @@ Client *add_client(Window w, int ws)
 	c->win = w;
 	c->next = NULL;
 	c->ws = ws;
+	c->pid = get_pid(w);
+	c->swallowed = NULL;
+	c->swallower = NULL;
 
 	if (!workspaces[ws]) {
 		workspaces[ws] = c;
@@ -621,6 +629,26 @@ int get_monitor_for(Client *c)
 	return 0;
 }
 
+pid_t get_pid(Window w)
+{
+	pid_t pid = 0;
+	Atom actual_type;
+	int actual_format;
+	unsigned long nitems, bytes_after;
+	unsigned char *prop = NULL;
+	Atom atom_pid = XInternAtom(dpy, "_NET_WM_PID", False);
+
+	if (XGetWindowProperty(dpy, w, atom_pid, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems,
+	                       &bytes_after, &prop) == Success &&
+	    prop) {
+		if (actual_format == 32 && nitems == 1) {
+			pid = *(pid_t *)prop;
+		}
+		XFree(prop);
+	}
+	return pid;
+}
+
 void grab_keys(void)
 {
 	const int guards[] = {0,
@@ -831,6 +859,21 @@ void hdl_destroy_ntf(XEvent *xev)
 			c = c->next;
 		}
 		if (c) {
+			if (c->swallower) {
+				unswallow_window(c);
+			}
+
+			if (c->swallowed) {
+				Client *swallowed = c->swallowed;
+				c->swallowed = NULL;
+				swallowed->swallower = NULL;
+
+				/* show swallowed window */
+				XMapWindow(dpy, swallowed->win);
+				swallowed->mapped = True;
+				focused = swallowed;
+			}
+
 			if (focused == c) {
 				if (c->next) {
 					focused = c->next;
@@ -900,6 +943,31 @@ void hdl_keypress(XEvent *xev)
 			return;
 		}
 	}
+}
+
+void swallow_window(Client *swallower, Client *swallowed)
+{
+	if (!swallower || !swallowed || swallower->swallowed || swallowed->swallower) {
+		return;
+	}
+
+	XUnmapWindow(dpy, swallower->win);
+	swallower->mapped = False;
+
+	swallower->swallowed = swallowed;
+	swallowed->swallower = swallower;
+
+	swallowed->floating = swallower->floating;
+	if (swallowed->floating) {
+		swallowed->x = swallower->x;
+		swallowed->y = swallower->y;
+		swallowed->w = swallower->w;
+		swallowed->h = swallower->h;
+		XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
+	}
+
+	tile();
+	update_borders();
 }
 
 void swap_clients(Client *a, Client *b)
@@ -1064,6 +1132,67 @@ void hdl_map_req(XEvent *xev)
 	}
 	else if (c->floating) {
 		XRaiseWindow(dpy, w);
+	}
+
+	/* check for swallowing opportunities */
+	{
+		XClassHint ch;
+		Bool can_be_swallowed = False;
+
+		if (XGetClassHint(dpy, w, &ch)) {
+			/* check if new window can be swallowed */
+			for (int i = 0; i < 256; i++) {
+				if (!user_config.can_be_swallowed[i] || !user_config.can_be_swallowed[i][0]) {
+					break;
+				}
+
+				if ((ch.res_class && strcasecmp(ch.res_class, user_config.can_be_swallowed[i][0]) == 0) ||
+				    (ch.res_name && strcasecmp(ch.res_name, user_config.can_be_swallowed[i][0]) == 0)) {
+					can_be_swallowed = True;
+					break;
+				}
+			}
+
+			/* if window can be swallowed look for a potential swallower */
+			if (can_be_swallowed) {
+				for (Client *p = workspaces[current_ws]; p; p = p->next) {
+					if (p == c || p->swallowed || !p->mapped) {
+						continue;
+					}
+
+					XClassHint pch;
+					Bool can_swallow = False;
+
+					if (XGetClassHint(dpy, p->win, &pch)) {
+						/* check if this existing window can swallow others */
+						for (int i = 0; i < 256; i++) {
+							if (!user_config.can_swallow[i] || !user_config.can_swallow[i][0]) {
+								break;
+							}
+
+							if ((pch.res_class && strcasecmp(pch.res_class, user_config.can_swallow[i][0]) == 0) ||
+							    (pch.res_name && strcasecmp(pch.res_name, user_config.can_swallow[i][0]) == 0)) {
+								can_swallow = True;
+								break;
+							}
+						}
+
+						/* check process relationship */
+						if (can_swallow) {
+							/* we know class matches — swallow now */
+							swallow_window(p, c);
+							XFree(pch.res_class);
+							XFree(pch.res_name);
+							break;
+						}
+						XFree(pch.res_class);
+						XFree(pch.res_name);
+					}
+				}
+			}
+			XFree(ch.res_class);
+			XFree(ch.res_name);
+		}
 	}
 
 	XMapWindow(dpy, w);
@@ -1293,8 +1422,14 @@ void init_defaults(void)
 	default_config.border_foc_col = parse_col("#c0cbff");
 	default_config.border_ufoc_col = parse_col("#555555");
 	default_config.border_swap_col = parse_col("#fff4c0");
+
 	for (int i = 0; i < MAX_MONITORS; i++) {
 		default_config.master_width[i] = 50 / 100.0f;
+	}
+
+	for (int i = 0; i < 256; i++) {
+		default_config.can_be_swallowed[i] = NULL;
+		default_config.can_swallow[i] = NULL;
 	}
 
 	default_config.motion_throttle = 60;
@@ -1316,6 +1451,47 @@ void init_defaults(void)
 	}
 
 	user_config = default_config;
+}
+
+Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
+{
+	if (parent_pid <= 0 || child_pid <= 0) {
+		return False;
+	}
+
+	char path[PATH_MAX];
+	FILE *f;
+	pid_t current_pid = child_pid;
+	int max_iterations = 20;
+
+	while (current_pid > 1 && max_iterations-- > 0) {
+		snprintf(path, sizeof(path), "/proc/%d/stat", current_pid);
+		f = fopen(path, "r");
+		if (!f) {
+			printf("sxwm: could not open %s\n", path);
+			return False;
+		}
+
+		int ppid = 0;
+		if (fscanf(f, "%*d %*s %*c %d", &ppid) != 1) {
+			printf("sxwm: failed to read ppid from %s\n", path);
+			fclose(f);
+			return False;
+		}
+		fclose(f);
+
+		if (ppid == parent_pid) {
+			return True;
+		}
+
+		if (ppid <= 1) { /* Reached init or kernel */
+			printf("sxwm: reached init/kernel, no relationship found\n");
+			break;
+		}
+
+		current_pid = ppid;
+	}
+	return False;
 }
 
 void move_master_next(void)
@@ -1475,8 +1651,11 @@ void reload_config(void)
 {
 	puts("sxwm: reloading config...");
 
+	/* free binding commands without */
 	for (int i = 0; i < user_config.bindsn; i++) {
-		free(user_config.binds[i].action.cmd);
+		if (user_config.binds[i].type == TYPE_CMD && user_config.binds[i].action.cmd) {
+			free(user_config.binds[i].action.cmd);
+		}
 		user_config.binds[i].action.cmd = NULL;
 		user_config.binds[i].action.fn = NULL;
 		user_config.binds[i].type = -1;
@@ -1484,14 +1663,52 @@ void reload_config(void)
 		user_config.binds[i].mods = 0;
 	}
 
-	memset(&user_config, 0, sizeof(user_config));
+	/* free swallow-related arrays */
+	for (int i = 0; i < 256; i++) {
+		if (user_config.can_swallow[i]) {
+			if (user_config.can_swallow[i][0]) {
+				free(user_config.can_swallow[i][0]);
+			}
+			free(user_config.can_swallow[i]);
+			user_config.can_swallow[i] = NULL;
+		}
+		if (user_config.can_be_swallowed[i]) {
+			if (user_config.can_be_swallowed[i][0]) {
+				free(user_config.can_be_swallowed[i][0]);
+			}
+			free(user_config.can_be_swallowed[i]);
+			user_config.can_be_swallowed[i] = NULL;
+		}
+	}
 
+	/* free should_float arrays */
+	for (int i = 0; i < 256; i++) {
+		if (user_config.should_float[i]) {
+			if (user_config.should_float[i][0]) {
+				free(user_config.should_float[i][0]);
+			}
+			free(user_config.should_float[i]);
+			user_config.should_float[i] = NULL;
+		}
+	}
+
+	/* free any exec strings */
+	for (int i = 0; i < 256; i++) {
+		if (user_config.torun[i]) {
+			free(user_config.torun[i]);
+			user_config.torun[i] = NULL;
+		}
+	}
+
+	/* wipe everything else */
+	memset(&user_config, 0, sizeof(user_config));
 	init_defaults();
 	if (parser(&user_config)) {
-		fprintf(stderr, "sxrc: error parsing config file\n");
+		fprintf(stderr, "sxwmrc: error parsing config file\n");
 		init_defaults();
 	}
 
+	/* regrab all key/button bindings */
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
@@ -1499,16 +1716,12 @@ void reload_config(void)
 			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
 		}
 	}
-
 	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
-
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-
 	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
-
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			XGrabButton(dpy, Button1, 0, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
@@ -1523,8 +1736,8 @@ void reload_config(void)
 
 	update_client_desktop_properties();
 	update_net_client_list();
-
 	XSync(dpy, False);
+
 	tile();
 	update_borders();
 }
@@ -1676,6 +1889,7 @@ void setup(void)
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
 	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+
 	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
 	            GrabModeAsync, GrabModeAsync, None, None);
 	XSync(dpy, False);
@@ -2125,6 +2339,29 @@ void toggle_fullscreen(void)
 		tile();
 		update_borders();
 	}
+}
+
+void unswallow_window(Client *c)
+{
+	if (!c || !c->swallower) {
+		return;
+	}
+
+	Client *swallower = c->swallower;
+
+	/* unlink windows */
+	swallower->swallowed = NULL;
+	c->swallower = NULL;
+
+	XMapWindow(dpy, swallower->win);
+	swallower->mapped = True;
+
+	focused = swallower;
+	XSetInputFocus(dpy, swallower->win, RevertToPointerRoot, CurrentTime);
+	XRaiseWindow(dpy, swallower->win);
+
+	tile();
+	update_borders();
 }
 
 void update_borders(void)

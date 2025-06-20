@@ -1,13 +1,13 @@
 /* See LICENSE for more information on use */
 #pragma once
 #include <X11/Xlib.h>
-#define SXWM_VERSION	"sxwm ver. 1.6"
-#define SXWM_AUTHOR		"(C) Abhinav Prasai 2025"
-#define SXWM_LICINFO	"See LICENSE for more info"
+#define SXWM_VERSION "sxwm ver. 1.6"
+#define SXWM_AUTHOR "(C) Abhinav Prasai 2025"
+#define SXWM_LICINFO "See LICENSE for more info"
 
-#define ALT		Mod1Mask
-#define SUPER	Mod4Mask
-#define SHIFT	ShiftMask
+#define ALT Mod1Mask
+#define SUPER Mod4Mask
+#define SHIFT ShiftMask
 
 #define MARGIN (gaps + BORDER_WIDTH)
 #define OUT_IN (2 * BORDER_WIDTH)
@@ -17,18 +17,17 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LENGTH(X) (sizeof X / sizeof X[0])
-#define UDIST(a,b) abs((int)(a) - (int)(b))
-#define CLAMP(x, lo, hi) (( (x) < (lo) ) ? (lo) : ( (x) > (hi) ) ? (hi) : (x))
-#define MAXCLIENTS	99
-#define BIND(mod, key, cmdstr) { (mod), XK_##key, { cmdstr }, False }
-#define CALL(mod, key, fnptr) { (mod), XK_##key, { .fn = fnptr }, True }
-#define CMD(name, ...) 						\
-	const char *name[] = { __VA_ARGS__, NULL }
+#define UDIST(a, b) abs((int)(a) - (int)(b))
+#define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
+#define MAXCLIENTS 99
+#define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, False}
+#define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
+#define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
 
-#define TYPE_CWKSP	0
-#define TYPE_MWKSP	1
-#define TYPE_FUNC	2
-#define TYPE_CMD	3
+#define TYPE_CWKSP 0
+#define TYPE_MWKSP 1
+#define TYPE_FUNC 2
+#define TYPE_CMD 3
 
 #define NUM_WORKSPACES		9
 #define WORKSPACE_NAMES		\
@@ -40,14 +39,9 @@
 	"6"					"\0"\
 	"7"					"\0"\
 	"8"					"\0"\
-	"9"					"\0"\
+	"9"					"\0"
 
-typedef enum {
-	DRAG_NONE,
-	DRAG_MOVE,
-	DRAG_RESIZE,
-	DRAG_SWAP
-} DragMode;
+typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_SWAP } DragMode;
 
 typedef void (*EventHandler)(XEvent *);
 
@@ -64,7 +58,7 @@ typedef struct {
 	int type;
 } Binding;
 
-typedef struct Client{
+typedef struct Client {
 	Window win;
 	int x, y, h, w;
 	int orig_x, orig_y, orig_w, orig_h;
@@ -75,7 +69,10 @@ typedef struct Client{
 	Bool floating;
 	Bool fullscreen;
 	Bool mapped;
+	pid_t pid;
 	struct Client *next;
+	struct Client *swallowed;
+	struct Client *swallower;
 } Client;
 
 typedef struct {
@@ -95,7 +92,9 @@ typedef struct {
 	Bool warp_cursor;
 	Binding binds[256];
 	char **should_float[256];
-    char *torun[256];
+	char **can_swallow[256];
+	char **can_be_swallowed[256];
+	char *torun[256];
 } Config;
 
 typedef struct {

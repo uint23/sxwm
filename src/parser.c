@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -403,6 +403,41 @@ found:
 				goto cleanup_file;
 			}
 			torun++;
+		}
+		else if (!strcmp(key, "can_swallow")) {
+			char *token = strtok(rest, ",");
+			int i = 0;
+			while (token && i < 256) {
+				char *item = strip_quotes(strip(token));
+				if (*item) {
+					cfg->can_swallow[i] = malloc(2 * sizeof(char *));
+					if (!cfg->can_swallow[i]) {
+						fprintf(stderr, "sxwmrc:%d: malloc failed\n", lineno);
+						break;
+					}
+					cfg->can_swallow[i][0] = strdup(item);
+					cfg->can_swallow[i][1] = NULL;
+					i++;
+				}
+				token = strtok(NULL, ",");
+			}
+		}
+		else if (!strcmp(key, "can_be_swallowed")) {
+			char *token = strtok(rest, ",");
+			int i = 0;
+			while (token && i < 256) {
+				char *item = strip_quotes(strip(token));
+				if (*item) {
+					cfg->can_be_swallowed[i] = malloc(2 * sizeof(char *));
+					if (!cfg->can_be_swallowed[i]) {
+						break;
+					}
+					cfg->can_be_swallowed[i][0] = strdup(item);
+					cfg->can_be_swallowed[i][1] = NULL;
+					i++;
+				}
+				token = strtok(NULL, ",");
+			}
 		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);

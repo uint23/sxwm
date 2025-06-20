@@ -81,6 +81,9 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
 | `new_win_focus`          | Bool    | `true`    | Whether openening new windows should also set focus to them or keep on current window.|
 | `warp_cursor`            | Bool    | `true`    | Warp the cursor to the middle of newly focused windows                      |
+| `exec`                   | String  | `Nothing` | Command to run on startup (e.g., `sxbar`, `picom`, "autostart", etc.).      |
+| `can_swallow`            | String  | `st`      | Windows that can swallow.                                                   |
+| `can_be_swallowed`       | String  | `mpv`     | Windows that can be swallowed.                                              |
 
 ---
 

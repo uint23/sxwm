@@ -5,6 +5,7 @@ sxwm \- minimal, fast, and configurable tiling window manager for X11
 
 .SH SYNOPSIS
 .B sxwm
+[\fIOPTION\fR]
 
 .SH DESCRIPTION
 sxwm is a lightweight and efficient tiling window manager for X11, designed to be fast, minimal, and easy to configure. It supports workspaces, floating windows, mouse operations, and dynamic configuration reloading.
@@ -16,19 +17,21 @@ Live configuration reload without restart.
 Human-friendly configuration file requiring no recompilation.
 DWM-style master-stack layout.
 Mouse support for moving, resizing, and swapping windows.
-Depends only on libX11 and Xinerama.
+Depends only on libX11, Xinerama, and XCursor.
 Extremely lightweight (single C file).
 Multi-monitor support via Xinerama.
 Works well with external bars such as sxbar.
+Zero dependencies beyond X11 libraries.
+Fast and low resource usage.
 
 .SH LAUNCH ARGUMENTS
 
 .TP
-.B -v || --version
+.B \-v, \-\-version
 Displays current sxwm version
 
 .TP
-.B -b || --backup
+.B \-b, \-\-backup
 Uses default config along side the custom sxwmrc
 
 .SH CONFIGURATION
@@ -41,7 +44,7 @@ General options include:
 
 .TP
 .B mod_key
-Sets the primary modifier key (for example, "alt", "super", or "ctrl"). Default is "super".
+Sets the primary modifier key ("alt", "super", or "ctrl"). Default is "super".
 
 .TP
 .B gaps
@@ -72,6 +75,10 @@ Percentage of screen width allocated to the master window. Default is 60.
 Percentage to increase or decrease master width when resizing. Default is 1.
 
 .TP
+.B resize_stack_amount
+How many pixels to increase/decrease stack windows by. Default is 20.
+
+.TP
 .B snap_distance
 Pixels from screen edge before a floating window snaps to the edge. Default is 5.
 
@@ -81,7 +88,7 @@ Target updates per second for mouse drag operations (move, resize, swap). Defaul
 
 .TP
 .B should_float
-Lets you change which windows should float by default when opening them. Default is st
+Lets you change which windows should float by default when opening them. Multiple entries should be comma-separated. Optionally, entries can be enclosed in quotes. Default is "st".
 
 .TP
 .B new_win_focus
@@ -90,6 +97,18 @@ Whether newly opened windows should automatically gain focus. Default is true.
 .TP
 .B warp_cursor
 If true, warps the mouse cursor to the center of newly focused windows. Default is true.
+
+.TP
+.B exec
+Command to run on startup (e.g., "sxbar", "picom", "autostart", etc.).
+
+.TP
+.B can_swallow
+Windows that can swallow other windows. Default is "st".
+
+.TP
+.B can_be_swallowed
+Windows that can be swallowed by others. Default is "mpv".
 
 .SH KEYBINDINGS
 Keybindings associate key combinations with actions, either running external commands or internal sxwm functions.
@@ -103,26 +122,29 @@ Modifiers can be mod, shift, ctrl, alt, or super. The key is the final key name 
 
 Actions can be either a quoted external command or an internal function name.
 
+.TP
+.B workspace : modifier + modifier + ... + key : move n
+.TP
+.B workspace : modifier + modifier + ... + key : swap n
+
+For workspace switching and moving windows. n is the workspace number (1-9).
+
 Example bindings:
 
 .TP
 .B bind : mod + Return : "st"
-
 Open the st terminal.
 
 .TP
 .B bind : mod + shift + q : close_window
-
 Close any window that is selected.
 
 .TP
-.B bind : mod + 3 : change_ws3
-
+.B workspace : mod + 3 : move 3
 Go to workspace 3.
 
 .TP
-.B bind : mod + shift + 5 : moveto_ws5
-
+.B workspace : mod + shift + 5 : swap 5
 Move selected window to workspace 5.
 
 .SH AVAILABLE FUNCTIONS
@@ -145,6 +167,22 @@ Shifts focus to the next window in the stack.
 Shifts focus to the previous window in the stack.
 
 .TP
+.B focus_next_mon
+Switches focus to the next monitor.
+
+.TP
+.B focus_prev_mon
+Switches focus to the previous monitor.
+
+.TP
+.B move_next_mon
+Moves the focused window to the next monitor.
+
+.TP
+.B move_prev_mon
+Moves the focused window to the previous monitor.
+
+.TP
 .B increase_gaps
 Increases the gap size between windows.
 
@@ -153,7 +191,7 @@ Increases the gap size between windows.
 Moves the focused window down the master/stack order.
 
 .TP
-.B master_previous
+.B master_prev
 Moves the focused window up the master/stack order.
 
 .TP
@@ -220,6 +258,18 @@ Moves the focused window to the specified workspace (1 to 9).
 Window Management:
 
 .TP
+.B Mouse Click
+Focus window under cursor.
+
+.TP
+.B MOD + Left Mouse
+Move window with mouse.
+
+.TP
+.B MOD + Right Mouse
+Resize window with mouse.
+
+.TP
 .B MOD + Return
 Launch terminal (default: st).
 
@@ -232,8 +282,16 @@ Launch browser (default: firefox).
 Run launcher (default: dmenu_run).
 
 .TP
-.B MOD + q
+.B MOD + Shift + q
 Close focused window.
+
+.TP
+.B MOD + Shift + e
+Quit sxwm.
+
+.TP
+.B MOD + r
+Reload configuration.
 
 .TP
 .B MOD + 1 to 9
@@ -252,12 +310,12 @@ Focus next or previous window.
 Move window up or down in the master stack.
 
 .TP
-.B MOD + Shift + h / l
-Increase or decrease master size.
+.B MOD + h / l
+Resize master area (decrease/increase).
 
 .TP
-.B MOD + Ctrl  h / l
-Increase or decrease stack height.
+.B MOD + Ctrl + h / l
+Resize stack area (decrease/increase).
 
 .TP
 .B MOD + Space
@@ -272,42 +330,75 @@ Toggle floating mode for all windows.
 Increase or decrease gaps.
 
 .TP
-.B MOD + f
+.B MOD + Shift + f
 Toggle fullscreen mode.
 
 .TP
-.B MOD + .
-Focus next monitor.
+.B MOD + . / ,
+Focus next/previous monitor.
 
 .TP
-.B MOD + ,
-Focus previous monitor.
+.B MOD + Shift + . / ,
+Move focused window to next/previous monitor.
+
+.SH DEPENDENCIES
+sxwm requires the following libraries:
 
 .TP
-.B MOD + Shift + .
-Move focused window to next monitor.
+.B libX11
+Xorg client library
 
 .TP
-.B MOD + Shift + ,
-Move focused window to previous monitor.
+.B libXinerama
+Multi-monitor support
 
 .TP
-.B MOD + Left Mouse
-Move window with mouse.
+.B libXcursor
+Cursor support
 
 .TP
-.B MOD + Right Mouse
-Resize window with mouse.
+.B GCC or Clang & Make
+For building from source
 
 .SH FILES
 Configuration file:
 .B ~/.config/sxwmrc
 
+.SH EXAMPLES
+Example configuration snippets:
+
+.RS
+.nf
+# Set gaps and borders
+gaps : 15
+border_width : 2
+focused_border_colour : "#ff6b6b"
+
+# Custom keybindings
+bind : mod + Return : "alacritty"
+bind : mod + d : "rofi -show drun"
+
+# Workspace switching
+workspace : mod + 1 : move 1
+workspace : mod + shift + 1 : swap 1
+
+# Window swallowing
+can_swallow : Alacritty
+can_be_swallowed : sxiv, mpv, zathura
+.fi
+.RE
+
 .SH AUTHOR
-Written by El Bachir (elbachir-one), 2025.
+Written by Abhinav Prasai (uint23), 2025.
 
 .SH SEE ALSO
 sxbar(1), dmenu(1), st(1), X(7)
 
 .SH LICENSE
 MIT License. See the LICENSE file for full details.
+
+.SH BUGS
+Report bugs at: https://github.com/uint23/sxwm/issues
+
+.SH INSPIRATION
+sxwm draws inspiration from dwm, i3, sowm, and tinywm.
