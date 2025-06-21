@@ -37,8 +37,6 @@
 #include "defs.h"
 #include "parser.h"
 
-#define MIN_WINDOW_SIZE 20
-
 Client *add_client(Window w, int ws);
 void change_workspace(int ws);
 int clean_mask(int mask);

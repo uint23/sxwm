@@ -20,6 +20,7 @@
 #define UDIST(a, b) abs((int)(a) - (int)(b))
 #define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
 #define MAXCLIENTS 99
+#define MIN_WINDOW_SIZE 20
 #define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, False}
 #define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
 #define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
