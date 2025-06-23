@@ -20,15 +20,23 @@
 #define UDIST(a, b) abs((int)(a) - (int)(b))
 #define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
 #define MAXCLIENTS 99
+#define MAX_SCRATCHPADS 20
 #define MIN_WINDOW_SIZE 20
 #define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, False}
 #define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
 #define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
 
-#define TYPE_CWKSP 0
-#define TYPE_MWKSP 1
+/* workspaces */
+#define TYPE_FUNC 2
+#define TYPE_WS_CHANGE 0
+#define TYPE_WS_MOVE 1
+/* fn/cmd */
 #define TYPE_FUNC 2
 #define TYPE_CMD 3
+/* scratchpads*/
+#define TYPE_SP_REMOVE 4
+#define TYPE_SP_TOGGLE 5
+#define TYPE_SP_CREATE 6
 
 #define NUM_WORKSPACES		9
 #define WORKSPACE_NAMES		\
@@ -43,13 +51,13 @@
 	"9"					"\0"
 
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_SWAP } DragMode;
-
 typedef void (*EventHandler)(XEvent *);
 
 typedef union {
 	const char **cmd;
 	void (*fn)(void);
-	int ws;
+	int ws; /* workspace */
+	int sp; /* scratchpad */
 } Action;
 
 typedef struct {
@@ -95,7 +103,8 @@ typedef struct {
 	Binding binds[256];
 	char **should_float[256];
 	char **can_swallow[256];
-	char **can_be_swallowed[256];
+    char **can_be_swallowed[256];
+	char **scratchpads[32];
 	char *torun[256];
 } Config;
 
@@ -103,6 +112,11 @@ typedef struct {
 	int x, y;
 	int w, h;
 } Monitor;
+
+typedef struct {
+	Client *client;
+	Bool enabled;
+} Scratchpad;
 
 extern void close_focused(void);
 extern void dec_gaps(void);

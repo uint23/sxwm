@@ -13,6 +13,8 @@ sxwm is a lightweight and efficient tiling window manager for X11, designed to b
 .SH FEATURES
 Tiling and floating layouts.
 Nine workspaces with full bar support.
+Scratchpads for instant access to floating windows.
+Native windwo swallowing.
 Live configuration reload without restart.
 Human-friendly configuration file requiring no recompilation.
 DWM-style master-stack layout.
@@ -120,18 +122,27 @@ Keybindings associate key combinations with actions, either running external com
 They follow this syntax:
 
 .TP
-.B bind : modifier + modifier + ... + key : action
+.B bind : modifier + ... + key : action
 
 Modifiers can be mod, shift, ctrl, alt, or super. The key is the final key name (e.g., Return, q, 1, equal, space).
 
 Actions can be either a quoted external command or an internal function name.
 
 .TP
-.B workspace : modifier + modifier + ... + key : move n
+.B workspace : modifier + ... + key : move n
 .TP
-.B workspace : modifier + modifier + ... + key : swap n
+.B workspace : modifier + ... + key : swap n
 
 For workspace switching and moving windows. n is the workspace number (1-9).
+
+.TP
+.B scratchpad : modifier + ... + key : create n
+.TP
+.B scratchpad : modifier + ... + key : toggle n
+.TP
+.B scratchpad : modifier + ... + key : remove n
+
+For scratchpad management. create assigns the focused window to scratchpad n, toggle shows/hides scratchpad n, and remove returns the scratchpad window to normal tiling. n is the scratchpad number (1-5).
 
 Example bindings:
 
@@ -150,6 +161,18 @@ Go to workspace 3.
 .TP
 .B workspace : mod + shift + 5 : swap 5
 Move selected window to workspace 5.
+
+.TP
+.B scratchpad : mod + alt + 1 : create 1
+Assign focused window to scratchpad 1.
+
+.TP
+.B scratchpad : mod + ctrl + 1 : toggle 1
+Show or hide scratchpad 1.
+
+.TP
+.B scratchpad : mod + alt + shift + 1 : remove 1
+Remove window from scratchpad 1 and return to normal tiling.
 
 .SH AVAILABLE FUNCTIONS
 The following internal functions are available for keybindings:
@@ -306,6 +329,18 @@ Switch to workspace 1 through 9.
 Move focused window to workspace 1 through 9.
 
 .TP
+.B MOD + Alt + 1 to 4
+Create scratchpad 1 through 4.
+
+.TP
+.B MOD + Ctrl + 1 to 4
+Toggle scratchpad 1 through 4.
+
+.TP
+.B MOD + Alt + Shift + 1 to 4
+Remove scratchpad 1 through 4.
+
+.TP
 .B MOD + j / k
 Focus next or previous window.
 
@@ -386,9 +421,14 @@ bind : mod + d : "rofi -show drun"
 workspace : mod + 1 : move 1
 workspace : mod + shift + 1 : swap 1
 
+# Scratchpad management
+scratchpad : mod + alt + 1 : create 1
+scratchpad : mod + ctrl + 1 : toggle 1
+scratchpad : mod + alt + shift + 1 : remove 1
+
 # Window swallowing
-can_swallow : Alacritty
-can_be_swallowed : sxiv, mpv, zathura
+can_swallow : "st"
+can_be_swallowed : "sxiv", "mpv", "zathura"
 .fi
 .RE
 

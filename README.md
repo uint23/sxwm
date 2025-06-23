@@ -40,6 +40,8 @@ Allows user to use backup keybinds with `sxwm`
 
 - **Tiling & Floating**: Switch seamlessly between layouts.
 - **Workspaces**: 9 workspaces, fully integrated with your bar.
+- **Scratchpads**: Floating windows you can summon/hide instantly.
+- **Window Swallowing**: Native window swallowing support.
 - **Live Config Reload**: Change your config and reload instantly with a keybind.
 - **Easy Configuration**: Human-friendly `sxwmrc` file, no C required.
 - **Master-Stack Layout**: DWM-inspired productive workflow.
@@ -92,23 +94,30 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 
 ### Syntax
 
+- **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
+- **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
+- **Action**: Either an external command (in quotes) or internal function.
+- **move**: Move to that worspace
+- **swap**: Swap window to that workspace
+- **n**: Workspace / Scratchpad number
+- **create**: Creates a scratchpad on that slot
+- **toggle**: toggles the visibility of that scratchpad
+- **remove**: Removes the scratchpad on that slot
+
 ```sh
 bind : modifier + modifier + ... + key : action
 ```
 
-- **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
-- **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
-- **Action**: Either an external command (in quotes) or internal function.
+```sh
+scratchpad : modifier + ... + key : create n
+scratchpad : modifier + ... + key : toggle n
+scratchpad : modifier + ... + key : remove n
+```
 
 ```sh
 workspace : modifier + modifier + ... + key : move n
 workspace : modifier + modifier + ... + key : swap n
 ```
-- **Modifiers**: `mod`, `shift`, `ctrl`, `alt`, `super`
-- **Key**: Case-insensitive keysym (e.g., `Return`, `q`, `1`)
-- **move**: Move to that worspace
-- **swap**: Swap window to that workspace
-- **n**: Workspace number
 
 ### Available Functions
 
@@ -141,6 +150,11 @@ bind : mod + Return : "st"
 # Close window
 bind : mod + shift + q : close_window
 
+# Scratchpads
+scratchpad : mod + ctrl + Return : create 1
+scratchpad : mod + shift + b : toggle 2
+scratchpad : mod + alt + b : remove 2
+
 # Switch workspace
 workspace : mod + 3 : move 3
 # Move window to workspace
@@ -170,6 +184,14 @@ workspace : mod + shift + 5 : swap 5
 | `MOD` + `Shift` + `q`       | Close focused window               |
 | `MOD` + `Shift` + `e`       | Quit sxwm                          |
 | `MOD` + `r`                 | Reload configuration               |
+
+### Scratchpads
+
+| Combo                              | Action                           |
+| ---------------------------------- | -------------------------------- |
+| `MOD` + `Alt` + `1–4`              | Create scratchpad 1–5            |
+| `MOD` + `Ctrl` + `1–4`             | Toggle scratchpad 1–5            |
+| `MOD` + `Alt` + `Shift` + `1–4`    | Remove scratchpad 1–5            |
 
 ### Workspaces
 

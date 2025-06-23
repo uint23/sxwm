@@ -368,15 +368,56 @@ found:
 
 			int n;
 			if (sscanf(act, "move %d", &n) == 1 && n >= 1 && n <= NUM_WORKSPACES) {
-				b->type = TYPE_CWKSP;
+				b->type = TYPE_WS_CHANGE;
 				b->action.ws = n - 1;
 			}
 			else if (sscanf(act, "swap %d", &n) == 1 && n >= 1 && n <= NUM_WORKSPACES) {
-				b->type = TYPE_MWKSP;
+				b->type = TYPE_WS_MOVE;
 				b->action.ws = n - 1;
 			}
 			else {
 				fprintf(stderr, "sxwmrc:%d: invalid workspace action '%s'\n", lineno, act);
+			}
+		}
+		else if (!strcmp(key, "scratchpad")) {
+			char *mid = strchr(rest, ':');
+			if (!mid) {
+				fprintf(stderr, "sxwmrc:%d: scratchpad missing action\n", lineno);
+				continue;
+			}
+			*mid = '\0';
+			char *combo = strip(rest);
+			char *act = strip(mid + 1);
+
+			KeySym ks;
+			unsigned mods = parse_combo(combo, cfg, &ks);
+			if (ks == NoSymbol) {
+				fprintf(stderr, "sxwmrc:%d: bad key in '%s'\n", lineno, combo);
+				continue;
+			}
+
+			Binding *b = alloc_bind(cfg, mods, ks);
+			if (!b) {
+				fputs("sxwm: too many binds\n", stderr);
+				goto cleanup_file;
+			}
+
+			int padnum = -1;
+
+			if (sscanf(act, "create %d", &padnum) == 1 && padnum >= 1 && padnum <= MAX_SCRATCHPADS) {
+				b->type = TYPE_SP_CREATE;
+				b->action.sp = padnum - 1;
+			}
+			else if (sscanf(act, "toggle %d", &padnum) == 1 && padnum >= 1 && padnum <= MAX_SCRATCHPADS) {
+				b->type = TYPE_SP_TOGGLE;
+				b->action.sp = padnum - 1;
+			}
+			else if (sscanf(act, "remove %d", &padnum) == 1 && padnum >= 1 && padnum <= MAX_SCRATCHPADS) {
+				b->type = TYPE_SP_REMOVE;
+				b->action.sp = padnum - 1;
+			}
+			else {
+				fprintf(stderr, "sxwmrc:%d: invalid scratchpad action '%s'\n", lineno, act);
 			}
 		}
 		else if (!strcmp(key, "exec")) {

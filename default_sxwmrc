@@ -69,6 +69,22 @@ call : mod + shift + f : fullscreen
 # Reload Config
 call : mod + r : reload_config
 
+# Scratchpads
+scratchpad : mod + alt + 1 : create 1
+scratchpad : mod + alt + 2 : create 2
+scratchpad : mod + alt + 3 : create 3
+scratchpad : mod + alt + 4 : create 4
+
+scratchpad : mod + ctrl + 1 : toggle 1
+scratchpad : mod + ctrl + 2 : toggle 2
+scratchpad : mod + ctrl + 3 : toggle 3
+scratchpad : mod + ctrl + 4 : toggle 4
+
+scratchpad : mod + alt + shift + 1 : remove 1
+scratchpad : mod + alt + shift + 2 : remove 2
+scratchpad : mod + alt + shift + 3 : remove 3
+scratchpad : mod + alt + shift + 4 : remove 4
+
 # Workspaces (1-9)
 workspace : mod + 1          : move 1
 workspace : mod + shift + 1  : swap 1

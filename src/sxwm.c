@@ -71,6 +71,7 @@ int other_wm_err(Display *dpy, XErrorEvent *ee);
 /* long parse_col(const char *hex); */
 /* void quit(void); */
 /* void reload_config(void); */
+void remove_scratchpad(int n);
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
 /* void resize_stack_add(void); */
@@ -80,6 +81,7 @@ void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
+void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
 void startup_exec(void);
@@ -89,6 +91,7 @@ void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
+void toggle_scratchpad(int n);
 void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
@@ -133,6 +136,9 @@ Display *dpy;
 Window root;
 Window wm_check_win;
 Monitor *mons = NULL;
+Scratchpad scratchpads[MAX_SCRATCHPADS];
+int scratchpad_count = 0;
+int current_scratchpad = 0;
 int monsn = 0;
 int current_monitor = 0;
 Bool global_floating = False;
@@ -306,6 +312,14 @@ void close_focused(void)
 {
 	if (!focused) {
 		return;
+	}
+
+	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+		if (scratchpads[i].client == focused) {
+			scratchpads[i].client = NULL;
+			scratchpads[i].enabled = False;
+			break;
+		}
 	}
 
 	Atom *protos;
@@ -668,8 +682,8 @@ void grab_keys(void)
 	for (int i = 0; i < user_config.bindsn; i++) {
 		Binding *b = &user_config.binds[i];
 
-		if ((b->type == TYPE_CWKSP && b->mods != user_config.modkey) ||
-		    (b->type == TYPE_MWKSP && b->mods != (user_config.modkey | ShiftMask))) {
+		if ((b->type == TYPE_WS_CHANGE && b->mods != user_config.modkey) ||
+		    (b->type == TYPE_WS_MOVE && b->mods != (user_config.modkey | ShiftMask))) {
 			continue;
 		}
 
@@ -935,13 +949,22 @@ void hdl_keypress(XEvent *xev)
 						b->action.fn();
 					}
 					break;
-				case TYPE_CWKSP:
+				case TYPE_WS_CHANGE:
 					change_workspace(b->action.ws);
 					update_net_client_list();
 					break;
-				case TYPE_MWKSP:
+				case TYPE_WS_MOVE:
 					move_to_workspace(b->action.ws);
 					update_net_client_list();
+					break;
+				case TYPE_SP_REMOVE:
+					remove_scratchpad(b->action.sp);
+					break;
+				case TYPE_SP_TOGGLE:
+					toggle_scratchpad(b->action.sp);
+					break;
+				case TYPE_SP_CREATE:
+					set_win_scratchpad(b->action.sp);
 					break;
 			}
 			return;
@@ -1747,6 +1770,17 @@ void reload_config(void)
 	update_borders();
 }
 
+void remove_scratchpad(int n)
+{
+	if (scratchpads[n].client == NULL) {
+		return;
+	}
+
+	XMapWindow(dpy, scratchpads[n].client->win);
+	scratchpads[n].client = NULL;
+	scratchpads[n].enabled = False;
+}
+
 void resize_master_add(void)
 {
 	/* pick the monitor of the focused window (or 0 if none) */
@@ -1978,6 +2012,23 @@ void setup_atoms(void)
 	                sizeof(support_list) / sizeof(Atom));
 
 	update_workarea();
+}
+
+void set_win_scratchpad(int n)
+{
+	if (focused == NULL) {
+		return;
+	}
+
+	Client *pad_client = focused;
+	if (scratchpads[n].client != NULL) {
+		XMapWindow(dpy, scratchpads[n].client->win);
+		scratchpads[n].enabled = False;
+		scratchpads[n].client = NULL;
+	}
+	scratchpads[n].client = pad_client;
+	XUnmapWindow(dpy, scratchpads[n].client->win);
+	scratchpads[n].enabled = False;
 }
 
 Bool window_should_float(Window w)
@@ -2340,6 +2391,56 @@ void toggle_fullscreen(void)
 
 		if (!focused->floating) {
 			focused->mon = get_monitor_for(focused);
+		}
+		tile();
+		update_borders();
+	}
+}
+
+void toggle_scratchpad(int n)
+{
+	if (scratchpads[n].client == NULL) {
+		return;
+	}
+
+	if (scratchpads[n].client->ws != current_ws) {
+		Client *c = scratchpads[n].client;
+
+		/* unlink from old workspace */
+		Client **pp = &workspaces[c->ws];
+		while (*pp && *pp != c) {
+			pp = &(*pp)->next;
+		}
+		if (*pp) {
+			*pp = c->next;
+		}
+
+		/* link to new workspace */
+		c->next = workspaces[current_ws];
+		workspaces[current_ws] = c;
+
+		c->ws = current_ws;
+		c->mon = get_monitor_for(c);
+
+		tile();
+		update_borders();
+		update_client_desktop_properties();
+		update_net_client_list();
+	}
+
+	if (scratchpads[n].enabled) {
+		XUnmapWindow(dpy, scratchpads[n].client->win);
+		scratchpads[n].enabled = False;
+	}
+	else {
+		XMapWindow(dpy, scratchpads[n].client->win);
+		XRaiseWindow(dpy, scratchpads[n].client->win);
+		scratchpads[n].enabled = True;
+		focused = scratchpads[n].client;
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		send_wm_take_focus(scratchpads[n].client->win);
+		if (user_config.warp_cursor) {
+			warp_cursor(focused);
 		}
 		tile();
 		update_borders();
