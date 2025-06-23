@@ -9,6 +9,7 @@
 #include <wordexp.h>
 #endif
 #include <X11/keysym.h>
+#include <X11/XF86keysym.h>
 #include <X11/Xlib.h>
 #include "parser.h"
 #include "defs.h"
