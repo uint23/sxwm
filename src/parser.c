@@ -439,6 +439,9 @@ found:
 				token = strtok(NULL, ",");
 			}
 		}
+		else if (!strcmp(key, "new_win_master")) {
+			cfg->new_win_master = !strcmp(rest, "true") ? True : False;
+		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}

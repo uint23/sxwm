@@ -84,6 +84,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `exec`                   | String  | `Nothing` | Command to run on startup (e.g., `sxbar`, `picom`, "autostart", etc.).      |
 | `can_swallow`            | String  | `st`      | Windows that can swallow.                                                   |
 | `can_be_swallowed`       | String  | `mpv`     | Windows that can be swallowed.                                              |
+| `new_win_master`         | Bool    | `false`   | New windows will open as master window.                                              |
 
 ---
 

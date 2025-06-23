@@ -12,7 +12,7 @@
  *	  will use this will probably be programmers :)
  *
  *	  (C) Abhinav Prasai 2025
- */
+*/
 
 #include <X11/X.h>
 #include <err.h>
@@ -173,11 +173,17 @@ Client *add_client(Window w, int ws)
 		workspaces[ws] = c;
 	}
 	else {
-		Client *tail = workspaces[ws];
-		while (tail->next) {
-			tail = tail->next;
+		if (user_config.new_win_master) {
+			c->next = workspaces[ws];
+			workspaces[ws] = c;
 		}
-		tail->next = c;
+		else {
+			Client *tail = workspaces[ws];
+			while (tail->next) {
+				tail = tail->next;
+			}
+			tail->next = c;
+		}
 	}
 
 	open_windows++;
@@ -1437,6 +1443,7 @@ void init_defaults(void)
 	default_config.bindsn = 0;
 	default_config.new_win_focus = True;
 	default_config.warp_cursor = True;
+	default_config.new_win_master = False;
 
 	if (backup_binds) {
 		for (unsigned long i = 0; i < LENGTH(binds); i++) {

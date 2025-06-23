@@ -16,6 +16,7 @@ new_win_focus           : true
 warp_cursor             : true
 can_swallow             : "st"
 can_be_swallowed        : "mpv"
+new_win_master          : false
 
 # Keybinds:
 # Commands must be surrounded with ""

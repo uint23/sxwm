@@ -91,6 +91,7 @@ typedef struct {
 	int bindsn;
 	Bool new_win_focus;
 	Bool warp_cursor;
+	Bool new_win_master;
 	Binding binds[256];
 	char **should_float[256];
 	char **can_swallow[256];
