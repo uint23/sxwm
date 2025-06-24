@@ -2130,56 +2130,106 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 
 void spawn(const char **argv)
 {
-	int pipe_idx = -1;
-	for (int i = 0; argv[i]; i++) {
+	int argc = 0;
+	while (argv[argc])
+		argc++;
+
+	int cmd_count = 1;
+	for (int i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "|") == 0) {
-			pipe_idx = i;
-			break;
+			cmd_count++;
 		}
 	}
 
-	if (pipe_idx < 0) {
-		if (fork() == 0) {
+	char ***commands = malloc(cmd_count * sizeof(char **));
+	if (!commands) {
+		perror("malloc commands");
+		return;
+	}
+
+	int cmd_idx = 0;
+	int arg_start = 0;
+	for (int i = 0; i <= argc; i++) {
+		if (!argv[i] || strcmp(argv[i], "|") == 0) {
+			int len = i - arg_start;
+			char **cmd_args = malloc((len + 1) * sizeof(char *));
+			if (!cmd_args) {
+				perror("malloc cmd_args");
+				for (int j = 0; j < cmd_idx; j++) {
+					free(commands[j]);
+				}
+				free(commands);
+				return;
+			}
+			for (int j = 0; j < len; j++) {
+				cmd_args[j] = (char *)argv[arg_start + j];
+			}
+			cmd_args[len] = NULL;
+			commands[cmd_idx++] = cmd_args;
+			arg_start = i + 1;
+		}
+	}
+
+	int pipes[cmd_count - 1][2];
+	for (int i = 0; i < cmd_count - 1; i++) {
+		if (pipe(pipes[i]) == -1) {
+			perror("pipe");
+			for (int j = 0; j < cmd_count; j++) {
+				free(commands[j]);
+			}
+			free(commands);
+			return;
+		}
+	}
+
+	for (int i = 0; i < cmd_count; i++) {
+		pid_t pid = fork();
+		if (pid < 0) {
+			perror("fork");
+			for (int k = 0; k < cmd_count - 1; k++) {
+				close(pipes[k][0]);
+				close(pipes[k][1]);
+			}
+			for (int j = 0; j < cmd_count; j++) {
+				free(commands[j]);
+			}
+			free(commands);
+			return;
+		}
+		if (pid == 0) {
 			close(ConnectionNumber(dpy));
-			setsid();
-			execvp(argv[0], (char *const *)argv);
-			fprintf(stderr, "sxwm: execvp '%s' failed\n", argv[0]);
+
+			if (i > 0) {
+				dup2(pipes[i - 1][0], STDIN_FILENO);
+			}
+			if (i < cmd_count - 1) {
+				dup2(pipes[i][1], STDOUT_FILENO);
+			}
+
+			for (int k = 0; k < cmd_count - 1; k++) {
+				close(pipes[k][0]);
+				close(pipes[k][1]);
+			}
+
+			execvp(commands[i][0], commands[i]);
+			fprintf(stderr, "sxwm: execvp '%s' failed\n", commands[i][0]);
 			exit(EXIT_FAILURE);
 		}
 	}
-	else {
-		((char **)argv)[pipe_idx] = NULL;
-		const char **left = argv;
-		const char **right = argv + pipe_idx + 1;
-		int fd[2];
-		Bool x = pipe(fd);
-		(void)x;
 
-		pid_t pid1 = fork();
-		if (pid1 == 0) {
-			dup2(fd[1], STDOUT_FILENO);
-			close(fd[0]);
-			close(fd[1]);
-			execvp(left[0], (char *const *)left);
-			perror("spawn left");
-			exit(EXIT_FAILURE);
-		}
-
-		pid_t pid2 = fork();
-		if (pid2 == 0) {
-			dup2(fd[0], STDIN_FILENO);
-			close(fd[0]);
-			close(fd[1]);
-			execvp(right[0], (char *const *)right);
-			perror("spawn right");
-			exit(EXIT_FAILURE);
-		}
-
-		close(fd[0]);
-		close(fd[1]);
-		waitpid(pid1, NULL, 0);
-		waitpid(pid2, NULL, 0);
+	for (int i = 0; i < cmd_count - 1; i++) {
+		close(pipes[i][0]);
+		close(pipes[i][1]);
 	}
+
+	for (int i = 0; i < cmd_count; i++) {
+		wait(NULL);
+	}
+
+	for (int i = 0; i < cmd_count; i++) {
+		free(commands[i]);
+	}
+	free(commands);
 }
 
 void tile(void)
