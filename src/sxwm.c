@@ -1,17 +1,17 @@
 /*
- *	  See LICENSE for more info
+ *  See LICENSE for more info
  *
- *	  simple xorg window manager
- *	  sxwm is a user-friendly, easily configurable yet powerful
- *	  tiling window manager inspired by window managers such as
- *	  DWM and i3.
+ *  simple xorg window manager
+ *  sxwm is a user-friendly, easily configurable yet powerful
+ *  tiling window manager inspired by window managers such as
+ *  DWM and i3.
  *
- *	  The userconfig is designed to be as user-friendly as
- *	  possible, and I hope it is easy to configure even without
- *	  knowledge of C or programming, although most people who
- *	  will use this will probably be programmers :)
+ *  The userconfig is designed to be as user-friendly as
+ *  possible, and I hope it is easy to configure even without
+ *  knowledge of C or programming, although most people who
+ *  will use this will probably be programmers :)
  *
- *	  (C) Abhinav Prasai 2025
+ *  (C) Abhinav Prasai 2025
 */
 
 #include <X11/X.h>
@@ -1036,7 +1036,10 @@ void swallow_window(Client *swallower, Client *swallowed)
 		swallowed->y = swallower->y;
 		swallowed->w = swallower->w;
 		swallowed->h = swallower->h;
-		XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
+
+		if (swallowed->win) {
+			XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
+		}
 	}
 
 	tile();
@@ -2575,12 +2578,14 @@ void unswallow_window(Client *c)
 	swallower->swallowed = NULL;
 	c->swallower = NULL;
 
-	XMapWindow(dpy, swallower->win);
-	swallower->mapped = True;
+	if (swallower->win) {
+		XMapWindow(dpy, swallower->win);
+		swallower->mapped = True;
 
-	focused = swallower;
-	XSetInputFocus(dpy, swallower->win, RevertToPointerRoot, CurrentTime);
-	XRaiseWindow(dpy, swallower->win);
+		focused = swallower;
+		XSetInputFocus(dpy, swallower->win, RevertToPointerRoot, CurrentTime);
+		XRaiseWindow(dpy, swallower->win);
+	}
 
 	tile();
 	update_borders();
