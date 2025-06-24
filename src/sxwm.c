@@ -2494,6 +2494,9 @@ void toggle_scratchpad(int n)
 	if (scratchpads[n].enabled) {
 		XUnmapWindow(dpy, scratchpads[n].client->win);
 		scratchpads[n].enabled = False;
+		focus_prev();
+		send_wm_take_focus(focused->win);
+		update_borders();
 	}
 	else {
 		XMapWindow(dpy, scratchpads[n].client->win);
