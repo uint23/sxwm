@@ -47,6 +47,7 @@ Window find_toplevel(Window w);
 /* void focus_prev(void); */
 int get_monitor_for(Client *c);
 pid_t get_pid(Window w);
+int get_workspace_for_window(Window w);
 void grab_keys(void);
 void hdl_button(XEvent *xev);
 void hdl_button_release(XEvent *xev);
@@ -667,6 +668,36 @@ pid_t get_pid(Window w)
 	return pid;
 }
 
+int get_workspace_for_window(Window w)
+{
+	XClassHint ch;
+	if (!XGetClassHint(dpy, w, &ch)) {
+		return current_ws; /* default to current workspace */
+	}
+
+	for (int i = 0; i < 256; i++) {
+		if (!user_config.open_in_workspace[i]) {
+			break;
+		}
+
+		char *rule_class = user_config.open_in_workspace[i][0];
+		char *rule_ws = user_config.open_in_workspace[i][1];
+
+		if (rule_class && rule_ws) {
+			if ((ch.res_class && strcasecmp(ch.res_class, rule_class) == 0) ||
+			    (ch.res_name && strcasecmp(ch.res_name, rule_class) == 0)) {
+				XFree(ch.res_class);
+				XFree(ch.res_name);
+				return atoi(rule_ws);
+			}
+		}
+	}
+
+	XFree(ch.res_class);
+	XFree(ch.res_name);
+	return current_ws; /* default to current workspace */
+}
+
 void grab_keys(void)
 {
 	const int guards[] = {0,
@@ -1117,7 +1148,8 @@ void hdl_map_req(XEvent *xev)
 		return;
 	}
 
-	Client *c = add_client(w, current_ws);
+	int target_ws = get_workspace_for_window(w);
+	Client *c = add_client(w, target_ws);
 	if (!c) {
 		return;
 	}
@@ -1150,6 +1182,11 @@ void hdl_map_req(XEvent *xev)
 		c->h = h_;
 		XMoveResizeWindow(dpy, w, x, y, w_, h_);
 		XSetWindowBorderWidth(dpy, w, user_config.border_width);
+	}
+
+	if (target_ws != current_ws) {
+		update_net_client_list();
+		return;
 	}
 
 	/* map & borders */
@@ -1457,6 +1494,7 @@ void init_defaults(void)
 	for (int i = 0; i < 256; i++) {
 		default_config.can_be_swallowed[i] = NULL;
 		default_config.can_swallow[i] = NULL;
+		default_config.open_in_workspace[i] = NULL;
 	}
 
 	default_config.motion_throttle = 60;
@@ -1706,6 +1744,16 @@ void reload_config(void)
 			}
 			free(user_config.can_be_swallowed[i]);
 			user_config.can_be_swallowed[i] = NULL;
+		}
+		if (user_config.open_in_workspace[i]) {
+			if (user_config.open_in_workspace[i][0]) {
+				free(user_config.open_in_workspace[i][0]);
+			}
+			if (user_config.open_in_workspace[i][1]) {
+				free(user_config.open_in_workspace[i][1]);
+			}
+			free(user_config.open_in_workspace[i]);
+			user_config.open_in_workspace[i] = NULL;
 		}
 	}
 

@@ -484,6 +484,43 @@ found:
 		else if (!strcmp(key, "new_win_master")) {
 			cfg->new_win_master = !strcmp(rest, "true") ? True : False;
 		}
+		else if (!strcmp(key, "open_in_workspace")) {
+			char *mid = strchr(rest, ':');
+			if (!mid) {
+				fprintf(stderr, "sxwmrc:%d: open_in_workspace missing workspace number\n", lineno);
+				continue;
+			}
+			*mid = '\0';
+			char *class_name = strip(rest);
+			char *ws_str = strip(mid + 1);
+
+			class_name = strip_quotes(class_name);
+
+			int ws = atoi(ws_str);
+			if (ws < 1 || ws > NUM_WORKSPACES) {
+				fprintf(stderr, "sxwmrc:%d: invalid workspace number %d\n", lineno, ws);
+				continue;
+			}
+
+			/* find free slot in open_in_workspace */
+			int slot = -1;
+			for (int i = 0; i < 256; i++) {
+				if (!cfg->open_in_workspace[i]) {
+					slot = i;
+					break;
+				}
+			}
+
+			if (slot >= 0) {
+				cfg->open_in_workspace[slot] = malloc(2 * sizeof(char *));
+				if (cfg->open_in_workspace[slot]) {
+					cfg->open_in_workspace[slot][0] = strdup(class_name); /* class name */
+					char ws_buf[16];
+					snprintf(ws_buf, sizeof(ws_buf), "%d", ws - 1);   /* 0-indexed workspace */
+					cfg->open_in_workspace[slot][1] = strdup(ws_buf); /* workspace number */
+				}
+			}
+		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}

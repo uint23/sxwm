@@ -105,6 +105,7 @@ typedef struct {
 	char **can_swallow[256];
     char **can_be_swallowed[256];
 	char **scratchpads[32];
+	char **open_in_workspace[256];
 	char *torun[256];
 } Config;
 
