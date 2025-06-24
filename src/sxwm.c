@@ -2223,10 +2223,6 @@ void spawn(const char **argv)
 	}
 
 	for (int i = 0; i < cmd_count; i++) {
-		wait(NULL);
-	}
-
-	for (int i = 0; i < cmd_count; i++) {
 		free(commands[i]);
 	}
 	free(commands);
