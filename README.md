@@ -140,7 +140,8 @@ workspace : modifier + modifier + ... + key : swap n
 | `master_decrease`    | Shrinks master width.                                        |
 | `toggle_floating`    | Toggles floating state of current window.                    |
 | `global_floating`    | Toggles floating state for all windows.                      |
-| `fullscreen`         | Fullscreen toggle.                                           |
+| `fullscreen`         | Fullscreen the focused window.                               |
+| `centre_window`      | Centre the focused window.                                   |
 
 ### Example Bindings
 
@@ -168,9 +169,9 @@ workspace : mod + shift + 5 : swap 5
 ### Window Management
 | Combo                       | Action                             |
 | --------------------------- | ---------------------------------- |
-| Mouse                       | Focus under cursor                 |
-| `MOD` + Left Mouse          | Move window with mouse             |
-| `MOD` + Right Mouse         | Resize window with mouse           |
+| `Mouse`                     | Focus on click under cursor        |
+| `MOD` + `Left Mouse`        | Move window with mouse             |
+| `MOD` + `Right Mouse`       | Resize window with mouse           |
 | `MOD` + `j` / `k`           | Focus next / previous              |
 | `MOD` + `Shift` + `j` / `k` | Move window in master stack        |
 | `MOD` + `,` / `.`           | Focus prev / next monitor          |
@@ -184,6 +185,7 @@ workspace : mod + shift + 5 : swap 5
 | `MOD` + `Shift` + `q`       | Close focused window               |
 | `MOD` + `Shift` + `e`       | Quit sxwm                          |
 | `MOD` + `r`                 | Reload configuration               |
+| `MOD` + `c`                 | Centre window                      |
 
 ### Scratchpads
 

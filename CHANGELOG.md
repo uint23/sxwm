@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **NEW**: Window swallowing
 - **NEW**: New windows can now open as master window
 - **NEW**: Scratchpads
+- **NEW**: Window centering
 - **CHANGE**: Renamed `focus_previous` to `focus_prev`
 - **CHANGE**: Invalid sample config
 - **CHANGE**: Parser `$HOME` searching order. XDG Compliance

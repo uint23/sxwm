@@ -38,6 +38,7 @@
 #include "parser.h"
 
 Client *add_client(Window w, int ws);
+/* void centre_window(); */
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -251,6 +252,20 @@ Client *add_client(Window w, int ws)
 
 	XRaiseWindow(dpy, w);
 	return c;
+}
+
+void centre_window()
+{
+	if (!focused || !focused->mapped || !focused->floating) {
+		return;
+	}
+
+	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
+	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
+
+	focused->x = x;
+	focused->y = y;
+	XMoveWindow(dpy, focused->win, x, y);
 }
 
 void change_workspace(int ws)

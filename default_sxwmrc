@@ -31,6 +31,7 @@ bind : mod + p : "dmenu_run"
 
 # Window Management:
 call : mod + shift + q : close_window
+call : mod + c : centre_window
 call : mod + shift + e : quit
 
 # Focus Movement:
