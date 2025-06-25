@@ -1838,11 +1838,16 @@ void reload_config(void)
 
 void remove_scratchpad(int n)
 {
-	if (scratchpads[n].client == NULL) {
+	if (n < 0 || n >= MAX_SCRATCHPADS || scratchpads[n].client == NULL) {
 		return;
 	}
 
-	XMapWindow(dpy, scratchpads[n].client->win);
+	Client *c = scratchpads[n].client;
+
+	if (c->win) {
+		XMapWindow(dpy, c->win);
+	}
+
 	scratchpads[n].client = NULL;
 	scratchpads[n].enabled = False;
 }
@@ -2515,13 +2520,13 @@ void toggle_fullscreen(void)
 
 void toggle_scratchpad(int n)
 {
-	if (scratchpads[n].client == NULL) {
+	if (n < 0 || n >= MAX_SCRATCHPADS || scratchpads[n].client == NULL) {
 		return;
 	}
 
-	if (scratchpads[n].client->ws != current_ws) {
-		Client *c = scratchpads[n].client;
+	Client *c = scratchpads[n].client;
 
+	if (c->ws != current_ws) {
 		/* unlink from old workspace */
 		Client **pp = &workspaces[c->ws];
 		while (*pp && *pp != c) {
@@ -2545,19 +2550,21 @@ void toggle_scratchpad(int n)
 	}
 
 	if (scratchpads[n].enabled) {
-		XUnmapWindow(dpy, scratchpads[n].client->win);
+		XUnmapWindow(dpy, c->win);
 		scratchpads[n].enabled = False;
 		focus_prev();
-		send_wm_take_focus(focused->win);
+		if (focused) {
+			send_wm_take_focus(focused->win);
+		}
 		update_borders();
 	}
 	else {
-		XMapWindow(dpy, scratchpads[n].client->win);
-		XRaiseWindow(dpy, scratchpads[n].client->win);
+		XMapWindow(dpy, c->win);
+		XRaiseWindow(dpy, c->win);
 		scratchpads[n].enabled = True;
-		focused = scratchpads[n].client;
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		send_wm_take_focus(scratchpads[n].client->win);
+		focused = c;
+		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+		send_wm_take_focus(c->win);
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
