@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-#### v1.6 (git)
+#### v1.7 (git)
+
+#### v1.6 (current)
 - **NEW**: True multi-monitor support
 - **NEW**: Vertical stack resizing
 - **NEW**: Mouse warping
@@ -33,7 +35,7 @@ All notable changes to this project will be documented in this file.
 - **FIXED**: Undefined behaviour in `parse_col`
 - **FIXED**: Added monitor switching functions to call_table (#95)
 
-#### v1.5 (current)
+#### v1.5
 - **NEW**: Using XCursor instead of cursor font && new logo.
 - **CHANGE**: No longer using INIT_WORKSPACE macro, proper workspace handling. New sxwmrc
 - **FIXED**: Proper bind resetting on refresh config. && Multi-arg binds now work due to new and improved spawn function
