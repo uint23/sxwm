@@ -183,11 +183,9 @@ found:
 
 	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
-		cfg->should_float[j] = calloc(1, sizeof(char *));
+		cfg->should_float[j] = calloc(2, sizeof(char *));
 		if (!cfg->should_float[j]) {
-			fprintf(stderr, "calloc failed\n");
-			fclose(f);
-			return -1;
+			goto cleanup_file;
 		}
 	}
 
@@ -539,6 +537,19 @@ cleanup_file:
 		if (cfg->should_float[j]) {
 			free(cfg->should_float[j][0]);
 			free(cfg->should_float[j]);
+		}
+		if (cfg->can_swallow[j]) {
+			free(cfg->can_swallow[j][0]);
+			free(cfg->can_swallow[j]);
+		}
+		if (cfg->can_be_swallowed[j]) {
+			free(cfg->can_be_swallowed[j][0]);
+			free(cfg->can_be_swallowed[j]);
+		}
+		if (cfg->open_in_workspace[j]) {
+			free(cfg->open_in_workspace[j][0]);
+			free(cfg->open_in_workspace[j][1]);
+			free(cfg->open_in_workspace[j]);
 		}
 	}
 	for (int i = 0; i < torun; i++) {
