@@ -14,31 +14,28 @@
 #include "parser.h"
 #include "defs.h"
 
-static const struct {
-	const char *name;
-	void (*fn)(void);
-} call_table[] = {{"close_window", close_focused},
-                  {"decrease_gaps", dec_gaps},
-                  {"focus_next", focus_next},
-                  {"focus_prev", focus_prev},
-                  {"focus_next_mon", focus_next_mon},
-                  {"focus_prev_mon", focus_prev_mon},
-                  {"increase_gaps", inc_gaps},
-                  {"master_next", move_master_next},
-                  {"master_previous", move_master_prev},
-                  {"move_next_mon", move_next_mon},
-                  {"move_prev_mon", move_prev_mon},
-                  {"quit", quit},
-                  {"reload_config", reload_config},
-                  {"master_increase", resize_master_add},
-                  {"master_decrease", resize_master_sub},
-                  {"stack_increase", resize_stack_add},
-                  {"stack_decrease", resize_stack_sub},
-                  {"toggle_floating", toggle_floating},
-                  {"global_floating", toggle_floating_global},
-                  {"fullscreen", toggle_fullscreen},
-                  {"centre_window", centre_window},
-                  {NULL, NULL}};
+static const CommandEntry call_table[] = {{"close_window", close_focused},
+                                          {"decrease_gaps", dec_gaps},
+                                          {"focus_next", focus_next},
+                                          {"focus_prev", focus_prev},
+                                          {"focus_next_mon", focus_next_mon},
+                                          {"focus_prev_mon", focus_prev_mon},
+                                          {"increase_gaps", inc_gaps},
+                                          {"master_next", move_master_next},
+                                          {"master_previous", move_master_prev},
+                                          {"move_next_mon", move_next_mon},
+                                          {"move_prev_mon", move_prev_mon},
+                                          {"quit", quit},
+                                          {"reload_config", reload_config},
+                                          {"master_increase", resize_master_add},
+                                          {"master_decrease", resize_master_sub},
+                                          {"stack_increase", resize_stack_add},
+                                          {"stack_decrease", resize_stack_sub},
+                                          {"toggle_floating", toggle_floating},
+                                          {"global_floating", toggle_floating_global},
+                                          {"fullscreen", toggle_fullscreen},
+                                          {"centre_window", centre_window},
+                                          {NULL, NULL}};
 
 static void remap_and_dedupe_binds(Config *cfg)
 {
@@ -58,6 +55,10 @@ static char *strip(char *s)
 	while (*s && isspace((unsigned char)*s)) {
 		s++;
 	}
+	if (*s == '\0') {
+		return s;
+	}
+
 	char *e = s + strlen(s) - 1;
 	while (e > s && isspace((unsigned char)*e)) {
 		*e-- = '\0';
@@ -85,7 +86,7 @@ static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks)
 			return &cfg->binds[i];
 		}
 	}
-	if (cfg->bindsn >= 256) {
+	if (cfg->bindsn >= MAX_BINDS) {
 		return NULL;
 	}
 	Binding *b = &cfg->binds[cfg->bindsn++];
@@ -94,18 +95,23 @@ static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks)
 	return b;
 }
 
+KeySym parse_keysym(const char *tok);
+
 static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 {
 	unsigned m = 0;
 	KeySym ks = NoSymbol;
 	char buf[256];
-	strncpy(buf, combo, sizeof buf - 1);
+
+	strncpy(buf, combo, sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+
 	for (char *p = buf; *p; p++) {
 		if (*p == '+' || isspace((unsigned char)*p)) {
 			*p = '+';
 		}
 	}
-	buf[sizeof buf - 1] = '\0';
+
 	for (char *tok = strtok(buf, "+"); tok; tok = strtok(NULL, "+")) {
 		if (!strcmp(tok, "mod")) {
 			m |= cfg->modkey;
@@ -124,9 +130,12 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 		}
 		else {
 			ks = XStringToKeysym(tok);
-			ks = parse_keysym(tok);
+			if (ks == NoSymbol) {
+				ks = parse_keysym(tok);
+			}
 		}
 	}
+
 	*out_ks = ks;
 	return m;
 }
@@ -601,7 +610,7 @@ KeySym parse_keysym(const char *key)
 }
 
 #ifndef __linux__
-static char **split_cmd(const char *cmd, int *out_argc)
+char **split_cmd(const char *cmd, int *out_argc)
 {
 	enum { NORMAL, IN_QUOTE } state = NORMAL;
 	const char *p = cmd;
@@ -618,10 +627,11 @@ static char **split_cmd(const char *cmd, int *out_argc)
 				token[toklen] = '\0';
 				if (argc + 1 >= cap) {
 					cap *= 2;
-					argv = realloc(argv, cap * sizeof *argv);
-					if (!argv) {
+					char **new_argv = realloc(argv, cap * sizeof *argv);
+					if (!new_argv) {
 						goto err;
 					}
+					argv = new_argv;
 				}
 				argv[argc++] = strdup(token);
 				toklen = 0;
@@ -680,6 +690,7 @@ const char **build_argv(const char *cmd)
 	argv[p.we_wordc] = NULL;
 	wordfree(&p);
 	return argv;
+
 #else
 	int argc = 0;
 	char **tmp = split_cmd(cmd, &argc);

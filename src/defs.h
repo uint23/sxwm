@@ -50,6 +50,8 @@
 	"8"					"\0"\
 	"9"					"\0"
 
+#define MAX_BINDS 256
+
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_SWAP } DragMode;
 typedef void (*EventHandler)(XEvent *);
 
@@ -118,6 +120,11 @@ typedef struct {
 	Client *client;
 	Bool enabled;
 } Scratchpad;
+
+typedef struct {
+	const char *name;
+	void (*fn)(void);
+} CommandEntry;
 
 extern void centre_window();
 extern void close_focused(void);
