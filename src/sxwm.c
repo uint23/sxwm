@@ -1301,6 +1301,17 @@ void hdl_motion(XEvent *xev)
 	}
 	last_motion_time = e->time;
 
+	/* figure out which monitor the pointer is in right now */
+	int mon = 0;
+	for (int i = 0; i < monsn; i++) {
+		if (e->x_root >= mons[i].x && e->x_root < mons[i].x + mons[i].w && e->y_root >= mons[i].y &&
+		    e->y_root < mons[i].y + mons[i].h) {
+			mon = i;
+			break;
+		}
+	}
+	Monitor *m = &mons[mon];
+
 	if (drag_mode == DRAG_SWAP) {
 		Window root_ret, child;
 		int rx, ry, wx, wy;
@@ -1335,7 +1346,6 @@ void hdl_motion(XEvent *xev)
 		swap_target = new_target;
 		return;
 	}
-
 	else if (drag_mode == DRAG_MOVE) {
 		int dx = e->x_root - drag_start_x;
 		int dy = e->y_root - drag_start_y;
@@ -1345,8 +1355,15 @@ void hdl_motion(XEvent *xev)
 		int outer_w = drag_client->w + 2 * user_config.border_width;
 		int outer_h = drag_client->h + 2 * user_config.border_width;
 
-		nx = snap_coordinate(nx, outer_w, scr_width, user_config.snap_distance);
-		ny = snap_coordinate(ny, outer_h, scr_height, user_config.snap_distance);
+		/* snap relative to this mons bounds: */
+		int rel_x = nx - m->x;
+		int rel_y = ny - m->y;
+
+		rel_x = snap_coordinate(rel_x, outer_w, m->w, user_config.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, m->h, user_config.snap_distance);
+
+		nx = m->x + rel_x;
+		ny = m->y + rel_y;
 
 		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
 		                               UDIST(ny, drag_client->y) > user_config.snap_distance)) {
@@ -1357,15 +1374,15 @@ void hdl_motion(XEvent *xev)
 		drag_client->x = nx;
 		drag_client->y = ny;
 	}
-
 	else if (drag_mode == DRAG_RESIZE) {
 		int dx = e->x_root - drag_start_x;
 		int dy = e->y_root - drag_start_y;
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
 
-		int max_w = scr_width - drag_client->x;
-		int max_h = scr_height - drag_client->y;
+		/* clamp relative to this mon */
+		int max_w = (m->w - (drag_client->x - m->x));
+		int max_h = (m->h - (drag_client->y - m->y));
 
 		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
 		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);

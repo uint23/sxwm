@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 #### v1.7 (git)
+- **FIX**: Resizing bug on second monitor
 
 #### v1.6 (current)
 - **NEW**: True multi-monitor support
