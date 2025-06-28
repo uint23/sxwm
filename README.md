@@ -181,7 +181,7 @@ workspace : mod + shift + 5 : swap 5
 | `MOD` + `=` / `-`           | Increase / decrease gaps           |
 | `MOD` + `Space`             | Toggle floating                    |
 | `MOD` + `Shift` + `Space`   | Toggle all floating                |
-| `MOD` + `Shift` + `f`       | Toggle fullscreen mode             |
+| `MOD` + `Shift` + `f`       | Toggle fullscreen for focused window  |
 | `MOD` + `Shift` + `q`       | Close focused window               |
 | `MOD` + `Shift` + `e`       | Quit sxwm                          |
 | `MOD` + `r`                 | Reload configuration               |
