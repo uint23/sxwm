@@ -584,6 +584,34 @@ void focus_prev_mon(void)
 	}
 }
 
+/* Helper to center floating window on given monitor and clamp it to bounds */
+void center_floating_window(Client *c, int mon)
+{
+	if (!c || !c->floating) {
+		return;
+	}
+
+	int mx = mons[mon].x, my = mons[mon].y;
+	int mw = mons[mon].w, mh = mons[mon].h;
+
+	int x = mx + (mw - c->w) / 2;
+	int y = my + (mh - c->h) / 2;
+
+	/* Clamp position within monitor bounds */
+	if (x < mx)
+		x = mx;
+	if (y < my)
+		y = my;
+	if (x + c->w > mx + mw)
+		x = mx + mw - c->w;
+	if (y + c->h > my + mh)
+		y = my + mh - c->h;
+
+	c->x = x;
+	c->y = y;
+	XMoveWindow(dpy, c->win, x, y);
+}
+
 void move_next_mon(void)
 {
 	if (!focused || monsn <= 1) {
@@ -591,34 +619,9 @@ void move_next_mon(void)
 	}
 
 	int target_mon = (focused->mon + 1) % monsn;
+	focused->mon = current_monitor = target_mon;
 
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
+	center_floating_window(focused, target_mon);
 	tile();
 
 	/* follow the window with cursor if enabled */
@@ -636,34 +639,9 @@ void move_prev_mon(void)
 	}
 
 	int target_mon = (focused->mon - 1 + monsn) % monsn;
+	focused->mon = current_monitor = target_mon;
 
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
+	center_floating_window(focused, target_mon);
 	tile();
 
 	/* follow the window with cursor if enabled */
