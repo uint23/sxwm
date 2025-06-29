@@ -362,10 +362,11 @@ void close_focused(void)
 	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
 		for (int i = 0; i < n; i++) {
 			if (protos[i] == atom_wm_delete) {
-				XEvent ev = {.xclient = {.type = ClientMessage,
-				                         .window = focused->win,
-				                         .message_type = XInternAtom(dpy, "WM_PROTOCOLS", False),
-				                         .format = 32}};
+				XEvent ev = {0};
+				ev.xclient.type = ClientMessage;
+				ev.xclient.window = focused->win;
+				ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
+				ev.xclient.format = 32;
 				ev.xclient.data.l[0] = atom_wm_delete;
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
@@ -373,9 +374,9 @@ void close_focused(void)
 				return;
 			}
 		}
-		XUnmapWindow(dpy, focused->win);
 		XFree(protos);
 	}
+
 	XUnmapWindow(dpy, focused->win);
 	XKillClient(dpy, focused->win);
 }
