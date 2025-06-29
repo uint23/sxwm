@@ -83,6 +83,7 @@ void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
+void set_frame_extents(Window w);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
@@ -123,6 +124,7 @@ Atom atom_net_wm_name;
 Atom atom_utf8_string;
 Atom atom_net_wm_desktop;
 Atom atom_net_client_list;
+Atom atom_net_frame_extents;
 
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = {NULL};
@@ -1279,6 +1281,7 @@ void hdl_map_req(XEvent *xev)
 
 	XMapWindow(dpy, w);
 	c->mapped = True;
+	set_frame_extents(w);
 
 	if (user_config.new_win_focus) {
 		focused = c;
@@ -2057,6 +2060,7 @@ void setup_atoms(void)
 	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
 	atom_net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
 	atom_net_client_list = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
+	atom_net_frame_extents = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
 
 	Atom support_list[] = {
 	    atom_net_current_desktop,
@@ -2075,6 +2079,7 @@ void setup_atoms(void)
 	    atom_utf8_string,
 	    atom_net_wm_desktop,
 	    atom_net_client_list,
+		atom_net_frame_extents,
 	};
 
 	long num = NUM_WORKSPACES;
@@ -2094,6 +2099,12 @@ void setup_atoms(void)
 	                sizeof(support_list) / sizeof(Atom));
 
 	update_workarea();
+}
+
+void set_frame_extents(Window w)
+{
+	long extents[4] = {user_config.border_width, user_config.border_width, user_config.border_width, user_config.border_width};
+	XChangeProperty(dpy, w, atom_net_frame_extents, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
 }
 
 void set_win_scratchpad(int n)
