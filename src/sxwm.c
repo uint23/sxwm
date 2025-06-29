@@ -12,7 +12,7 @@
  *  will use this will probably be programmers :)
  *
  *  (C) Abhinav Prasai 2025
-*/
+ */
 
 #include <X11/X.h>
 #include <err.h>
@@ -266,14 +266,20 @@ Client *add_client(Window w, int workspace_index)
 	return c;
 }
 
-void centre_window()
+void center_window()
 {
 	if (!focused || !focused->mapped || !focused->floating) {
 		return;
 	}
 
-	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
-	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
+	if (focused->mon < 0 || focused->mon >= monsn) {
+		fprintf(stderr, "center_window: invalid monitor index %d\n", focused->mon);
+		return;
+	}
+
+	Monitor m = mons[focused->mon];
+	int x = m.x + (m.w - focused->w) / 2;
+	int y = m.y + (m.h - focused->h) / 2;
 
 	focused->x = x;
 	focused->y = y;

@@ -34,7 +34,7 @@ static const CommandEntry call_table[] = {{"close_window", close_focused},
                                           {"toggle_floating", toggle_floating},
                                           {"global_floating", toggle_floating_global},
                                           {"fullscreen", toggle_fullscreen},
-                                          {"centre_window", centre_window},
+                                          {"center_window", center_window},
                                           {NULL, NULL}};
 
 static void remap_and_dedupe_binds(Config *cfg)

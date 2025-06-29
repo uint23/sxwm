@@ -126,7 +126,7 @@ typedef struct {
 	void (*fn)(void);
 } CommandEntry;
 
-extern void centre_window();
+extern void center_window();
 extern void close_focused(void);
 extern void dec_gaps(void);
 extern void focus_next(void);
