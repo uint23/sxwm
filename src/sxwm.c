@@ -654,12 +654,15 @@ void move_prev_mon(void)
 
 int get_monitor_for(Client *c)
 {
-	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
+	int cx = c->x + c->w / 2;
+	int cy = c->y + c->h / 2;
+
 	for (int i = 0; i < monsn; i++) {
-		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h) {
+		if (cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= mons[i].y && cy < mons[i].y + mons[i].h) {
 			return i;
 		}
 	}
+
 	return 0;
 }
 
@@ -670,16 +673,18 @@ pid_t get_pid(Window w)
 	int actual_format;
 	unsigned long nitems, bytes_after;
 	unsigned char *prop = NULL;
+
 	Atom atom_pid = XInternAtom(dpy, "_NET_WM_PID", False);
 
 	if (XGetWindowProperty(dpy, w, atom_pid, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems,
 	                       &bytes_after, &prop) == Success &&
 	    prop) {
 		if (actual_format == 32 && nitems == 1) {
-			pid = *(pid_t *)prop;
+			pid = *(pid_t *)(void *)prop; /* Safe cast */
 		}
 		XFree(prop);
 	}
+
 	return pid;
 }
 
@@ -701,9 +706,10 @@ int get_workspace_for_window(Window w)
 		if (rule_class && rule_ws) {
 			if ((ch.res_class && strcasecmp(ch.res_class, rule_class) == 0) ||
 			    (ch.res_name && strcasecmp(ch.res_name, rule_class) == 0)) {
+				int ws = atoi(rule_ws);
 				XFree(ch.res_class);
 				XFree(ch.res_name);
-				return atoi(rule_ws);
+				return ws;
 			}
 		}
 	}
