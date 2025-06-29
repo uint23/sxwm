@@ -729,6 +729,7 @@ void grab_keys(void)
 	                      LockMask | Mod5Mask,
 	                      Mod2Mask | Mod5Mask,
 	                      LockMask | Mod2Mask | Mod5Mask};
+
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (int i = 0; i < user_config.bindsn; i++) {
@@ -744,7 +745,7 @@ void grab_keys(void)
 			continue;
 		}
 
-		for (size_t g = 0; g < sizeof guards / sizeof *guards; g++) {
+		for (size_t g = 0; g < sizeof(guards) / sizeof(guards[0]); g++) {
 			XGrabKey(dpy, kc, b->mods | guards[g], root, True, GrabModeAsync, GrabModeAsync);
 		}
 	}
