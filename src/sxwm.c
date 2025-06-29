@@ -295,7 +295,7 @@ void change_workspace(int ws)
 	in_ws_switch = True;
 	XGrabServer(dpy);
 
-	/* unmap those still marked mapped */
+	/* Unmap currently visible windows */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			XUnmapWindow(dpy, c->win);
@@ -304,7 +304,7 @@ void change_workspace(int ws)
 
 	current_ws = ws;
 
-	/* map those still marked mapped */
+	/* Map windows in the new workspace */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			XMapWindow(dpy, c->win);
@@ -318,18 +318,19 @@ void change_workspace(int ws)
 		focused = workspaces[current_ws];
 		Window focused_win = find_toplevel(focused->win);
 		XSetInputFocus(dpy, focused_win, RevertToPointerRoot, CurrentTime);
+
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
-		update_borders();
-	}
-	else {
-		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 	}
 
+	update_borders();
+
+	/* Update EWMH current desktop property */
 	long cd = current_ws;
-	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&cd, 1);
+	Atom net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	XChangeProperty(dpy, root, net_current_desktop, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&cd, 1);
+
 	update_client_desktop_properties();
 
 	XUngrabServer(dpy);
