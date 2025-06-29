@@ -126,7 +126,7 @@ workspace : modifier + modifier + ... + key : swap n
 | `close_window`       | Closes the focused window.                                   |
 | `decrease_gaps`      | Shrinks gaps.                                                |
 | `focus_next`         | Moves focus forward in the stack.                            |
-| `focus_previous`     | Moves focus backward in the stack.                           |
+| `focus_prev`         | Moves focus backward in the stack.                           |
 | `focus_next_mon`     | Switches focus to the next monitor.                          |
 | `focus_prev_mon`     | Switches focus to the previous monitor.                      |
 | `move_next_mon`      | Moves the focused window to the next monitor.                |
