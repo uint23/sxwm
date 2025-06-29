@@ -408,24 +408,26 @@ void startup_exec(void)
 
 Window find_toplevel(Window w)
 {
-	Window root = None;
-	Window parent;
-	Window *kids;
-	unsigned nkids;
+	Window root_return, parent_return;
+	Window *children;
+	unsigned int nchildren;
 
-	while (True) {
-		if (w == root) {
+	while (1) {
+		if (XQueryTree(dpy, w, &root_return, &parent_return, &children, &nchildren) == 0) {
 			break;
 		}
-		if (XQueryTree(dpy, w, &root, &parent, &kids, &nkids) == 0) {
+
+		if (children) {
+			XFree(children);
+		}
+
+		if (w == root_return || parent_return == None || parent_return == root_return) {
 			break;
 		}
-		XFree(kids);
-		if (parent == root || parent == None) {
-			break;
-		}
-		w = parent;
+
+		w = parent_return;
 	}
+
 	return w;
 }
 
