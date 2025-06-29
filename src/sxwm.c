@@ -1660,14 +1660,8 @@ void move_to_workspace(int ws)
 	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
 	}
-
-	if (focused->fullscreen) {
-		focused->fullscreen = False;
-		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
-		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
-	}
-
 	XUnmapWindow(dpy, focused->win);
+
 	/* remove from current list */
 	Client **pp = &workspaces[current_ws];
 	while (*pp && *pp != focused) {
