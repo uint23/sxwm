@@ -162,31 +162,31 @@ int reserve_bottom = 0;
 
 Bool next_should_float = False;
 
-Client *add_client(Window w, int ws)
+Client *add_client(Window w, int workspace_index)
 {
 	Client *c = malloc(sizeof(Client));
 	if (!c) {
-		fprintf(stderr, "sxwm: could not alloc memory for client\n");
+		fprintf(stderr, "sxwm: could not allocate memory for client\n");
 		return NULL;
 	}
 
 	c->win = w;
 	c->next = NULL;
-	c->ws = ws;
+	c->ws = workspace_index;
 	c->pid = get_pid(w);
 	c->swallowed = NULL;
 	c->swallower = NULL;
 
-	if (!workspaces[ws]) {
-		workspaces[ws] = c;
+	if (!workspaces[workspace_index]) {
+		workspaces[workspace_index] = c;
 	}
 	else {
 		if (user_config.new_win_master) {
-			c->next = workspaces[ws];
-			workspaces[ws] = c;
+			c->next = workspaces[workspace_index];
+			workspaces[workspace_index] = c;
 		}
 		else {
-			Client *tail = workspaces[ws];
+			Client *tail = workspaces[workspace_index];
 			while (tail->next) {
 				tail = tail->next;
 			}
@@ -195,21 +195,33 @@ Client *add_client(Window w, int ws)
 	}
 
 	open_windows++;
+
 	XSelectInput(dpy, w,
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
 	                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
-	XGrabButton(dpy, Button1, 0, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
-	            None, None);
-	XGrabButton(dpy, Button3, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+	struct {
+		unsigned int button;
+		unsigned int modifiers;
+	} button_grabs[] = {{Button1, 0},
+	                    {Button1, user_config.modkey},
+	                    {Button1, user_config.modkey | ShiftMask},
+	                    {Button3, user_config.modkey}};
+
+	for (size_t i = 0; i < sizeof(button_grabs) / sizeof(button_grabs[0]); ++i) {
+		XGrabButton(dpy, button_grabs[i].button, button_grabs[i].modifiers, w, False, ButtonPressMask, GrabModeSync,
+		            GrabModeAsync, None, None);
+	}
 
 	Atom protos[] = {atom_wm_delete};
 	XSetWMProtocols(dpy, w, protos, 1);
 
 	XWindowAttributes wa;
-	XGetWindowAttributes(dpy, w, &wa);
+	if (!XGetWindowAttributes(dpy, w, &wa)) {
+		fprintf(stderr, "sxwm: failed to get window attributes for 0x%lx\n", w);
+		free(c);
+		return NULL;
+	}
 	c->x = wa.x;
 	c->y = wa.y;
 	c->w = wa.width;
@@ -230,27 +242,27 @@ Client *add_client(Window w, int ws)
 			}
 		}
 	}
+	else {
+		fprintf(stderr, "sxwm: failed to query pointer, assigning monitor 0\n");
+	}
 
 	c->mon = pointer_mon;
 	c->fixed = False;
-	c->floating = False;
+	c->floating = global_floating ? True : False;
 	c->fullscreen = False;
 	c->mapped = True;
 	c->custom_stack_height = 0;
 
-	if (global_floating) {
-		c->floating = True;
-	}
-
-	if (ws == current_ws && !focused) {
+	if (workspace_index == current_ws && !focused) {
 		focused = c;
 	}
 
-	long desktop = ws;
-	XChangeProperty(dpy, w, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&desktop, 1);
+	long desktop = workspace_index;
+	Atom net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	XChangeProperty(dpy, w, net_wm_desktop, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 
 	XRaiseWindow(dpy, w);
+
 	return c;
 }
 
