@@ -1401,15 +1401,20 @@ void hdl_motion(XEvent *xev)
 void hdl_root_property(XEvent *xev)
 {
 	XPropertyEvent *e = &xev->xproperty;
+
 	if (e->atom == atom_net_current_desktop) {
 		long *val = NULL;
-		Atom actual;
-		int fmt;
-		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, atom_net_current_desktop, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
-		                       (unsigned char **)&val) == Success &&
-		    val) {
+		Atom actual_type;
+		int actual_format;
+		unsigned long nitems, bytes_after;
+
+		if (XGetWindowProperty(dpy, root, atom_net_current_desktop, 0, 1, False, XA_CARDINAL, &actual_type,
+		                       &actual_format, &nitems, &bytes_after, (unsigned char **)&val) == Success &&
+		    val && actual_type == XA_CARDINAL && actual_format == 32 && nitems == 1) {
 			change_workspace((int)val[0]);
+			XFree(val);
+		}
+		else if (val) {
 			XFree(val);
 		}
 	}
