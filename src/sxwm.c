@@ -1498,6 +1498,7 @@ void update_struts(void)
 		}
 	}
 	XFree(children);
+	update_workarea();
 }
 
 void update_workarea(void)
@@ -1736,12 +1737,16 @@ long parse_col(const char *hex)
 
 void quit(void)
 {
+	/* Kill all clients on exit...
+
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			XUnmapWindow(dpy, c->win);
 			XKillClient(dpy, c->win);
 		}
 	}
+	*/
+
 	XSync(dpy, False);
 	XCloseDisplay(dpy);
 	XFreeCursor(dpy, c_move);
