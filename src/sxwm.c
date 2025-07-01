@@ -1435,10 +1435,14 @@ void hdl_unmap_ntf(XEvent *xev)
 
 void update_struts(void)
 {
-	reserve_left = reserve_right = reserve_top = reserve_bottom = 0;
+	/* reset all reserves */
+	for (int i = 0; i < monsn; i++) {
+		mons[i].reserve_left = mons[i].reserve_right = mons[i].reserve_top = mons[i].reserve_bottom = 0;
+	}
 
 	Window root_ret, parent_ret, *children;
 	unsigned int nchildren;
+
 	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &nchildren)) {
 		return;
 	}
@@ -1448,17 +1452,17 @@ void update_struts(void)
 
 		Atom actual_type;
 		int actual_format;
-		unsigned long nitems, bytes_after;
+		unsigned long n_items, bytes_after;
 		Atom *types = NULL;
 
-		if (XGetWindowProperty(dpy, w, atom_wm_window_type, 0, 4, False, XA_ATOM, &actual_type, &actual_format, &nitems,
-		                       &bytes_after, (unsigned char **)&types) != Success ||
-		    !types) {
+		if (XGetWindowProperty(dpy, w, atom_wm_window_type, 0, 4, False, XA_ATOM,
+					&actual_type, &actual_format, &n_items, &bytes_after,
+					(unsigned char **)&types) != Success || !types) {
 			continue;
 		}
 
 		Bool is_dock = False;
-		for (unsigned long j = 0; j < nitems; j++) {
+		for (unsigned long j = 0; j < n_items; j++) {
 			if (types[j] == atom_net_wm_window_type_dock) {
 				is_dock = True;
 				break;
@@ -1473,22 +1477,23 @@ void update_struts(void)
 		Atom actual;
 		int sfmt;
 		unsigned long len, rem;
-		if (XGetWindowProperty(dpy, w, atom_wm_strut_partial, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
-		                       (unsigned char **)&str) == Success &&
-		    str && len >= 4) {
-			reserve_left = MAX(reserve_left, str[0]);
-			reserve_right = MAX(reserve_right, str[1]);
-			reserve_top = MAX(reserve_top, str[2]);
-			reserve_bottom = MAX(reserve_bottom, str[3]);
-			XFree(str);
-		}
-		else if (XGetWindowProperty(dpy, w, atom_wm_strut, 0, 4, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
-		                            (unsigned char **)&str) == Success &&
-		         str && len == 4) {
-			reserve_left = MAX(reserve_left, str[0]);
-			reserve_right = MAX(reserve_right, str[1]);
-			reserve_top = MAX(reserve_top, str[2]);
-			reserve_bottom = MAX(reserve_bottom, str[3]);
+
+		if (XGetWindowProperty(dpy, w, atom_wm_strut_partial, 0, 12, False, XA_CARDINAL,
+					&actual, &sfmt, &len, &rem, (unsigned char **)&str) == Success && str && len >= 4) {
+
+			XWindowAttributes wa;
+			if (XGetWindowAttributes(dpy, w, &wa)) {
+				/* find the monitor this dock belongs to */
+				for (int m = 0; m < monsn; m++) {
+					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w &&
+							wa.y >= mons[m].y && wa.y < mons[m].y + mons[m].h) {
+						mons[m].reserve_left = MAX(mons[m].reserve_left, str[0]);
+						mons[m].reserve_right = MAX(mons[m].reserve_right, str[1]);
+						mons[m].reserve_top = MAX(mons[m].reserve_top, str[2]);
+						mons[m].reserve_bottom = MAX(mons[m].reserve_bottom, str[3]);
+					}
+				}
+			}
 			XFree(str);
 		}
 	}
@@ -1500,13 +1505,14 @@ void update_workarea(void)
 	long workarea[4 * MAX_MONITORS];
 
 	for (int i = 0; i < monsn && i < MAX_MONITORS; i++) {
-		workarea[i * 4 + 0] = mons[i].x + reserve_left;
-		workarea[i * 4 + 1] = mons[i].y + reserve_top;
-		workarea[i * 4 + 2] = mons[i].w - reserve_left - reserve_right;
-		workarea[i * 4 + 3] = mons[i].h - reserve_top - reserve_bottom;
+		workarea[i * 4 + 0] = mons[i].x + mons[i].reserve_left;
+		workarea[i * 4 + 1] = mons[i].y + mons[i].reserve_top;
+		workarea[i * 4 + 2] = mons[i].w - mons[i].reserve_left - mons[i].reserve_right;
+		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
 	}
-	XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea,
-	                monsn * 4);
+
+	XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace,
+			(unsigned char *)workarea, monsn * 4);
 }
 
 void inc_gaps(void)
@@ -2279,8 +2285,8 @@ void tile(void)
 	}
 
 	for (int m = 0; m < monsn; m++) {
-		int mon_x = mons[m].x, mon_y = mons[m].y + reserve_top;
-		int mon_w = mons[m].w, mon_h = mons[m].h - reserve_top - reserve_bottom;
+		int mon_x = mons[m].x, mon_y = mons[m].y + mons[m].reserve_top;
+		int mon_w = mons[m].w, mon_h = mons[m].h - mons[m].reserve_top - mons[m].reserve_bottom;
 
 		Client *stackers[MAXCLIENTS];
 		int N = 0;
