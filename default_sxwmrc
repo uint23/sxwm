@@ -11,12 +11,13 @@ resize_master_amount    : 1
 resize_stack_amt        : 20
 snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
-should_float            : "pcmanfm"
+should_float            : "pcmanfm", "obs"
 new_win_focus           : true
 warp_cursor             : true
 can_swallow             : "st"
-can_be_swallowed        : "mpv"
+can_be_swallowed        : "mpv", "sxiv"
 new_win_master          : false
+start_fullscreen        : "mpv", "vlc"
 
 # Keybinds:
 # Commands must be surrounded with ""

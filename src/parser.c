@@ -529,6 +529,60 @@ found:
 				}
 			}
 		}
+		else if (!strcmp(key, "start_fullscreen")) {
+			char *comment = strchr(rest, '#');
+			size_t len = comment ? (size_t)(comment - rest) : strlen(rest);
+			if (len >= sizeof(line)) {
+				len = sizeof(line) - 1;
+			}
+
+			char win[sizeof(line)];
+			snprintf(win, sizeof(win), "%.*s", (int)len, rest);
+
+			char *final = strip(win);
+			char *comma_ptr;
+			char *comma = strtok_r(final, ",", &comma_ptr);
+
+			int start_fullscreen_idx = 0;
+			/* find first empty slot */
+			for (int i = 0; i < 256; i++) {
+				if (!cfg->start_fullscreen[i]) {
+					start_fullscreen_idx = i;
+					break;
+				}
+			}
+
+			/* store each comma separated value in a separate row */
+			while (comma && start_fullscreen_idx < 256) {
+				comma = strip(comma);
+				if (*comma == '"') {
+					comma++;
+				}
+				char *end = comma + strlen(comma) - 1;
+				if (*end == '"') {
+					*end = '\0';
+				}
+
+				char *dup = strdup(comma);
+				if (!dup) {
+					fprintf(stderr, "sxwmrc:%d: failed to allocate memory\n", lineno);
+					goto cleanup_file;
+				}
+
+				cfg->start_fullscreen[start_fullscreen_idx] = malloc(2 * sizeof(char *));
+				if (!cfg->start_fullscreen[start_fullscreen_idx]) {
+					free(dup);
+					fprintf(stderr, "sxwmrc:%d: failed to allocate memory\n", lineno);
+					goto cleanup_file;
+				}
+
+				/* store each program's name in its own row at index 0 */
+				cfg->start_fullscreen[start_fullscreen_idx][0] = dup;
+				cfg->start_fullscreen[start_fullscreen_idx][1] = NULL;
+				start_fullscreen_idx++;
+				comma = strtok_r(NULL, ",", &comma_ptr);
+			}
+		}
 		else {
 			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
 		}

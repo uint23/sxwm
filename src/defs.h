@@ -104,6 +104,7 @@ typedef struct {
 	Bool new_win_master;
 	Binding binds[256];
 	char **should_float[256];
+	char **start_fullscreen[256];
 	char **can_swallow[256];
     char **can_be_swallowed[256];
 	char **scratchpads[32];

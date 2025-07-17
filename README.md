@@ -81,6 +81,7 @@ The file uses a `key : value` format. Lines starting with `#` are ignored.
 | `snap_distance`          | Integer | `5`       | Distance (px) before a floating window snaps to edge.                       |
 | `motion_throttle`        | Integer | `60`      | Target FPS for mouse drag actions.                                          |
 | `should_float`           | String  | `"st"`    | Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.|
+| `start_fullscreen`       | String  | `"st"`    | Starts specified windows that should start fullscreened. Enclosed in quotes and comma-seperated|
 | `new_win_focus`          | Bool    | `true`    | Whether openening new windows should also set focus to them or keep on current window.|
 | `warp_cursor`            | Bool    | `true`    | Warp the cursor to the middle of newly focused windows                      |
 | `exec`                   | String  | `Nothing` | Command to run on startup (e.g., `sxbar`, `picom`, "autostart", etc.).      |

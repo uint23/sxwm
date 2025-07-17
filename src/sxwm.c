@@ -104,6 +104,7 @@ void update_struts(void);
 void update_workarea(void);
 void warp_cursor(Client *c);
 Bool window_should_float(Window w);
+Bool window_should_start_fullscreen(Window w);
 int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
@@ -1176,6 +1177,11 @@ void hdl_map_req(XEvent *xev)
 		c->floating = True;
 	}
 
+	if (window_should_start_fullscreen(w)) {
+		c->fullscreen = True;
+		c->floating = False;
+	}
+
 	/* center floating windows & set border */
 	if (c->floating && !c->fullscreen) {
 		int w_ = MAX(c->w, 64), h_ = MAX(c->h, 64);
@@ -1267,6 +1273,11 @@ void hdl_map_req(XEvent *xev)
 
 	XMapWindow(dpy, w);
 	c->mapped = True;
+	if (c->fullscreen) {
+		int m = c->mon;
+		XSetWindowBorderWidth(dpy, w, 0);
+		XMoveResizeWindow(dpy, w, mons[m].x, mons[m].y, mons[m].w, mons[m].h);
+	}
 	set_frame_extents(w);
 
 	if (user_config.new_win_focus) {
@@ -1526,6 +1537,7 @@ void init_defaults(void)
 		default_config.can_be_swallowed[i] = NULL;
 		default_config.can_swallow[i] = NULL;
 		default_config.open_in_workspace[i] = NULL;
+		default_config.start_fullscreen[i] = NULL;
 	}
 
 	default_config.motion_throttle = 60;
@@ -1782,6 +1794,13 @@ void reload_config(void)
 			}
 			free(user_config.open_in_workspace[i]);
 			user_config.open_in_workspace[i] = NULL;
+		}
+		if (user_config.start_fullscreen[i]) {
+			if (user_config.start_fullscreen[i][0]) {
+				free(user_config.start_fullscreen[i][0]);
+			}
+			free(user_config.start_fullscreen[i]);
+			user_config.start_fullscreen[i] = NULL;
 		}
 	}
 
@@ -2691,6 +2710,29 @@ void warp_cursor(Client *c)
 
 	XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 	XSync(dpy, False);
+}
+
+Bool window_should_start_fullscreen(Window w)
+{
+	XClassHint ch;
+	if (XGetClassHint(dpy, w, &ch)) {
+		for (int i = 0; i < 256; i++) {
+			if (!user_config.start_fullscreen[i] || !user_config.start_fullscreen[i][0]) {
+				break;
+			}
+
+			if ((ch.res_class && !strcmp(ch.res_class, user_config.start_fullscreen[i][0])) ||
+			    (ch.res_name && !strcmp(ch.res_name, user_config.start_fullscreen[i][0]))) {
+				XFree(ch.res_class);
+				XFree(ch.res_name);
+				return True;
+			}
+		}
+		XFree(ch.res_class);
+		XFree(ch.res_name);
+	}
+
+	return False;
 }
 
 int xerr(Display *dpy, XErrorEvent *ee)
