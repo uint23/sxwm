@@ -1716,9 +1716,8 @@ long parse_col(const char *hex)
 		return WhitePixel(dpy, DefaultScreen(dpy));
 	}
 
-	/* return col.pixel |= 0xff << 24; */
-	/* This is a fix for picom making the borders transparent. DANGEROUS */
-	return col.pixel;
+	/* possibly unsafe BUT i dont think it can cause any problems */
+	return col.pixel |= 0xff << 24;
 }
 
 void quit(void)
