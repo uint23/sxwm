@@ -112,7 +112,6 @@ Atom atom_net_active_window;
 Atom atom_net_current_desktop;
 Atom atom_net_supported;
 Atom atom_net_wm_state;
-Atom atom_net_wm_state_fullscreen;
 Atom atom_wm_window_type;
 Atom atom_net_wm_window_type_dock;
 Atom atom_net_workarea;
@@ -852,19 +851,6 @@ void hdl_client_msg(XEvent *xev)
 	if (xev->xclient.message_type == atom_net_current_desktop) {
 		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
-		return;
-	}
-	if (xev->xclient.message_type == atom_net_wm_state) {
-		long action = xev->xclient.data.l[0];
-		Atom target = xev->xclient.data.l[1];
-		if (target == atom_net_wm_state_fullscreen) {
-			if (action == 1 || action == 2) {
-				toggle_fullscreen();
-			}
-			else if (action == 0 && focused && focused->fullscreen) {
-				toggle_fullscreen();
-			}
-		}
 		return;
 	}
 }
@@ -2062,9 +2048,7 @@ void setup_atoms(void)
 	atom_net_wm_window_type_dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
 	atom_net_workarea = XInternAtom(dpy, "_NET_WORKAREA", False);
 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
 	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
@@ -2078,7 +2062,6 @@ void setup_atoms(void)
 	    atom_net_active_window,
 	    atom_net_supported,
 	    atom_net_wm_state,
-	    atom_net_wm_state_fullscreen,
 	    atom_wm_window_type,
 	    atom_net_wm_window_type_dock,
 	    atom_net_workarea,
