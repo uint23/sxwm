@@ -21,6 +21,14 @@ static const CommandEntry call_table[] = {{"close_window", close_focused},
                                           {"focus_next_mon", focus_next_mon},
                                           {"focus_prev_mon", focus_prev_mon},
                                           {"increase_gaps", inc_gaps},
+                                          {"increase_gap_top", inc_gap_top},
+                                          {"decrease_gap_top", dec_gap_top},
+                                          {"increase_gap_bottom", inc_gap_bottom},
+                                          {"decrease_gap_bottom", dec_gap_bottom},
+                                          {"increase_gap_left", inc_gap_left},
+                                          {"decrease_gap_left", dec_gap_left},
+                                          {"increase_gap_right", inc_gap_right},
+                                          {"decrease_gap_right", dec_gap_right},
                                           {"master_next", move_master_next},
                                           {"master_previous", move_master_prev},
                                           {"move_next_mon", move_next_mon},
@@ -225,7 +233,24 @@ found:
 			}
 		}
 		else if (!strcmp(key, "gaps")) {
-			cfg->gaps = atoi(rest);
+			int gap_val = atoi(rest);
+			cfg->gaps = gap_val;
+			cfg->gap_top = gap_val;
+			cfg->gap_bottom = gap_val;
+			cfg->gap_left = gap_val;
+			cfg->gap_right = gap_val;
+		}
+		else if (!strcmp(key, "gap_top")) {
+			cfg->gap_top = atoi(rest);
+		}
+		else if (!strcmp(key, "gap_bottom")) {
+			cfg->gap_bottom = atoi(rest);
+		}
+		else if (!strcmp(key, "gap_left")) {
+			cfg->gap_left = atoi(rest);
+		}
+		else if (!strcmp(key, "gap_right")) {
+			cfg->gap_right = atoi(rest);
 		}
 		else if (!strcmp(key, "border_width")) {
 			cfg->border_width = atoi(rest);

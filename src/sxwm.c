@@ -367,6 +367,19 @@ void dec_gaps(void)
 {
 	if (user_config.gaps > 0) {
 		user_config.gaps--;
+		user_config.gap_top--;
+		user_config.gap_bottom--;
+		user_config.gap_left--;
+		user_config.gap_right--;
+		tile();
+		update_borders();
+	}
+}
+
+void dec_gap_top(void)
+{
+	if (user_config.gap_top > 0) {
+		user_config.gap_top--;
 		tile();
 		update_borders();
 	}
@@ -1519,14 +1532,77 @@ void update_workarea(void)
 void inc_gaps(void)
 {
 	user_config.gaps++;
+	user_config.gap_top++;
+	user_config.gap_bottom++;
+	user_config.gap_left++;
+	user_config.gap_right++;
 	tile();
 	update_borders();
+}
+
+void inc_gap_top(void)
+{
+	user_config.gap_top++;
+	tile();
+	update_borders();
+}
+
+void inc_gap_bottom(void)
+{
+	user_config.gap_bottom++;
+	tile();
+	update_borders();
+}
+
+void dec_gap_bottom(void)
+{
+	if (user_config.gap_bottom > 0) {
+		user_config.gap_bottom--;
+		tile();
+		update_borders();
+	}
+}
+
+void inc_gap_left(void)
+{
+	user_config.gap_left++;
+	tile();
+	update_borders();
+}
+
+void dec_gap_left(void)
+{
+	if (user_config.gap_left > 0) {
+		user_config.gap_left--;
+		tile();
+		update_borders();
+	}
+}
+
+void inc_gap_right(void)
+{
+	user_config.gap_right++;
+	tile();
+	update_borders();
+}
+
+void dec_gap_right(void)
+{
+	if (user_config.gap_right > 0) {
+		user_config.gap_right--;
+		tile();
+		update_borders();
+	}
 }
 
 void init_defaults(void)
 {
 	default_config.modkey = Mod4Mask;
 	default_config.gaps = 10;
+	default_config.gap_top = 10;
+	default_config.gap_bottom = 10;
+	default_config.gap_left = 10;
+	default_config.gap_right = 10;
 	default_config.border_width = 1;
 	default_config.border_foc_col = parse_col("#c0cbff");
 	default_config.border_ufoc_col = parse_col("#555555");
@@ -2305,13 +2381,14 @@ void tile(void)
 			continue;
 		}
 
-		int gx = user_config.gaps, gy = user_config.gaps;
-		int tile_x = mon_x + gx, tile_y = mon_y + gy;
-		int tile_w = MAX(1, mon_w - 2 * gx);
-		int tile_h = MAX(1, mon_h - 2 * gy);
+		int gap_left = user_config.gap_left, gap_right = user_config.gap_right;
+		int gap_top = user_config.gap_top, gap_bottom = user_config.gap_bottom;
+		int tile_x = mon_x + gap_left, tile_y = mon_y + gap_top;
+		int tile_w = MAX(1, mon_w - gap_left - gap_right);
+		int tile_h = MAX(1, mon_h - gap_top - gap_bottom);
 		float mf = CLAMP(user_config.master_width[m], MF_MIN, MF_MAX);
 		int master_w = (N > 1) ? (int)(tile_w * mf) : tile_w;
-		int stack_w = (N > 1) ? (tile_w - master_w - gx) : 0;
+		int stack_w = (N > 1) ? (tile_w - master_w - gap_left) : 0;
 
 		{
 			Client *c = stackers[0];
@@ -2354,7 +2431,7 @@ void tile(void)
 			}
 		}
 
-		int total_vgaps = (num_stack - 1) * gy;
+		int total_vgaps = (num_stack - 1) * gap_top;
 		int remaining = tile_h - total_fixed_heights - total_vgaps;
 
 		if (auto_count > 0 && remaining >= auto_count * min_raw) {
@@ -2408,7 +2485,7 @@ void tile(void)
 		int sy = tile_y;
 		for (int i = 1; i < N; i++) {
 			Client *c = stackers[i];
-			XWindowChanges wc = {.x = tile_x + master_w + gx,
+			XWindowChanges wc = {.x = tile_x + master_w + gap_left,
 			                     .y = sy,
 			                     .width = MAX(1, stack_w - (2 * user_config.border_width)),
 			                     .height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
@@ -2423,7 +2500,7 @@ void tile(void)
 			c->w = wc.width;
 			c->h = wc.height;
 
-			sy += heights_final[i] + gy;
+			sy += heights_final[i] + gap_top;
 		}
 
 		update_borders();
