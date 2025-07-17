@@ -259,7 +259,7 @@ sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
 <details>
 <summary>Alpine Linux</summary>
 <pre><code>doas apk update
-doas apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
+doas apk add libx11-dev libxinerama-dev gcc make musl-dev linux-headers</code></pre>
 </details>
 
 <details>
