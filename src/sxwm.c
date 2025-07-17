@@ -12,7 +12,7 @@
  *  will use this will probably be programmers :)
  *
  *  (C) Abhinav Prasai 2025
-*/
+ */
 
 #include <X11/X.h>
 #include <err.h>
@@ -164,31 +164,31 @@ int reserve_bottom = 0;
 
 Bool next_should_float = False;
 
-Client *add_client(Window w, int ws)
+Client *add_client(Window w, int workspace_index)
 {
 	Client *c = malloc(sizeof(Client));
 	if (!c) {
-		fprintf(stderr, "sxwm: could not alloc memory for client\n");
+		fprintf(stderr, "sxwm: could not allocate memory for client\n");
 		return NULL;
 	}
 
 	c->win = w;
 	c->next = NULL;
-	c->ws = ws;
+	c->ws = workspace_index;
 	c->pid = get_pid(w);
 	c->swallowed = NULL;
 	c->swallower = NULL;
 
-	if (!workspaces[ws]) {
-		workspaces[ws] = c;
+	if (!workspaces[workspace_index]) {
+		workspaces[workspace_index] = c;
 	}
 	else {
 		if (user_config.new_win_master) {
-			c->next = workspaces[ws];
-			workspaces[ws] = c;
+			c->next = workspaces[workspace_index];
+			workspaces[workspace_index] = c;
 		}
 		else {
-			Client *tail = workspaces[ws];
+			Client *tail = workspaces[workspace_index];
 			while (tail->next) {
 				tail = tail->next;
 			}
@@ -197,21 +197,33 @@ Client *add_client(Window w, int ws)
 	}
 
 	open_windows++;
+
 	XSelectInput(dpy, w,
 	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
 	                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
-	XGrabButton(dpy, Button1, 0, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
-	            None, None);
-	XGrabButton(dpy, Button3, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+	struct {
+		unsigned int button;
+		unsigned int modifiers;
+	} button_grabs[] = {{Button1, 0},
+	                    {Button1, user_config.modkey},
+	                    {Button1, user_config.modkey | ShiftMask},
+	                    {Button3, user_config.modkey}};
+
+	for (size_t i = 0; i < sizeof(button_grabs) / sizeof(button_grabs[0]); ++i) {
+		XGrabButton(dpy, button_grabs[i].button, button_grabs[i].modifiers, w, False, ButtonPressMask, GrabModeSync,
+		            GrabModeAsync, None, None);
+	}
 
 	Atom protos[] = {atom_wm_delete};
 	XSetWMProtocols(dpy, w, protos, 1);
 
 	XWindowAttributes wa;
-	XGetWindowAttributes(dpy, w, &wa);
+	if (!XGetWindowAttributes(dpy, w, &wa)) {
+		fprintf(stderr, "sxwm: failed to get window attributes for 0x%lx\n", w);
+		free(c);
+		return NULL;
+	}
 	c->x = wa.x;
 	c->y = wa.y;
 	c->w = wa.width;
@@ -232,38 +244,44 @@ Client *add_client(Window w, int ws)
 			}
 		}
 	}
+	else {
+		fprintf(stderr, "sxwm: failed to query pointer, assigning monitor 0\n");
+	}
 
 	c->mon = pointer_mon;
 	c->fixed = False;
-	c->floating = False;
+	c->floating = global_floating ? True : False;
 	c->fullscreen = False;
 	c->mapped = True;
 	c->custom_stack_height = 0;
 
-	if (global_floating) {
-		c->floating = True;
-	}
-
-	if (ws == current_ws && !focused) {
+	if (workspace_index == current_ws && !focused) {
 		focused = c;
 	}
 
-	long desktop = ws;
-	XChangeProperty(dpy, w, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&desktop, 1);
+	long desktop = workspace_index;
+	Atom net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	XChangeProperty(dpy, w, net_wm_desktop, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 
 	XRaiseWindow(dpy, w);
+
 	return c;
 }
 
-void centre_window()
+void center_window()
 {
 	if (!focused || !focused->mapped || !focused->floating) {
 		return;
 	}
 
-	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
-	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
+	if (focused->mon < 0 || focused->mon >= monsn) {
+		fprintf(stderr, "center_window: invalid monitor index %d\n", focused->mon);
+		return;
+	}
+
+	Monitor m = mons[focused->mon];
+	int x = m.x + (m.w - focused->w) / 2;
+	int y = m.y + (m.h - focused->h) / 2;
 
 	focused->x = x;
 	focused->y = y;
@@ -279,7 +297,7 @@ void change_workspace(int ws)
 	in_ws_switch = True;
 	XGrabServer(dpy);
 
-	/* unmap those still marked mapped */
+	/* Unmap currently visible windows */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			XUnmapWindow(dpy, c->win);
@@ -288,7 +306,7 @@ void change_workspace(int ws)
 
 	current_ws = ws;
 
-	/* map those still marked mapped */
+	/* Map windows in the new workspace */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			XMapWindow(dpy, c->win);
@@ -302,18 +320,19 @@ void change_workspace(int ws)
 		focused = workspaces[current_ws];
 		Window focused_win = find_toplevel(focused->win);
 		XSetInputFocus(dpy, focused_win, RevertToPointerRoot, CurrentTime);
+
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
-		update_borders();
-	}
-	else {
-		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 	}
 
+	update_borders();
+
+	/* Update EWMH current desktop property */
 	long cd = current_ws;
-	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&cd, 1);
+	Atom net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	XChangeProperty(dpy, root, net_current_desktop, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&cd, 1);
+
 	update_client_desktop_properties();
 
 	XUngrabServer(dpy);
@@ -345,10 +364,11 @@ void close_focused(void)
 	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
 		for (int i = 0; i < n; i++) {
 			if (protos[i] == atom_wm_delete) {
-				XEvent ev = {.xclient = {.type = ClientMessage,
-				                         .window = focused->win,
-				                         .message_type = XInternAtom(dpy, "WM_PROTOCOLS", False),
-				                         .format = 32}};
+				XEvent ev = {0};
+				ev.xclient.type = ClientMessage;
+				ev.xclient.window = focused->win;
+				ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", False);
+				ev.xclient.format = 32;
 				ev.xclient.data.l[0] = atom_wm_delete;
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
@@ -356,9 +376,9 @@ void close_focused(void)
 				return;
 			}
 		}
-		XUnmapWindow(dpy, focused->win);
 		XFree(protos);
 	}
+
 	XUnmapWindow(dpy, focused->win);
 	XKillClient(dpy, focused->win);
 }
@@ -390,24 +410,26 @@ void startup_exec(void)
 
 Window find_toplevel(Window w)
 {
-	Window root = None;
-	Window parent;
-	Window *kids;
-	unsigned nkids;
+	Window root_return, parent_return;
+	Window *children;
+	unsigned int nchildren;
 
-	while (True) {
-		if (w == root) {
+	while (1) {
+		if (XQueryTree(dpy, w, &root_return, &parent_return, &children, &nchildren) == 0) {
 			break;
 		}
-		if (XQueryTree(dpy, w, &root, &parent, &kids, &nkids) == 0) {
+
+		if (children) {
+			XFree(children);
+		}
+
+		if (w == root_return || parent_return == None || parent_return == root_return) {
 			break;
 		}
-		XFree(kids);
-		if (parent == root || parent == None) {
-			break;
-		}
-		w = parent;
+
+		w = parent_return;
 	}
+
 	return w;
 }
 
@@ -564,6 +586,34 @@ void focus_prev_mon(void)
 	}
 }
 
+/* Helper to center floating window on given monitor and clamp it to bounds */
+void center_floating_window(Client *c, int mon)
+{
+	if (!c || !c->floating) {
+		return;
+	}
+
+	int mx = mons[mon].x, my = mons[mon].y;
+	int mw = mons[mon].w, mh = mons[mon].h;
+
+	int x = mx + (mw - c->w) / 2;
+	int y = my + (mh - c->h) / 2;
+
+	/* Clamp position within monitor bounds */
+	if (x < mx)
+		x = mx;
+	if (y < my)
+		y = my;
+	if (x + c->w > mx + mw)
+		x = mx + mw - c->w;
+	if (y + c->h > my + mh)
+		y = my + mh - c->h;
+
+	c->x = x;
+	c->y = y;
+	XMoveWindow(dpy, c->win, x, y);
+}
+
 void move_next_mon(void)
 {
 	if (!focused || monsn <= 1) {
@@ -571,34 +621,9 @@ void move_next_mon(void)
 	}
 
 	int target_mon = (focused->mon + 1) % monsn;
+	focused->mon = current_monitor = target_mon;
 
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
+	center_floating_window(focused, target_mon);
 	tile();
 
 	/* follow the window with cursor if enabled */
@@ -616,34 +641,9 @@ void move_prev_mon(void)
 	}
 
 	int target_mon = (focused->mon - 1 + monsn) % monsn;
+	focused->mon = current_monitor = target_mon;
 
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
+	center_floating_window(focused, target_mon);
 	tile();
 
 	/* follow the window with cursor if enabled */
@@ -656,12 +656,15 @@ void move_prev_mon(void)
 
 int get_monitor_for(Client *c)
 {
-	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
+	int cx = c->x + c->w / 2;
+	int cy = c->y + c->h / 2;
+
 	for (int i = 0; i < monsn; i++) {
-		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h) {
+		if (cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= mons[i].y && cy < mons[i].y + mons[i].h) {
 			return i;
 		}
 	}
+
 	return 0;
 }
 
@@ -672,16 +675,18 @@ pid_t get_pid(Window w)
 	int actual_format;
 	unsigned long nitems, bytes_after;
 	unsigned char *prop = NULL;
+
 	Atom atom_pid = XInternAtom(dpy, "_NET_WM_PID", False);
 
 	if (XGetWindowProperty(dpy, w, atom_pid, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems,
 	                       &bytes_after, &prop) == Success &&
 	    prop) {
 		if (actual_format == 32 && nitems == 1) {
-			pid = *(pid_t *)prop;
+			pid = *(pid_t *)(void *)prop; /* Safe cast */
 		}
 		XFree(prop);
 	}
+
 	return pid;
 }
 
@@ -703,9 +708,10 @@ int get_workspace_for_window(Window w)
 		if (rule_class && rule_ws) {
 			if ((ch.res_class && strcasecmp(ch.res_class, rule_class) == 0) ||
 			    (ch.res_name && strcasecmp(ch.res_name, rule_class) == 0)) {
+				int ws = atoi(rule_ws);
 				XFree(ch.res_class);
 				XFree(ch.res_name);
-				return atoi(rule_ws);
+				return ws;
 			}
 		}
 	}
@@ -725,6 +731,7 @@ void grab_keys(void)
 	                      LockMask | Mod5Mask,
 	                      Mod2Mask | Mod5Mask,
 	                      LockMask | Mod2Mask | Mod5Mask};
+
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (int i = 0; i < user_config.bindsn; i++) {
@@ -740,7 +747,7 @@ void grab_keys(void)
 			continue;
 		}
 
-		for (size_t g = 0; g < sizeof guards / sizeof *guards; g++) {
+		for (size_t g = 0; g < sizeof(guards) / sizeof(guards[0]); g++) {
 			XGrabKey(dpy, kc, b->mods | guards[g], root, True, GrabModeAsync, GrabModeAsync);
 		}
 	}
@@ -1394,15 +1401,20 @@ void hdl_motion(XEvent *xev)
 void hdl_root_property(XEvent *xev)
 {
 	XPropertyEvent *e = &xev->xproperty;
+
 	if (e->atom == atom_net_current_desktop) {
 		long *val = NULL;
-		Atom actual;
-		int fmt;
-		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, atom_net_current_desktop, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
-		                       (unsigned char **)&val) == Success &&
-		    val) {
+		Atom actual_type;
+		int actual_format;
+		unsigned long nitems, bytes_after;
+
+		if (XGetWindowProperty(dpy, root, atom_net_current_desktop, 0, 1, False, XA_CARDINAL, &actual_type,
+		                       &actual_format, &nitems, &bytes_after, (unsigned char **)&val) == Success &&
+		    val && actual_type == XA_CARDINAL && actual_format == 32 && nitems == 1) {
 			change_workspace((int)val[0]);
+			XFree(val);
+		}
+		else if (val) {
 			XFree(val);
 		}
 	}
