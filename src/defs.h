@@ -89,6 +89,10 @@ typedef struct Client {
 typedef struct {
 	int modkey;
 	int gaps;
+	int gap_top;
+	int gap_bottom;
+	int gap_left;
+	int gap_right;
 	int border_width;
 	long border_foc_col;
 	long border_ufoc_col;
@@ -132,6 +136,14 @@ typedef struct {
 extern void centre_window();
 extern void close_focused(void);
 extern void dec_gaps(void);
+extern void inc_gap_top(void);
+extern void dec_gap_top(void);
+extern void inc_gap_bottom(void);
+extern void dec_gap_bottom(void);
+extern void inc_gap_left(void);
+extern void dec_gap_left(void);
+extern void inc_gap_right(void);
+extern void dec_gap_right(void);
 extern void focus_next(void);
 extern void focus_prev(void);
 extern void focus_next_mon(void);
