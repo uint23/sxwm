@@ -9,7 +9,11 @@
   <img src="https://img.shields.io/github/license/uint23/sxwm?style=flat-square">
 </div>
 
----
+> [!WARNING]
+> From commit `7a7c6300`, `master_previous` binding has now been renamed to `master_prev`.  
+> Please update your `sxwmrc` accordingly.
+
+-
 
 ## Table of Contents
 - [Launch Args](#launch-args)
