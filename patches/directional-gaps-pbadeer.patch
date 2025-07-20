@@ -13,27 +13,12 @@ Key features:
 - Parser commands: increase_gap_[side], decrease_gap_[side]
 - Backward compatibility with existing 'gaps' option
 - Fixed stack window positioning to avoid internal gaps
-- Transparent border fix for picom compatibility
-- Added linux-headers dependency for Alpine Linux builds
 
 This allows users to configure asymmetric gaps for specific layouts while
 maintaining the simplicity of the original gap system for basic use cases.
 
 ---
 
-diff --git a/README.md b/README.md
-index 11c0314..262b6de 100644
---- a/README.md
-+++ b/README.md
-@@ -259,7 +259,7 @@ sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
- <details>
- <summary>Alpine Linux</summary>
- <pre><code>doas apk update
--doas apk add libx11-dev libxinerama-dev gcc make musl-dev</code></pre>
-+doas apk add libx11-dev libxinerama-dev gcc make musl-dev linux-headers</code></pre>
- </details>
- 
- <details>
 diff --git a/src/defs.h b/src/defs.h
 index 1652fbe..496dc61 100644
 --- a/src/defs.h
@@ -110,18 +95,10 @@ index 9e82c08..f347762 100644
  		else if (!strcmp(key, "border_width")) {
  			cfg->border_width = atoi(rest);
 diff --git a/src/sxwm.c b/src/sxwm.c
-index 90ef09d..c6598fb 100644
+index 90ef09d..6f44c12 100644
 --- a/src/sxwm.c
 +++ b/src/sxwm.c
-@@ -112,7 +112,6 @@ Atom atom_net_active_window;
- Atom atom_net_current_desktop;
- Atom atom_net_supported;
- Atom atom_net_wm_state;
--Atom atom_net_wm_state_fullscreen;
- Atom atom_wm_window_type;
- Atom atom_net_wm_window_type_dock;
- Atom atom_net_workarea;
-@@ -367,6 +366,19 @@ void dec_gaps(void)
+@@ -367,6 +367,11 @@ void dec_gaps(void)
  {
  	if (user_config.gaps > 0) {
  		user_config.gaps--;
@@ -141,27 +118,7 @@ index 90ef09d..c6598fb 100644
  		tile();
  		update_borders();
  	}
-@@ -854,19 +866,6 @@ void hdl_client_msg(XEvent *xev)
- 		change_workspace(ws);
- 		return;
- 	}
--	if (xev->xclient.message_type == atom_net_wm_state) {
--		long action = xev->xclient.data.l[0];
--		Atom target = xev->xclient.data.l[1];
--		if (target == atom_net_wm_state_fullscreen) {
--			if (action == 1 || action == 2) {
--				toggle_fullscreen();
--			}
--			else if (action == 0 && focused && focused->fullscreen) {
--				toggle_fullscreen();
--			}
--		}
--		return;
--	}
- }
- 
- void hdl_config_ntf(XEvent *xev)
-@@ -1519,14 +1518,77 @@ void update_workarea(void)
+@@ -1519,6 +1524,73 @@ void update_workarea(void)
  void inc_gaps(void)
  {
  	user_config.gaps++;
@@ -169,10 +126,10 @@ index 90ef09d..c6598fb 100644
 +	user_config.gap_bottom++;
 +	user_config.gap_left++;
 +	user_config.gap_right++;
- 	tile();
- 	update_borders();
- }
- 
++	tile();
++	update_borders();
++}
++
 +void inc_gap_top(void)
 +{
 +	user_config.gap_top++;
@@ -228,10 +185,11 @@ index 90ef09d..c6598fb 100644
 +	}
 +}
 +
- void init_defaults(void)
- {
- 	default_config.modkey = Mod4Mask;
- 	default_config.gaps = 10;
++
++void init_defaults(void)
++{
++	default_config.modkey = Mod4Mask;
++	default_config.gaps = 10;
 +	default_config.gap_top = 10;
 +	default_config.gap_bottom = 10;
 +	default_config.gap_left = 10;
@@ -239,37 +197,7 @@ index 90ef09d..c6598fb 100644
  	default_config.border_width = 1;
  	default_config.border_foc_col = parse_col("#c0cbff");
  	default_config.border_ufoc_col = parse_col("#555555");
-@@ -1730,9 +1792,8 @@ long parse_col(const char *hex)
- 		return WhitePixel(dpy, DefaultScreen(dpy));
- 	}
- 
--	/* return col.pixel |= 0xff << 24; */
--	/* This is a fix for picom making the borders transparent. DANGEROUS */
--	return col.pixel;
-+	/* possibly unsafe BUT i dont think it can cause any problems */
-+	return col.pixel |= 0xff << 24;
- }
- 
- void quit(void)
-@@ -2062,9 +2123,7 @@ void setup_atoms(void)
- 	atom_net_wm_window_type_dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
- 	atom_net_workarea = XInternAtom(dpy, "_NET_WORKAREA", False);
- 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
--	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
- 	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
--	atom_net_wm_state_fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
- 	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
- 	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
- 	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
-@@ -2078,7 +2137,6 @@ void setup_atoms(void)
- 	    atom_net_active_window,
- 	    atom_net_supported,
- 	    atom_net_wm_state,
--	    atom_net_wm_state_fullscreen,
- 	    atom_wm_window_type,
- 	    atom_net_wm_window_type_dock,
- 	    atom_net_workarea,
-@@ -2305,13 +2363,14 @@ void tile(void)
+@@ -2305,13 +2381,14 @@ void tile(void)
  			continue;
  		}
  
@@ -289,7 +217,7 @@ index 90ef09d..c6598fb 100644
  
  		{
  			Client *c = stackers[0];
-@@ -2338,7 +2397,6 @@ void tile(void)
+@@ -2338,7 +2415,6 @@ void tile(void)
  		}
  
  		int bw2 = 2 * user_config.border_width;
@@ -297,7 +225,7 @@ index 90ef09d..c6598fb 100644
  		int min_raw = bw2 + 1;
  		int total_fixed_heights = 0, auto_count = 0;
  		int heights_final[MAXCLIENTS] = {0};
-@@ -2354,7 +2412,7 @@ void tile(void)
+@@ -2354,7 +2430,7 @@ void tile(void)
  			}
  		}
  
@@ -306,7 +234,7 @@ index 90ef09d..c6598fb 100644
  		int remaining = tile_h - total_fixed_heights - total_vgaps;
  
  		if (auto_count > 0 && remaining >= auto_count * min_raw) {
-@@ -2408,7 +2466,7 @@ void tile(void)
+@@ -2408,7 +2484,7 @@ void tile(void)
  		int sy = tile_y;
  		for (int i = 1; i < N; i++) {
  			Client *c = stackers[i];
@@ -315,7 +243,7 @@ index 90ef09d..c6598fb 100644
  			                     .y = sy,
  			                     .width = MAX(1, stack_w - (2 * user_config.border_width)),
  			                     .height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
-@@ -2423,7 +2481,7 @@ void tile(void)
+@@ -2423,7 +2499,7 @@ void tile(void)
  			c->w = wc.width;
  			c->h = wc.height;
  
