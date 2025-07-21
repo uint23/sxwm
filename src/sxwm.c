@@ -109,22 +109,24 @@ int xerr(Display *dpy, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
 
-Atom atom_net_active_window;
-Atom atom_net_current_desktop;
-Atom atom_net_supported;
-Atom atom_net_wm_state;
-Atom atom_wm_window_type;
-Atom atom_net_wm_window_type_dock;
-Atom atom_net_workarea;
-Atom atom_wm_delete;
-Atom atom_wm_strut;
-Atom atom_wm_strut_partial;
-Atom atom_net_supporting_wm_check;
-Atom atom_net_wm_name;
-Atom atom_utf8_string;
-Atom atom_net_wm_desktop;
-Atom atom_net_client_list;
-Atom atom_net_frame_extents;
+Atom _NET_ACTIVE_WINDOW;
+Atom _NET_CURRENT_DESKTOP;
+Atom _NET_SUPPORTED;
+Atom _NET_WM_STATE;
+Atom _NET_WM_WINDOW_TYPE;
+Atom _NET_WM_WINDOW_TYPE_DOCK;
+Atom _NET_WORKAREA;
+Atom WM_DELETE_WINDOW;
+Atom _NET_WM_STRUT;
+Atom _NET_WM_STRUT_PARTIAL;
+Atom _NET_SUPPORTING_WM_CHECK;
+Atom _NET_WM_NAME;
+Atom UTF8_STRING;
+Atom _NET_WM_DESKTOP;
+Atom _NET_CLIENT_LIST;
+Atom _NET_FRAME_EXTENTS;
+Atom _NET_NUMBER_OF_DESKTOPS;
+Atom _NET_DESKTOP_NAMES;
 
 Cursor c_normal, c_move, c_resize;
 Client *workspaces[NUM_WORKSPACES] = {NULL};
@@ -207,7 +209,7 @@ Client *add_client(Window w, int ws)
 	            None, None);
 	XGrabButton(dpy, Button3, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
 
-	Atom protos[] = {atom_wm_delete};
+	Atom protos[] = {WM_DELETE_WINDOW};
 	XSetWMProtocols(dpy, w, protos, 1);
 
 	XWindowAttributes wa;
@@ -344,12 +346,12 @@ void close_focused(void)
 	int n;
 	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
 		for (int i = 0; i < n; i++) {
-			if (protos[i] == atom_wm_delete) {
+			if (protos[i] == WM_DELETE_WINDOW) {
 				XEvent ev = {.xclient = {.type = ClientMessage,
 				                         .window = focused->win,
 				                         .message_type = XInternAtom(dpy, "WM_PROTOCOLS", False),
 				                         .format = 32}};
-				ev.xclient.data.l[0] = atom_wm_delete;
+				ev.xclient.data.l[0] = WM_DELETE_WINDOW;
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
 				XFree(protos);
@@ -849,7 +851,7 @@ void hdl_button_release(XEvent *xev)
 void hdl_client_msg(XEvent *xev)
 {
 	/* clickable bar workspace switching */
-	if (xev->xclient.message_type == atom_net_current_desktop) {
+	if (xev->xclient.message_type == _NET_CURRENT_DESKTOP) {
 		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
 		return;
@@ -1121,7 +1123,7 @@ void hdl_map_req(XEvent *xev)
 	Atom *types = NULL;
 	Bool should_float = False;
 
-	if (XGetWindowProperty(dpy, w, atom_wm_window_type, 0, 8, False, XA_ATOM, &type, &format, &nitems, &after,
+	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &nitems, &after,
 	                       (unsigned char **)&types) == Success &&
 	    types) {
 		Atom dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
@@ -1394,19 +1396,19 @@ void hdl_motion(XEvent *xev)
 void hdl_root_property(XEvent *xev)
 {
 	XPropertyEvent *e = &xev->xproperty;
-	if (e->atom == atom_net_current_desktop) {
+	if (e->atom == _NET_CURRENT_DESKTOP) {
 		long *val = NULL;
 		Atom actual;
 		int fmt;
 		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, atom_net_current_desktop, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
+		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
 		                       (unsigned char **)&val) == Success &&
 		    val) {
 			change_workspace((int)val[0]);
 			XFree(val);
 		}
 	}
-	else if (e->atom == atom_wm_strut_partial) {
+	else if (e->atom == _NET_WM_STRUT_PARTIAL) {
 		update_struts();
 		tile();
 		update_borders();
@@ -1452,15 +1454,15 @@ void update_struts(void)
 		unsigned long n_items, bytes_after;
 		Atom *types = NULL;
 
-		if (XGetWindowProperty(dpy, w, atom_wm_window_type, 0, 4, False, XA_ATOM,
-					&actual_type, &actual_format, &n_items, &bytes_after,
-					(unsigned char **)&types) != Success || !types) {
+		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &actual_type, &actual_format,
+		                       &n_items, &bytes_after, (unsigned char **)&types) != Success ||
+		    !types) {
 			continue;
 		}
 
 		Bool is_dock = False;
 		for (unsigned long j = 0; j < n_items; j++) {
-			if (types[j] == atom_net_wm_window_type_dock) {
+			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
 				is_dock = True;
 				break;
 			}
@@ -1475,15 +1477,16 @@ void update_struts(void)
 		int sfmt;
 		unsigned long len, rem;
 
-		if (XGetWindowProperty(dpy, w, atom_wm_strut_partial, 0, 12, False, XA_CARDINAL,
-					&actual, &sfmt, &len, &rem, (unsigned char **)&str) == Success && str && len >= 4) {
+		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
+		                       (unsigned char **)&str) == Success &&
+		    str && len >= 4) {
 
 			XWindowAttributes wa;
 			if (XGetWindowAttributes(dpy, w, &wa)) {
 				/* find the monitor this dock belongs to */
 				for (int m = 0; m < monsn; m++) {
-					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w &&
-							wa.y >= mons[m].y && wa.y < mons[m].y + mons[m].h) {
+					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w && wa.y >= mons[m].y &&
+					    wa.y < mons[m].y + mons[m].h) {
 						mons[m].reserve_left = MAX(mons[m].reserve_left, str[0]);
 						mons[m].reserve_right = MAX(mons[m].reserve_right, str[1]);
 						mons[m].reserve_top = MAX(mons[m].reserve_top, str[2]);
@@ -1509,8 +1512,7 @@ void update_workarea(void)
 		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
 	}
 
-	XChangeProperty(dpy, root, atom_net_workarea, XA_CARDINAL, 32, PropModeReplace,
-			(unsigned char *)workarea, monsn * 4);
+	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, monsn * 4);
 }
 
 void inc_gaps(void)
@@ -1737,10 +1739,10 @@ void quit(void)
 	/* Kill all clients on exit...
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
-			XUnmapWindow(dpy, c->win);
-			XKillClient(dpy, c->win);
-		}
+	    for (Client *c = workspaces[ws]; c; c = c->next) {
+	        XUnmapWindow(dpy, c->win);
+	        XKillClient(dpy, c->win);
+	    }
 	}
 	*/
 
@@ -2055,59 +2057,43 @@ void setup(void)
 
 void setup_atoms(void)
 {
-	Atom a_num = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
-	Atom a_names = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
-	atom_net_current_desktop = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
-	atom_net_active_window = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
-	atom_net_supported = XInternAtom(dpy, "_NET_SUPPORTED", False);
-	atom_wm_strut_partial = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
-	atom_wm_strut = XInternAtom(dpy, "_NET_WM_STRUT", False); /* legacy struts */
-	atom_wm_window_type = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
-	atom_net_wm_window_type_dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
-	atom_net_workarea = XInternAtom(dpy, "_NET_WORKAREA", False);
-	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	atom_net_wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	atom_wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-	atom_net_supporting_wm_check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
-	atom_net_wm_name = XInternAtom(dpy, "_NET_WM_NAME", False);
-	atom_utf8_string = XInternAtom(dpy, "UTF8_STRING", False);
-	atom_net_wm_desktop = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
-	atom_net_client_list = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
-	atom_net_frame_extents = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
+	_NET_NUMBER_OF_DESKTOPS = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+	_NET_DESKTOP_NAMES = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
+	_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	_NET_SUPPORTED = XInternAtom(dpy, "_NET_SUPPORTED", False);
+	_NET_WM_STRUT_PARTIAL = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
+	_NET_WM_STRUT = XInternAtom(dpy, "_NET_WM_STRUT", False); /* legacy struts */
+	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
+	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", False);
+	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
+	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
+	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_NAME", False);
+	UTF8_STRING = XInternAtom(dpy, "UTF8_STRING", False);
+	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
+	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
+	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
 
 	Atom support_list[] = {
-	    atom_net_current_desktop,
-	    atom_net_active_window,
-	    atom_net_supported,
-	    atom_net_wm_state,
-	    atom_wm_window_type,
-	    atom_net_wm_window_type_dock,
-	    atom_net_workarea,
-	    atom_wm_strut,
-	    atom_wm_strut_partial,
-	    atom_wm_delete,
-	    atom_net_supporting_wm_check,
-	    atom_net_wm_name,
-	    atom_utf8_string,
-	    atom_net_wm_desktop,
-	    atom_net_client_list,
-		atom_net_frame_extents,
+	    _NET_CURRENT_DESKTOP,     _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,         _NET_WM_WINDOW_TYPE,
+	    _NET_WM_WINDOW_TYPE_DOCK, _NET_WORKAREA,      _NET_WM_STRUT,  _NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW,
+	    _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,       UTF8_STRING,    _NET_WM_DESKTOP,       _NET_CLIENT_LIST,
+	    _NET_FRAME_EXTENTS,
 	};
 
 	long num = NUM_WORKSPACES;
-	XChangeProperty(dpy, root, a_num, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&num, 1);
+	XChangeProperty(dpy, root, _NET_NUMBER_OF_DESKTOPS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&num, 1);
 
 	const char names[] = WORKSPACE_NAMES;
 	int names_len = sizeof(names);
-
-	XChangeProperty(dpy, root, a_names, XInternAtom(dpy, "UTF8_STRING", False), 8, PropModeReplace,
-	                (unsigned char *)names, names_len);
+	XChangeProperty(dpy, root, _NET_DESKTOP_NAMES, UTF8_STRING, 8, PropModeReplace, (unsigned char *)names, names_len);
 
 	long initial = current_ws;
-	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&initial, 1);
+	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&initial, 1);
 
-	XChangeProperty(dpy, root, atom_net_supported, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
+	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
 	                sizeof(support_list) / sizeof(Atom));
 
 	update_workarea();
@@ -2115,8 +2101,9 @@ void setup_atoms(void)
 
 void set_frame_extents(Window w)
 {
-	long extents[4] = {user_config.border_width, user_config.border_width, user_config.border_width, user_config.border_width};
-	XChangeProperty(dpy, w, atom_net_frame_extents, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+	long extents[4] = {user_config.border_width, user_config.border_width, user_config.border_width,
+	                   user_config.border_width};
+	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
 }
 
 void set_win_scratchpad(int n)
@@ -2635,7 +2622,7 @@ void update_borders(void)
 	}
 	if (focused) {
 		Window w = focused->win;
-		XChangeProperty(dpy, root, atom_net_active_window, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&w, 1);
+		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&w, 1);
 	}
 }
 
