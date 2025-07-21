@@ -1877,10 +1877,14 @@ void remove_scratchpad(int n)
 
 	if (c->win) {
 		XMapWindow(dpy, c->win);
+		c->mapped = True;
 	}
 
 	scratchpads[n].client = NULL;
 	scratchpads[n].enabled = False;
+
+	update_net_client_list();
+	update_borders();
 }
 
 void resize_master_add(void)
