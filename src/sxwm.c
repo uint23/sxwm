@@ -281,27 +281,105 @@ void change_workspace(int ws)
 	in_ws_switch = True;
 	XGrabServer(dpy);
 
-	/* unmap those still marked mapped */
+	Bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
+	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+		if (scratchpads[i].client && scratchpads[i].enabled) {
+			visible_scratchpads[i] = True;
+			XUnmapWindow(dpy, scratchpads[i].client->win);
+			scratchpads[i].client->mapped = False;
+		}
+	}
+
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
-			XUnmapWindow(dpy, c->win);
+			Bool is_scratchpad = False;
+			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+				if (scratchpads[i].client == c) {
+					is_scratchpad = True;
+					break;
+				}
+			}
+			if (!is_scratchpad) {
+				XUnmapWindow(dpy, c->win);
+			}
 		}
 	}
 
 	current_ws = ws;
-
-	/* map those still marked mapped */
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
+			Bool is_scratchpad = False;
+			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+				if (scratchpads[i].client == c) {
+					is_scratchpad = True;
+					break;
+				}
+			}
+			if (!is_scratchpad) {
+				XMapWindow(dpy, c->win);
+			}
+		}
+	}
+
+	/* move visible scratchpads to new workspace and map them */
+	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+		if (visible_scratchpads[i] && scratchpads[i].client) {
+			Client *c = scratchpads[i].client;
+
+			/* remove from old workspace */
+			Client **pp = &workspaces[c->ws];
+			while (*pp && *pp != c) {
+				pp = &(*pp)->next;
+			}
+			if (*pp) {
+				*pp = c->next;
+			}
+
+			/* add to new workspace */
+			c->next = workspaces[current_ws];
+			workspaces[current_ws] = c;
+			c->ws = current_ws;
+
 			XMapWindow(dpy, c->win);
+			c->mapped = True;
+			XRaiseWindow(dpy, c->win);
+
+			/* Update desktop property */
+			long desktop = current_ws;
+			XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+			                (unsigned char *)&desktop, 1);
 		}
 	}
 
 	tile();
 
 	focused = NULL;
-	if (workspaces[current_ws]) {
-		focused = workspaces[current_ws];
+
+	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
+		if (visible_scratchpads[i] && scratchpads[i].client) {
+			focused = scratchpads[i].client;
+			break;
+		}
+	}
+
+	/* if no scratchpad focused, focus regular window */
+	if (!focused && workspaces[current_ws]) {
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			Bool is_scratchpad = False;
+			for (int j = 0; j < MAX_SCRATCHPADS; j++) {
+				if (scratchpads[j].client == c) {
+					is_scratchpad = True;
+					break;
+				}
+			}
+			if (!is_scratchpad) {
+				focused = c;
+				break;
+			}
+		}
+	}
+
+	if (focused) {
 		Window focused_win = find_toplevel(focused->win);
 		XSetInputFocus(dpy, focused_win, RevertToPointerRoot, CurrentTime);
 		if (user_config.warp_cursor) {
@@ -2557,41 +2635,45 @@ void toggle_scratchpad(int n)
 			*pp = c->next;
 		}
 
-		/* link to new workspace */
+		/* link to current workspace */
 		c->next = workspaces[current_ws];
 		workspaces[current_ws] = c;
-
 		c->ws = current_ws;
-		c->mon = get_monitor_for(c);
 
-		tile();
-		update_borders();
-		update_client_desktop_properties();
-		update_net_client_list();
+		long desktop = current_ws;
+		XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
+		                (unsigned char *)&desktop, 1);
 	}
+
+	c->mon = focused ? focused->mon : current_monitor;
 
 	if (scratchpads[n].enabled) {
 		XUnmapWindow(dpy, c->win);
+		c->mapped = False;
 		scratchpads[n].enabled = False;
 		focus_prev();
 		if (focused) {
 			send_wm_take_focus(focused->win);
 		}
-		update_borders();
 	}
 	else {
 		XMapWindow(dpy, c->win);
+		c->mapped = True;
 		XRaiseWindow(dpy, c->win);
 		scratchpads[n].enabled = True;
+
 		focused = c;
 		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(c->win);
+
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
-		tile();
-		update_borders();
 	}
+
+	tile();
+	update_borders();
+	update_net_client_list();
 }
 
 void unswallow_window(Client *c)
