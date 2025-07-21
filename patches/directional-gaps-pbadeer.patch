@@ -1,0 +1,254 @@
+Author: pbadeer
+Date: 2025-07-20
+Description: Add directional gap support with runtime adjustment
+Commit Version: 539a8ff (fix bottom bar struts taking half screen && windows killed on exit)
+
+This patch extends the existing gap system to support individual gaps for each side:
+gap_top, gap_bottom, gap_left, and gap_right. The original 'gaps' config option
+is preserved for backward compatibility and sets all four directional gaps when used.
+
+Key features:
+- Individual gap configuration per side (gap_top, gap_bottom, gap_left, gap_right)
+- Runtime adjustment functions for each gap direction
+- Parser commands: increase_gap_[side], decrease_gap_[side]
+- Backward compatibility with existing 'gaps' option
+- Fixed stack window positioning to avoid internal gaps
+
+This allows users to configure asymmetric gaps for specific layouts while
+maintaining the simplicity of the original gap system for basic use cases.
+
+---
+
+diff --git a/src/defs.h b/src/defs.h
+index 1652fbe..496dc61 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -89,6 +89,10 @@ typedef struct Client {
+ typedef struct {
+ 	int modkey;
+ 	int gaps;
++	int gap_top;
++	int gap_bottom;
++	int gap_left;
++	int gap_right;
+ 	int border_width;
+ 	long border_foc_col;
+ 	long border_ufoc_col;
+@@ -131,6 +135,14 @@ typedef struct {
+ extern void centre_window();
+ extern void close_focused(void);
+ extern void dec_gaps(void);
++extern void inc_gap_top(void);
++extern void dec_gap_top(void);
++extern void inc_gap_bottom(void);
++extern void dec_gap_bottom(void);
++extern void inc_gap_left(void);
++extern void dec_gap_left(void);
++extern void inc_gap_right(void);
++extern void dec_gap_right(void);
+ extern void focus_next(void);
+ extern void focus_prev(void);
+ extern void focus_next_mon(void);
+diff --git a/src/parser.c b/src/parser.c
+index 9e82c08..f347762 100644
+--- a/src/parser.c
++++ b/src/parser.c
+@@ -21,6 +21,14 @@ static const CommandEntry call_table[] = {{"close_window", close_focused},
+                                           {"focus_next_mon", focus_next_mon},
+                                           {"focus_prev_mon", focus_prev_mon},
+                                           {"increase_gaps", inc_gaps},
++                                          {"increase_gap_top", inc_gap_top},
++                                          {"decrease_gap_top", dec_gap_top},
++                                          {"increase_gap_bottom", inc_gap_bottom},
++                                          {"decrease_gap_bottom", dec_gap_bottom},
++                                          {"increase_gap_left", inc_gap_left},
++                                          {"decrease_gap_left", dec_gap_left},
++                                          {"increase_gap_right", inc_gap_right},
++                                          {"decrease_gap_right", dec_gap_right},
+                                           {"master_next", move_master_next},
+                                           {"master_previous", move_master_prev},
+                                           {"move_next_mon", move_next_mon},
+@@ -225,7 +233,24 @@ found:
+ 			}
+ 		}
+ 		else if (!strcmp(key, "gaps")) {
+-			cfg->gaps = atoi(rest);
++			int gap_val = atoi(rest);
++			cfg->gaps = gap_val;
++			cfg->gap_top = gap_val;
++			cfg->gap_bottom = gap_val;
++			cfg->gap_left = gap_val;
++			cfg->gap_right = gap_val;
++		}
++		else if (!strcmp(key, "gap_top")) {
++			cfg->gap_top = atoi(rest);
++		}
++		else if (!strcmp(key, "gap_bottom")) {
++			cfg->gap_bottom = atoi(rest);
++		}
++		else if (!strcmp(key, "gap_left")) {
++			cfg->gap_left = atoi(rest);
++		}
++		else if (!strcmp(key, "gap_right")) {
++			cfg->gap_right = atoi(rest);
+ 		}
+ 		else if (!strcmp(key, "border_width")) {
+ 			cfg->border_width = atoi(rest);
+diff --git a/src/sxwm.c b/src/sxwm.c
+index 90ef09d..6f44c12 100644
+--- a/src/sxwm.c
++++ b/src/sxwm.c
+@@ -367,6 +367,11 @@ void dec_gaps(void)
+ {
+ 	if (user_config.gaps > 0) {
+ 		user_config.gaps--;
++		user_config.gap_top--;
++		user_config.gap_bottom--;
++		user_config.gap_left--;
++		user_config.gap_right--;
++		tile();
++		update_borders();
++	}
++}
++
++void dec_gap_top(void)
++{
++	if (user_config.gap_top > 0) {
++		user_config.gap_top--;
+ 		tile();
+ 		update_borders();
+ 	}
+@@ -1519,6 +1524,73 @@ void update_workarea(void)
+ void inc_gaps(void)
+ {
+ 	user_config.gaps++;
++	user_config.gap_top++;
++	user_config.gap_bottom++;
++	user_config.gap_left++;
++	user_config.gap_right++;
++	tile();
++	update_borders();
++}
++
++void inc_gap_top(void)
++{
++	user_config.gap_top++;
++	tile();
++	update_borders();
++}
++
++void inc_gap_bottom(void)
++{
++	user_config.gap_bottom++;
++	tile();
++	update_borders();
++}
++
++void dec_gap_bottom(void)
++{
++	if (user_config.gap_bottom > 0) {
++		user_config.gap_bottom--;
++		tile();
++		update_borders();
++	}
++}
++
++void inc_gap_left(void)
++{
++	user_config.gap_left++;
++	tile();
++	update_borders();
++}
++
++void dec_gap_left(void)
++{
++	if (user_config.gap_left > 0) {
++		user_config.gap_left--;
++		tile();
++		update_borders();
++	}
++}
++
++void inc_gap_right(void)
++{
++	user_config.gap_right++;
++	tile();
++	update_borders();
++}
++
++void dec_gap_right(void)
++{
++	if (user_config.gap_right > 0) {
++		user_config.gap_right--;
++		tile();
++		update_borders();
++	}
++}
++
++
++void init_defaults(void)
++{
++	default_config.modkey = Mod4Mask;
++	default_config.gaps = 10;
++	default_config.gap_top = 10;
++	default_config.gap_bottom = 10;
++	default_config.gap_left = 10;
++	default_config.gap_right = 10;
+ 	default_config.border_width = 1;
+ 	default_config.border_foc_col = parse_col("#c0cbff");
+ 	default_config.border_ufoc_col = parse_col("#555555");
+@@ -2305,13 +2381,14 @@ void tile(void)
+ 			continue;
+ 		}
+ 
+-		int gx = user_config.gaps, gy = user_config.gaps;
+-		int tile_x = mon_x + gx, tile_y = mon_y + gy;
+-		int tile_w = MAX(1, mon_w - 2 * gx);
+-		int tile_h = MAX(1, mon_h - 2 * gy);
++		int gap_left = user_config.gap_left, gap_right = user_config.gap_right;
++		int gap_top = user_config.gap_top, gap_bottom = user_config.gap_bottom;
++		int tile_x = mon_x + gap_left, tile_y = mon_y + gap_top;
++		int tile_w = MAX(1, mon_w - gap_left - gap_right);
++		int tile_h = MAX(1, mon_h - gap_top - gap_bottom);
+ 		float mf = CLAMP(user_config.master_width[m], MF_MIN, MF_MAX);
+ 		int master_w = (N > 1) ? (int)(tile_w * mf) : tile_w;
+-		int stack_w = (N > 1) ? (tile_w - master_w - gx) : 0;
++		int stack_w = (N > 1) ? (tile_w - master_w) : 0;
+ 
+ 		{
+ 			Client *c = stackers[0];
+@@ -2338,7 +2415,6 @@ void tile(void)
+ 		}
+ 
+ 		int bw2 = 2 * user_config.border_width;
+-		int num_stack = N - 1;
+ 		int min_raw = bw2 + 1;
+ 		int total_fixed_heights = 0, auto_count = 0;
+ 		int heights_final[MAXCLIENTS] = {0};
+@@ -2354,7 +2430,7 @@ void tile(void)
+ 			}
+ 		}
+ 
+-		int total_vgaps = (num_stack - 1) * gy;
++		int total_vgaps = 0;
+ 		int remaining = tile_h - total_fixed_heights - total_vgaps;
+ 
+ 		if (auto_count > 0 && remaining >= auto_count * min_raw) {
+@@ -2408,7 +2484,7 @@ void tile(void)
+ 		int sy = tile_y;
+ 		for (int i = 1; i < N; i++) {
+ 			Client *c = stackers[i];
+-			XWindowChanges wc = {.x = tile_x + master_w + gx,
++			XWindowChanges wc = {.x = tile_x + master_w,
+ 			                     .y = sy,
+ 			                     .width = MAX(1, stack_w - (2 * user_config.border_width)),
+ 			                     .height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
+@@ -2423,7 +2499,7 @@ void tile(void)
+ 			c->w = wc.width;
+ 			c->h = wc.height;
+ 
+-			sy += heights_final[i] + gy;
++			sy += heights_final[i];
+ 		}
+ 
+ 		update_borders();
