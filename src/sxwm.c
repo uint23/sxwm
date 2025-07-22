@@ -514,8 +514,9 @@ void focus_next(void)
 	current_monitor = c->mon;
 	XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 	XRaiseWindow(dpy, c->win);
-	if (user_config.warp_cursor)
+	if (user_config.warp_cursor) {
 		warp_cursor(c);
+	}
 	update_borders();
 }
 
@@ -1039,6 +1040,9 @@ void hdl_destroy_ntf(XEvent *xev)
 				if (focused) {
 					XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 					XRaiseWindow(dpy, focused->win);
+					if (user_config.warp_cursor) {
+						warp_cursor(focused);
+					}
 				}
 			}
 			return;
