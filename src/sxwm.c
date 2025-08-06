@@ -154,12 +154,13 @@ Monitor *mons = NULL;
 Scratchpad scratchpads[MAX_SCRATCHPADS];
 int scratchpad_count = 0;
 int current_scratchpad = 0;
-int monsn = 0;
+int n_mons = 0;
 int current_monitor = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool backup_binds = False;
 Bool running = False;
+Bool next_should_float = False;
 
 long last_motion_time = 0;
 int scr_width;
@@ -172,8 +173,6 @@ int reserve_left = 0;
 int reserve_right = 0;
 int reserve_top = 0;
 int reserve_bottom = 0;
-
-Bool next_should_float = False;
 
 Client *add_client(Window w, int ws)
 {
@@ -208,16 +207,15 @@ Client *add_client(Window w, int ws)
 	}
 	open_windows++;
 
-	Mask window_masks =  EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask |
-		                 StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	Mask window_masks = EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask |
+		                StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	select_input(w, window_masks);
-
-	/* grab buttons for win */
 	grab_button(Button1, None, w, False, ButtonPressMask);
 	grab_button(Button1, user_config.modkey, w, False, ButtonPressMask);
 	grab_button(Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask);
 	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
 
+	/* allow for more graceful exitting */
 	Atom protos[] = {WM_DELETE_WINDOW};
 	XSetWMProtocols(dpy, w, protos, 1);
 
@@ -228,23 +226,27 @@ Client *add_client(Window w, int ws)
 	c->w = wa.width;
 	c->h = wa.height;
 
-	/* set monitor based on pointer location */
+	/* set monitor based on cursor location */
 	Window root_ret, child_ret;
-	int root_x, root_y, win_x, win_y;
-	unsigned int mask;
-	int pointer_mon = 0;
+	int root_x, root_y,
+		win_x, win_y;
+	unsigned int masks;
+	int cursor_mon = 0;
 
-	if (XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &mask)) {
-		for (int i = 0; i < monsn; i++) {
-			if (root_x >= mons[i].x && root_x < mons[i].x + mons[i].w && root_y >= mons[i].y &&
-			    root_y < mons[i].y + mons[i].h) {
-				pointer_mon = i;
+	if (XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &masks)) {
+		for (int i = 0; i < n_mons; i++) {
+			Bool in_mon = root_x >= mons[i].x &&
+				          root_x < mons[i].x + mons[i].w &&
+				          root_y >= mons[i].y &&
+			              root_y < mons[i].y + mons[i].h;
+			if (in_mon) {
+				cursor_mon = i;
 				break;
 			}
 		}
 	}
 
-	c->mon = pointer_mon;
+	c->mon = cursor_mon;
 	c->fixed = False;
 	c->floating = False;
 	c->fullscreen = False;
@@ -260,9 +262,8 @@ Client *add_client(Window w, int ws)
 	}
 
 	long desktop = ws;
-	XChangeProperty(dpy, w, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&desktop, 1);
-
+	XChangeProperty(dpy, w, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)&desktop, 1);
 	XRaiseWindow(dpy, w);
 	return c;
 }
@@ -560,13 +561,13 @@ void focus_prev(void)
 
 void focus_next_mon(void)
 {
-	if (monsn <= 1) {
+	if (n_mons <= 1) {
 		return; /* only one monitor, nothing to switch to */
 	}
 
 	/* use current_monitor if no focused window, otherwise use focused window's monitor */
 	int current_mon = focused ? focused->mon : current_monitor;
-	int target_mon = (current_mon + 1) % monsn;
+	int target_mon = (current_mon + 1) % n_mons;
 
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
@@ -600,13 +601,13 @@ void focus_next_mon(void)
 
 void focus_prev_mon(void)
 {
-	if (monsn <= 1) {
+	if (n_mons <= 1) {
 		return; /* only one monitor, nothing to switch to */
 	}
 
 	/* use current_monitor if no focused window, otherwise use focused window's monitor */
 	int current_mon = focused ? focused->mon : current_monitor;
-	int target_mon = (current_mon - 1 + monsn) % monsn;
+	int target_mon = (current_mon - 1 + n_mons) % n_mons;
 
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
@@ -641,7 +642,7 @@ void focus_prev_mon(void)
 int get_monitor_for(Client *c)
 {
 	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
-	for (int i = 0; i < monsn; i++) {
+	for (int i = 0; i < n_mons; i++) {
 		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h) {
 			return i;
 		}
@@ -1228,7 +1229,7 @@ void hdl_motion(XEvent *xev)
 
 	/* figure out which monitor the pointer is in right now */
 	int mon = 0;
-	for (int i = 0; i < monsn; i++) {
+	for (int i = 0; i < n_mons; i++) {
 		if (e->x_root >= mons[i].x && e->x_root < mons[i].x + mons[i].w && e->y_root >= mons[i].y &&
 		    e->y_root < mons[i].y + mons[i].h) {
 			mon = i;
@@ -1507,11 +1508,11 @@ void move_master_prev(void)
 
 void move_next_mon(void)
 {
-	if (!focused || monsn <= 1) {
+	if (!focused || n_mons <= 1) {
 		return; /* no focused window or only one monitor */
 	}
 
-	int target_mon = (focused->mon + 1) % monsn;
+	int target_mon = (focused->mon + 1) % n_mons;
 
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
@@ -1552,11 +1553,11 @@ void move_next_mon(void)
 
 void move_prev_mon(void)
 {
-	if (!focused || monsn <= 1) {
+	if (!focused || n_mons <= 1) {
 		return; /* no focused window or only one monitor */
 	}
 
-	int target_mon = (focused->mon - 1 + monsn) % monsn;
+	int target_mon = (focused->mon - 1 + n_mons) % n_mons;
 
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
@@ -1887,18 +1888,20 @@ void run(void)
 
 void scan_existing_windows(void)
 {
-	Window root_return, parent_return;
+	Window root_return;
+	Window parent_return;
 	Window *children;
-	unsigned int nchildren;
+	unsigned int n_children;
 
-	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &nchildren)) {
-		for (unsigned int i = 0; i < nchildren; i++) {
+	if (XQueryTree(dpy, root, &root_return, &parent_return, &children, &n_children)) {
+		for (unsigned int i = 0; i < n_children; i++) {
 			XWindowAttributes wa;
-			if (!XGetWindowAttributes(dpy, children[i], &wa) || wa.override_redirect || wa.map_state != IsViewable) {
+			if (!XGetWindowAttributes(dpy, children[i], &wa)
+				|| wa.override_redirect || wa.map_state != IsViewable) {
 				continue;
 			}
 
-			XEvent fake_event = {0};
+			XEvent fake_event = {None};
 			fake_event.type = MapRequest;
 			fake_event.xmaprequest.window = children[i];
 			hdl_map_req(&fake_event);
@@ -1937,7 +1940,7 @@ void send_wm_take_focus(Window w)
 void setup(void)
 {
 	if ((dpy = XOpenDisplay(NULL)) == False) {
-		errx(0, "can't open display. quitting...");
+		errx(0, "can't open display.\nquitting...");
 	}
 	root = XDefaultRootWindow(dpy);
 
@@ -2285,7 +2288,7 @@ void tile(void)
 		}
 	}
 
-	for (int m = 0; m < monsn; m++) {
+	for (int m = 0; m < n_mons; m++) {
 		int mon_x = mons[m].x, mon_y = mons[m].y + mons[m].reserve_top;
 		int mon_w = mons[m].w, mon_h = mons[m].h - mons[m].reserve_top - mons[m].reserve_bottom;
 
@@ -2663,9 +2666,9 @@ void update_mons(void)
 	}
 
 	if (XineramaIsActive(dpy)) {
-		info = XineramaQueryScreens(dpy, &monsn);
-		mons = malloc(sizeof *mons * monsn);
-		for (int i = 0; i < monsn; i++) {
+		info = XineramaQueryScreens(dpy, &n_mons);
+		mons = malloc(sizeof *mons * n_mons);
+		for (int i = 0; i < n_mons; i++) {
 			mons[i].x = info[i].x_org;
 			mons[i].y = info[i].y_org;
 			mons[i].w = info[i].width;
@@ -2674,7 +2677,7 @@ void update_mons(void)
 		XFree(info);
 	}
 	else {
-		monsn = 1;
+		n_mons = 1;
 		mons = malloc(sizeof *mons);
 		mons[0].x = 0;
 		mons[0].y = 0;
@@ -2701,7 +2704,7 @@ void update_net_client_list(void)
 void update_struts(void)
 {
 	/* reset all reserves */
-	for (int i = 0; i < monsn; i++) {
+	for (int i = 0; i < n_mons; i++) {
 		mons[i].reserve_left = mons[i].reserve_right = mons[i].reserve_top = mons[i].reserve_bottom = 0;
 	}
 
@@ -2750,7 +2753,7 @@ void update_struts(void)
 			XWindowAttributes wa;
 			if (XGetWindowAttributes(dpy, w, &wa)) {
 				/* find the monitor this dock belongs to */
-				for (int m = 0; m < monsn; m++) {
+				for (int m = 0; m < n_mons; m++) {
 					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w && wa.y >= mons[m].y &&
 					    wa.y < mons[m].y + mons[m].h) {
 						mons[m].reserve_left = MAX(mons[m].reserve_left, str[0]);
@@ -2771,7 +2774,7 @@ void update_workarea(void)
 {
 	long workarea[4 * MAX_MONITORS];
 
-	for (int i = 0; i < monsn && i < MAX_MONITORS; i++) {
+	for (int i = 0; i < n_mons && i < MAX_MONITORS; i++) {
 		workarea[i * 4 + 0] = mons[i].x + mons[i].reserve_left;
 		workarea[i * 4 + 1] = mons[i].y + mons[i].reserve_top;
 		workarea[i * 4 + 2] = mons[i].w - mons[i].reserve_left - mons[i].reserve_right;
@@ -2779,7 +2782,7 @@ void update_workarea(void)
 	}
 
 	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32,
-			        PropModeReplace, (unsigned char *)workarea, monsn * 4);
+			        PropModeReplace, (unsigned char *)workarea, n_mons * 4);
 }
 
 void warp_cursor(Client *c)
