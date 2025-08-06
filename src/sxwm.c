@@ -1998,24 +1998,29 @@ void setup_atoms(void)
 	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
 
 	Atom support_list[] = {
-	    _NET_CURRENT_DESKTOP,     _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,         _NET_WM_WINDOW_TYPE,
-	    _NET_WM_WINDOW_TYPE_DOCK, _NET_WORKAREA,      _NET_WM_STRUT,  _NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW,
-	    _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,       UTF8_STRING,    _NET_WM_DESKTOP,       _NET_CLIENT_LIST,
-	    _NET_FRAME_EXTENTS,
+	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
+		_NET_WM_WINDOW_TYPE, _NET_WM_WINDOW_TYPE_DOCK, _NET_WORKAREA, _NET_WM_STRUT,
+		_NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW, _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,
+		UTF8_STRING, _NET_WM_DESKTOP, _NET_CLIENT_LIST, _NET_FRAME_EXTENTS,
 	};
 
-	long num = NUM_WORKSPACES;
-	XChangeProperty(dpy, root, _NET_NUMBER_OF_DESKTOPS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&num, 1);
+	/* workspace setup */
+	long num_workspaces = NUM_WORKSPACES;
+	XChangeProperty(dpy, root, _NET_NUMBER_OF_DESKTOPS, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)&num_workspaces, 1);
 
-	const char names[] = WORKSPACE_NAMES;
-	int names_len = sizeof(names);
-	XChangeProperty(dpy, root, _NET_DESKTOP_NAMES, UTF8_STRING, 8, PropModeReplace, (unsigned char *)names, names_len);
+	const char workspace_names[] = WORKSPACE_NAMES;
+	int names_len = sizeof(workspace_names);
+	XChangeProperty(dpy, root, _NET_DESKTOP_NAMES, UTF8_STRING, 8,
+			        PropModeReplace, (unsigned char *)workspace_names, names_len);
 
-	long initial = current_ws;
-	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&initial, 1);
+	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)&current_ws, 1);
 
-	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32, PropModeReplace, (unsigned char *)support_list,
-	                sizeof(support_list) / sizeof(Atom));
+	/* load supported list */
+	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32,
+			        PropModeReplace, (unsigned char *)support_list,
+					sizeof(support_list) / sizeof(Atom));
 
 	update_workarea();
 }
@@ -2754,7 +2759,8 @@ void update_workarea(void)
 		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
 	}
 
-	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, monsn * 4);
+	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)workarea, monsn * 4);
 }
 
 void warp_cursor(Client *c)
