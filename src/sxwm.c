@@ -46,6 +46,8 @@ int clean_mask(int mask);
 Window find_toplevel(Window w);
 /* void focus_next(void); */
 /* void focus_prev(void); */
+/* void focus_next_mon(void); */
+/* void focus_prev_mon(void); */
 int get_monitor_for(Client *c);
 pid_t get_pid(Window w);
 int get_workspace_for_window(Window w);
@@ -67,6 +69,8 @@ void init_defaults(void);
 Bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
+/* void move_next_mon(void); */
+/* void move_prev_mon(void); */
 void move_to_workspace(int ws);
 void other_wm(void);
 int other_wm_err(Display *dpy, XErrorEvent *ee);
@@ -452,22 +456,6 @@ void dec_gaps(void)
 	}
 }
 
-void startup_exec(void)
-{
-	for (int i = 0; i < 256; i++) {
-		if (user_config.torun[i]) {
-			const char **argv = build_argv(user_config.torun[i]);
-			if (argv) {
-				spawn(argv);
-				for (int j = 0; argv[j]; j++) {
-					free((char *)argv[j]);
-				}
-				free(argv);
-			}
-		}
-	}
-}
-
 Window find_toplevel(Window w)
 {
 	Window root = None;
@@ -643,96 +631,6 @@ void focus_prev_mon(void)
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 		XSync(dpy, False);
 	}
-}
-
-void move_next_mon(void)
-{
-	if (!focused || monsn <= 1) {
-		return; /* no focused window or only one monitor */
-	}
-
-	int target_mon = (focused->mon + 1) % monsn;
-
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
-	tile();
-
-	/* follow the window with cursor if enabled */
-	if (user_config.warp_cursor) {
-		warp_cursor(focused);
-	}
-
-	update_borders();
-}
-
-void move_prev_mon(void)
-{
-	if (!focused || monsn <= 1) {
-		return; /* no focused window or only one monitor */
-	}
-
-	int target_mon = (focused->mon - 1 + monsn) % monsn;
-
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	current_monitor = target_mon;
-
-	/* if window is floating, center it on the target monitor */
-	if (focused->floating) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
-
-	/* retile to update layouts on both monitors */
-	tile();
-
-	/* follow the window with cursor if enabled */
-	if (user_config.warp_cursor) {
-		warp_cursor(focused);
-	}
-
-	update_borders();
 }
 
 int get_monitor_for(Client *c)
@@ -1091,76 +989,6 @@ void hdl_keypress(XEvent *xev)
 	}
 }
 
-void swallow_window(Client *swallower, Client *swallowed)
-{
-	if (!swallower || !swallowed || swallower->swallowed || swallowed->swallower) {
-		return;
-	}
-
-	XUnmapWindow(dpy, swallower->win);
-	swallower->mapped = False;
-
-	swallower->swallowed = swallowed;
-	swallowed->swallower = swallower;
-
-	swallowed->floating = swallower->floating;
-	if (swallowed->floating) {
-		swallowed->x = swallower->x;
-		swallowed->y = swallower->y;
-		swallowed->w = swallower->w;
-		swallowed->h = swallower->h;
-
-		if (swallowed->win) {
-			XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
-		}
-	}
-
-	tile();
-	update_borders();
-}
-
-void swap_clients(Client *a, Client *b)
-{
-	if (!a || !b || a == b) {
-		return;
-	}
-
-	Client **head = &workspaces[current_ws];
-	Client **pa = head, **pb = head;
-
-	while (*pa && *pa != a) {
-		pa = &(*pa)->next;
-	}
-	while (*pb && *pb != b) {
-		pb = &(*pb)->next;
-	}
-
-	if (!*pa || !*pb) {
-		return;
-	}
-
-	/* if next to it swap */
-	if (*pa == b && *pb == a) {
-		Client *tmp = b->next;
-		b->next = a;
-		a->next = tmp;
-		*pa = b;
-		return;
-	}
-
-	/* full swap */
-	Client *ta = *pa;
-	Client *tb = *pb;
-	Client *ta_next = ta->next;
-	Client *tb_next = tb->next;
-
-	*pa = tb;
-	tb->next = ta_next == tb ? ta : ta_next;
-
-	*pb = ta;
-	ta->next = tb_next == ta ? tb : tb_next;
-}
-
 void hdl_map_req(XEvent *xev)
 {
 	Window w = xev->xmaprequest.window;
@@ -1514,89 +1342,6 @@ void hdl_unmap_ntf(XEvent *xev)
 	update_borders();
 }
 
-void update_struts(void)
-{
-	/* reset all reserves */
-	for (int i = 0; i < monsn; i++) {
-		mons[i].reserve_left = mons[i].reserve_right = mons[i].reserve_top = mons[i].reserve_bottom = 0;
-	}
-
-	Window root_ret, parent_ret, *children;
-	unsigned int nchildren;
-
-	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &nchildren)) {
-		return;
-	}
-
-	for (unsigned int i = 0; i < nchildren; i++) {
-		Window w = children[i];
-
-		Atom actual_type;
-		int actual_format;
-		unsigned long n_items, bytes_after;
-		Atom *types = NULL;
-
-		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &actual_type, &actual_format,
-		                       &n_items, &bytes_after, (unsigned char **)&types) != Success ||
-		    !types) {
-			continue;
-		}
-
-		Bool is_dock = False;
-		for (unsigned long j = 0; j < n_items; j++) {
-			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
-				is_dock = True;
-				break;
-			}
-		}
-		XFree(types);
-		if (!is_dock) {
-			continue;
-		}
-
-		long *str = NULL;
-		Atom actual;
-		int sfmt;
-		unsigned long len, rem;
-
-		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
-		                       (unsigned char **)&str) == Success &&
-		    str && len >= 4) {
-
-			XWindowAttributes wa;
-			if (XGetWindowAttributes(dpy, w, &wa)) {
-				/* find the monitor this dock belongs to */
-				for (int m = 0; m < monsn; m++) {
-					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w && wa.y >= mons[m].y &&
-					    wa.y < mons[m].y + mons[m].h) {
-						mons[m].reserve_left = MAX(mons[m].reserve_left, str[0]);
-						mons[m].reserve_right = MAX(mons[m].reserve_right, str[1]);
-						mons[m].reserve_top = MAX(mons[m].reserve_top, str[2]);
-						mons[m].reserve_bottom = MAX(mons[m].reserve_bottom, str[3]);
-					}
-				}
-			}
-			XFree(str);
-		}
-	}
-	XFree(children);
-	update_workarea();
-}
-
-void update_workarea(void)
-{
-	long workarea[4 * MAX_MONITORS];
-
-	for (int i = 0; i < monsn && i < MAX_MONITORS; i++) {
-		workarea[i * 4 + 0] = mons[i].x + mons[i].reserve_left;
-		workarea[i * 4 + 1] = mons[i].y + mons[i].reserve_top;
-		workarea[i * 4 + 2] = mons[i].w - mons[i].reserve_left - mons[i].reserve_right;
-		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
-	}
-
-	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, monsn * 4);
-}
-
 void inc_gaps(void)
 {
 	user_config.gaps++;
@@ -1677,11 +1422,11 @@ Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 			return True;
 		}
 
-		if (ppid <= 1) { /* Reached init or kernel */
+		if (ppid <= 1) {
+			/* Reached init or kernel */
 			printf("sxwm: reached init/kernel, no relationship found\n");
 			break;
 		}
-
 		current_pid = ppid;
 	}
 	return False;
@@ -1744,6 +1489,96 @@ void move_master_prev(void)
 	if (old_focused) {
 		send_wm_take_focus(old_focused->win);
 	}
+	update_borders();
+}
+
+void move_next_mon(void)
+{
+	if (!focused || monsn <= 1) {
+		return; /* no focused window or only one monitor */
+	}
+
+	int target_mon = (focused->mon + 1) % monsn;
+
+	/* update window's monitor assignment */
+	focused->mon = target_mon;
+	current_monitor = target_mon;
+
+	/* if window is floating, center it on the target monitor */
+	if (focused->floating) {
+		int mx = mons[target_mon].x, my = mons[target_mon].y;
+		int mw = mons[target_mon].w, mh = mons[target_mon].h;
+		int x = mx + (mw - focused->w) / 2;
+		int y = my + (mh - focused->h) / 2;
+
+		/* ensure window stays within monitor bounds */
+		if (x < mx)
+			x = mx;
+		if (y < my)
+			y = my;
+		if (x + focused->w > mx + mw)
+			x = mx + mw - focused->w;
+		if (y + focused->h > my + mh)
+			y = my + mh - focused->h;
+
+		focused->x = x;
+		focused->y = y;
+		XMoveWindow(dpy, focused->win, x, y);
+	}
+
+	/* retile to update layouts on both monitors */
+	tile();
+
+	/* follow the window with cursor if enabled */
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
+
+	update_borders();
+}
+
+void move_prev_mon(void)
+{
+	if (!focused || monsn <= 1) {
+		return; /* no focused window or only one monitor */
+	}
+
+	int target_mon = (focused->mon - 1 + monsn) % monsn;
+
+	/* update window's monitor assignment */
+	focused->mon = target_mon;
+	current_monitor = target_mon;
+
+	/* if window is floating, center it on the target monitor */
+	if (focused->floating) {
+		int mx = mons[target_mon].x, my = mons[target_mon].y;
+		int mw = mons[target_mon].w, mh = mons[target_mon].h;
+		int x = mx + (mw - focused->w) / 2;
+		int y = my + (mh - focused->h) / 2;
+
+		/* ensure window stays within monitor bounds */
+		if (x < mx)
+			x = mx;
+		if (y < my)
+			y = my;
+		if (x + focused->w > mx + mw)
+			x = mx + mw - focused->w;
+		if (y + focused->h > my + mh)
+			y = my + mh - focused->h;
+
+		focused->x = x;
+		focused->y = y;
+		XMoveWindow(dpy, focused->win, x, y);
+	}
+
+	/* retile to update layouts on both monitors */
+	tile();
+
+	/* follow the window with cursor if enabled */
+	if (user_config.warp_cursor) {
+		warp_cursor(focused);
+	}
+
 	update_borders();
 }
 
@@ -2209,29 +2044,6 @@ void set_win_scratchpad(int n)
 	scratchpads[n].enabled = False;
 }
 
-Bool window_should_float(Window w)
-{
-	XClassHint ch;
-	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < 256; i++) {
-			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
-				break;
-			}
-
-			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
-			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
-				XFree(ch.res_class);
-				XFree(ch.res_name);
-				return True;
-			}
-		}
-		XFree(ch.res_class);
-		XFree(ch.res_name);
-	}
-
-	return False;
-}
-
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 {
 	if (UDIST(pos, 0) <= snap_dist) {
@@ -2341,6 +2153,92 @@ void spawn(const char **argv)
 		free(commands[i]);
 	}
 	free(commands);
+}
+
+void startup_exec(void)
+{
+	for (int i = 0; i < 256; i++) {
+		if (user_config.torun[i]) {
+			const char **argv = build_argv(user_config.torun[i]);
+			if (argv) {
+				spawn(argv);
+				for (int j = 0; argv[j]; j++) {
+					free((char *)argv[j]);
+				}
+				free(argv);
+			}
+		}
+	}
+}
+
+void swallow_window(Client *swallower, Client *swallowed)
+{
+	if (!swallower || !swallowed || swallower->swallowed || swallowed->swallower) {
+		return;
+	}
+
+	XUnmapWindow(dpy, swallower->win);
+	swallower->mapped = False;
+
+	swallower->swallowed = swallowed;
+	swallowed->swallower = swallower;
+
+	swallowed->floating = swallower->floating;
+	if (swallowed->floating) {
+		swallowed->x = swallower->x;
+		swallowed->y = swallower->y;
+		swallowed->w = swallower->w;
+		swallowed->h = swallower->h;
+
+		if (swallowed->win) {
+			XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
+		}
+	}
+
+	tile();
+	update_borders();
+}
+
+void swap_clients(Client *a, Client *b)
+{
+	if (!a || !b || a == b) {
+		return;
+	}
+
+	Client **head = &workspaces[current_ws];
+	Client **pa = head, **pb = head;
+
+	while (*pa && *pa != a) {
+		pa = &(*pa)->next;
+	}
+	while (*pb && *pb != b) {
+		pb = &(*pb)->next;
+	}
+
+	if (!*pa || !*pb) {
+		return;
+	}
+
+	/* if next to it swap */
+	if (*pa == b && *pb == a) {
+		Client *tmp = b->next;
+		b->next = a;
+		a->next = tmp;
+		*pa = b;
+		return;
+	}
+
+	/* full swap */
+	Client *ta = *pa;
+	Client *tb = *pb;
+	Client *ta_next = ta->next;
+	Client *tb_next = tb->next;
+
+	*pa = tb;
+	tb->next = ta_next == tb ? ta : ta_next;
+
+	*pb = ta;
+	ta->next = tb_next == ta ? tb : tb_next;
 }
 
 void tile(void)
@@ -2776,6 +2674,89 @@ void update_net_client_list(void)
 	XChangeProperty(dpy, root, prop, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
 }
 
+void update_struts(void)
+{
+	/* reset all reserves */
+	for (int i = 0; i < monsn; i++) {
+		mons[i].reserve_left = mons[i].reserve_right = mons[i].reserve_top = mons[i].reserve_bottom = 0;
+	}
+
+	Window root_ret, parent_ret, *children;
+	unsigned int nchildren;
+
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &nchildren)) {
+		return;
+	}
+
+	for (unsigned int i = 0; i < nchildren; i++) {
+		Window w = children[i];
+
+		Atom actual_type;
+		int actual_format;
+		unsigned long n_items, bytes_after;
+		Atom *types = NULL;
+
+		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &actual_type, &actual_format,
+		                       &n_items, &bytes_after, (unsigned char **)&types) != Success ||
+		    !types) {
+			continue;
+		}
+
+		Bool is_dock = False;
+		for (unsigned long j = 0; j < n_items; j++) {
+			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
+				is_dock = True;
+				break;
+			}
+		}
+		XFree(types);
+		if (!is_dock) {
+			continue;
+		}
+
+		long *str = NULL;
+		Atom actual;
+		int sfmt;
+		unsigned long len, rem;
+
+		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
+		                       (unsigned char **)&str) == Success &&
+		    str && len >= 4) {
+
+			XWindowAttributes wa;
+			if (XGetWindowAttributes(dpy, w, &wa)) {
+				/* find the monitor this dock belongs to */
+				for (int m = 0; m < monsn; m++) {
+					if (wa.x >= mons[m].x && wa.x < mons[m].x + mons[m].w && wa.y >= mons[m].y &&
+					    wa.y < mons[m].y + mons[m].h) {
+						mons[m].reserve_left = MAX(mons[m].reserve_left, str[0]);
+						mons[m].reserve_right = MAX(mons[m].reserve_right, str[1]);
+						mons[m].reserve_top = MAX(mons[m].reserve_top, str[2]);
+						mons[m].reserve_bottom = MAX(mons[m].reserve_bottom, str[3]);
+					}
+				}
+			}
+			XFree(str);
+		}
+	}
+	XFree(children);
+	update_workarea();
+}
+
+void update_workarea(void)
+{
+	long workarea[4 * MAX_MONITORS];
+
+	for (int i = 0; i < monsn && i < MAX_MONITORS; i++) {
+		workarea[i * 4 + 0] = mons[i].x + mons[i].reserve_left;
+		workarea[i * 4 + 1] = mons[i].y + mons[i].reserve_top;
+		workarea[i * 4 + 2] = mons[i].w - mons[i].reserve_left - mons[i].reserve_right;
+		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
+	}
+
+	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, monsn * 4);
+}
+
 void warp_cursor(Client *c)
 {
 	if (!c) {
@@ -2787,6 +2768,29 @@ void warp_cursor(Client *c)
 
 	XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 	XSync(dpy, False);
+}
+
+Bool window_should_float(Window w)
+{
+	XClassHint ch;
+	if (XGetClassHint(dpy, w, &ch)) {
+		for (int i = 0; i < 256; i++) {
+			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
+				break;
+			}
+
+			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
+			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
+				XFree(ch.res_class);
+				XFree(ch.res_name);
+				return True;
+			}
+		}
+		XFree(ch.res_class);
+		XFree(ch.res_name);
+	}
+
+	return False;
 }
 
 Bool window_should_start_fullscreen(Window w)
