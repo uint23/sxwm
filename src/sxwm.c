@@ -51,6 +51,7 @@ Window find_toplevel(Window w);
 int get_monitor_for(Client *c);
 pid_t get_pid(Window w);
 int get_workspace_for_window(Window w);
+void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
 void grab_keys(void);
 void hdl_button(XEvent *xev);
 void hdl_button_release(XEvent *xev);
@@ -84,6 +85,7 @@ void remove_scratchpad(int n);
 /* void resize_stack_sub(void); */
 void run(void);
 void scan_existing_windows(void);
+void select_input(Window w, Mask masks);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
@@ -102,7 +104,7 @@ void toggle_scratchpad(int n);
 void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
-void update_monitors(void);
+void update_mons(void);
 void update_net_client_list(void);
 void update_struts(void);
 void update_workarea(void);
@@ -132,7 +134,10 @@ Atom _NET_FRAME_EXTENTS;
 Atom _NET_NUMBER_OF_DESKTOPS;
 Atom _NET_DESKTOP_NAMES;
 
-Cursor c_normal, c_move, c_resize;
+Cursor cursor_normal;
+Cursor cursor_move;
+Cursor cursor_resize;
+
 Client *workspaces[NUM_WORKSPACES] = {NULL};
 Config default_config;
 Config user_config;
@@ -201,17 +206,17 @@ Client *add_client(Window w, int ws)
 			tail->next = c;
 		}
 	}
-
 	open_windows++;
-	XSelectInput(dpy, w,
-	             EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
-	                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
-	XGrabButton(dpy, Button1, 0, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
-	            None, None);
-	XGrabButton(dpy, Button3, user_config.modkey, w, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
+	Mask window_masks =  EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask |
+		                 StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	select_input(w, window_masks);
+
+	/* grab buttons for win */
+	grab_button(Button1, None, w, False, ButtonPressMask);
+	grab_button(Button1, user_config.modkey, w, False, ButtonPressMask);
+	grab_button(Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask);
+	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
 
 	Atom protos[] = {WM_DELETE_WINDOW};
 	XSetWMProtocols(dpy, w, protos, 1);
@@ -691,19 +696,25 @@ int get_workspace_for_window(Window w)
 
 	XFree(ch.res_class);
 	XFree(ch.res_name);
-	return current_ws; /* default to current workspace */
+
+	/* default to current workspace */
+	return current_ws;
+}
+
+void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
+{
+	if (w == root) {
+		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeAsync, GrabModeAsync, None, None);
+	}
+	else {
+		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeSync, GrabModeAsync, None, None);
+	}
 }
 
 void grab_keys(void)
 {
-	const int guards[] = {0,
-	                      LockMask,
-	                      Mod2Mask,
-	                      LockMask | Mod2Mask,
-	                      Mod5Mask,
-	                      LockMask | Mod5Mask,
-	                      Mod2Mask | Mod5Mask,
-	                      LockMask | Mod2Mask | Mod5Mask};
+	const int guards[] = {0, LockMask, Mod2Mask, LockMask | Mod2Mask, Mod5Mask,
+	                      LockMask | Mod5Mask, Mod2Mask | Mod5Mask, LockMask | Mod2Mask | Mod5Mask};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (int i = 0; i < user_config.bindsn; i++) {
@@ -714,13 +725,15 @@ void grab_keys(void)
 			continue;
 		}
 
-		KeyCode kc = XKeysymToKeycode(dpy, b->keysym);
-		if (!kc) {
+		KeyCode key_code = XKeysymToKeycode(dpy, b->keysym);
+		if (!key_code) {
 			continue;
 		}
 
-		for (size_t g = 0; g < sizeof guards / sizeof *guards; g++) {
-			XGrabKey(dpy, kc, b->mods | guards[g], root, True, GrabModeAsync, GrabModeAsync);
+		size_t guards_len = sizeof(guards) / sizeof(*guards);
+		for (size_t guard = 0; guard < guards_len; guard++) {
+			XGrabKey(dpy, key_code, b->mods | guards[guard],
+			         root, True, GrabModeAsync, GrabModeAsync);
 		}
 	}
 }
@@ -753,7 +766,7 @@ void hdl_button(XEvent *xev)
 			drag_orig_h = c->h;
 			drag_mode = DRAG_SWAP;
 			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None,
-			             c_move, CurrentTime);
+			             cursor_move, CurrentTime);
 			focused = c;
 			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
@@ -783,7 +796,7 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		Cursor cur = (e->button == Button1) ? c_move : c_resize;
+		Cursor cur = (e->button == Button1) ? cursor_move : cursor_resize;
 		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, cur,
 		             CurrentTime);
 
@@ -838,7 +851,7 @@ void hdl_client_msg(XEvent *xev)
 void hdl_config_ntf(XEvent *xev)
 {
 	if (xev->xconfigure.window == root) {
-		update_monitors();
+		update_mons();
 		tile();
 		update_borders();
 	}
@@ -1665,9 +1678,9 @@ void quit(void)
 
 	XSync(dpy, False);
 	XCloseDisplay(dpy);
-	XFreeCursor(dpy, c_move);
-	XFreeCursor(dpy, c_normal);
-	XFreeCursor(dpy, c_resize);
+	XFreeCursor(dpy, cursor_move);
+	XFreeCursor(dpy, cursor_normal);
+	XFreeCursor(dpy, cursor_resize);
 	printf("quitting...\n");
 	running = False;
 }
@@ -1758,21 +1771,20 @@ void reload_config(void)
 			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
 		}
 	}
-	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-	            GrabModeAsync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
-	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-	            GrabModeAsync, GrabModeAsync, None, None);
+
+	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
+	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
+	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
+
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
-			XGrabButton(dpy, Button1, 0, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync, None, None);
-			XGrabButton(dpy, Button1, user_config.modkey, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
-			            None, None);
-			XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, c->win, False, ButtonPressMask, GrabModeSync,
-			            GrabModeAsync, None, None);
-			XGrabButton(dpy, Button3, user_config.modkey, c->win, False, ButtonPressMask, GrabModeSync, GrabModeAsync,
-			            None, None);
+			grab_button(Button1, None, c->win, False, ButtonPressMask);
+			grab_button(Button1, user_config.modkey, c->win, False, ButtonPressMask);
+			grab_button(Button1, user_config.modkey | ShiftMask, c->win, False, ButtonPressMask);
+			grab_button(Button2, user_config.modkey, c->win, False, ButtonPressMask);
 		}
 	}
 
@@ -1897,6 +1909,11 @@ void scan_existing_windows(void)
 	}
 }
 
+void select_input(Window w, Mask masks)
+{
+	XSelectInput(dpy, w, masks);
+}
+
 void send_wm_take_focus(Window w)
 {
 	Atom wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
@@ -1919,7 +1936,7 @@ void send_wm_take_focus(Window w)
 
 void setup(void)
 {
-	if ((dpy = XOpenDisplay(NULL)) == 0) {
+	if ((dpy = XOpenDisplay(NULL)) == False) {
 		errx(0, "can't open display. quitting...");
 	}
 	root = XDefaultRootWindow(dpy);
@@ -1934,32 +1951,33 @@ void setup(void)
 	grab_keys();
 	startup_exec();
 
-	c_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
-	c_move = XcursorLibraryLoadCursor(dpy, "fleur");
-	c_resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
-	XDefineCursor(dpy, root, c_normal);
+	cursor_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
+	cursor_move = XcursorLibraryLoadCursor(dpy, "fleur");
+	cursor_resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
+	XDefineCursor(dpy, root, cursor_normal);
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
-	update_monitors();
 
-	XSelectInput(dpy, root,
-	             StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask | KeyPressMask |
-	                 PropertyChangeMask);
+	update_mons();
 
-	XGrabButton(dpy, Button1, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-	            GrabModeAsync, GrabModeAsync, None, None);
-	XGrabButton(dpy, Button1, user_config.modkey | ShiftMask, root, True,
-	            ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+	/* select events wm should look for on root */
+	Mask wm_masks = StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask |
+	                KeyPressMask | PropertyChangeMask;
+	select_input(root, wm_masks);
 
-	XGrabButton(dpy, Button3, user_config.modkey, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-	            GrabModeAsync, GrabModeAsync, None, None);
+	/* grab mouse button events on root window */
+	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
+	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
+	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
 	XSync(dpy, False);
 
 	for (int i = 0; i < LASTEvent; i++) {
 		evtable[i] = hdl_dummy;
 	}
-
 	evtable[ButtonPress] = hdl_button;
 	evtable[ButtonRelease] = hdl_button_release;
 	evtable[ClientMessage] = hdl_client_msg;
@@ -1973,7 +1991,8 @@ void setup(void)
 	evtable[UnmapNotify] = hdl_unmap_ntf;
 	scan_existing_windows();
 
-	signal(SIGCHLD, SIG_IGN); /* prevent child processes from becoming zombies */
+	/* prevent child processes from becoming zombies */
+	signal(SIGCHLD, SIG_IGN);
 }
 
 void setup_atoms(void)
@@ -2162,13 +2181,13 @@ void spawn(const char **argv)
 
 void startup_exec(void)
 {
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		if (user_config.torun[i]) {
 			const char **argv = build_argv(user_config.torun[i]);
 			if (argv) {
 				spawn(argv);
 				for (int j = 0; argv[j]; j++) {
-					free((char *)argv[j]);
+					free((char*)argv[j]);
 				}
 				free(argv);
 			}
@@ -2630,7 +2649,7 @@ void update_client_desktop_properties(void)
 	}
 }
 
-void update_monitors(void)
+void update_mons(void)
 {
 	XineramaScreenInfo *info;
 	Monitor *old = mons;
@@ -2640,7 +2659,7 @@ void update_monitors(void)
 
 	for (int s = 0; s < ScreenCount(dpy); s++) {
 		Window scr_root = RootWindow(dpy, s);
-		XDefineCursor(dpy, scr_root, c_normal);
+		XDefineCursor(dpy, scr_root, cursor_normal);
 	}
 
 	if (XineramaIsActive(dpy)) {

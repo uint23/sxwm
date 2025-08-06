@@ -22,6 +22,7 @@
 #define MAXCLIENTS 99
 #define MAX_SCRATCHPADS 20
 #define MIN_WINDOW_SIZE 20
+#define MAX_ITEMS 256
 #define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, False}
 #define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
 #define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
@@ -102,14 +103,14 @@ typedef struct {
 	Bool new_win_focus;
 	Bool warp_cursor;
 	Bool new_win_master;
-	Binding binds[256];
-	char **should_float[256];
-	char **start_fullscreen[256];
-	char **can_swallow[256];
-    char **can_be_swallowed[256];
+	Binding binds[MAX_ITEMS];
+	char **should_float[MAX_ITEMS];
+	char **start_fullscreen[MAX_ITEMS];
+	char **can_swallow[MAX_ITEMS];
+    char **can_be_swallowed[MAX_ITEMS];
 	char **scratchpads[32];
-	char **open_in_workspace[256];
-	char *torun[256];
+	char **open_in_workspace[MAX_ITEMS];
+	char *torun[MAX_ITEMS];
 } Config;
 
 typedef struct {
