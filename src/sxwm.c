@@ -79,11 +79,13 @@ void remove_scratchpad(int n);
 /* void resize_stack_add(void); */
 /* void resize_stack_sub(void); */
 void run(void);
+void reset_opacity(Window w);
 void scan_existing_windows(void);
 void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
 void set_frame_extents(Window w);
+void set_opacity(Window w, double opacity);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
@@ -2232,6 +2234,27 @@ Bool window_should_float(Window w)
 	return False;
 }
 
+void reset_opacity(Window w)
+{
+	Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+	XDeleteProperty(dpy, w, atom);
+}
+
+
+void set_opacity(Window w, double opacity)
+{
+    unsigned long op = (unsigned long)(opacity * 0xFFFFFFFF);
+    Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+
+    if (opacity < 0.0) {
+		opacity = 0.0;
+	}
+    if (opacity > 1.0) {
+		opacity = 1.0;
+	}
+    XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
+}
+
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 {
 	if (UDIST(pos, 0) <= snap_dist) {
@@ -2608,10 +2631,12 @@ void toggle_fullscreen(void)
 		XSetWindowBorderWidth(dpy, focused->win, 0);
 		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
 		XRaiseWindow(dpy, focused->win);
+		set_opacity(focused->win, 100);
 	}
 	else {
 		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
 		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
+		reset_opacity(focused->win);
 
 		if (!focused->floating) {
 			focused->mon = get_monitor_for(focused);
