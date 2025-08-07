@@ -89,6 +89,7 @@ void remove_scratchpad(int n);
 /* void resize_stack_add(void); */
 /* void resize_stack_sub(void); */
 void run(void);
+void reset_opacity(Window w);
 void scan_existing_windows(void);
 void select_input(Window w, Mask masks);
 void send_wm_take_focus(Window w);
@@ -96,6 +97,7 @@ void setup(void);
 void setup_atoms(void);
 void set_frame_extents(Window w);
 void set_input_focus(Client *c, Bool raise_win, Bool warp);
+void set_opacity(Window w, double opacity);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
@@ -2174,6 +2176,50 @@ void set_win_scratchpad(int n)
 	scratchpads[n].enabled = False;
 }
 
+Bool window_should_float(Window w)
+{
+	XClassHint ch;
+	if (XGetClassHint(dpy, w, &ch)) {
+		for (int i = 0; i < 256; i++) {
+			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
+				break;
+			}
+
+			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
+			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
+				XFree(ch.res_class);
+				XFree(ch.res_name);
+				return True;
+			}
+		}
+		XFree(ch.res_class);
+		XFree(ch.res_name);
+	}
+
+	return False;
+}
+
+void reset_opacity(Window w)
+{
+	Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+	XDeleteProperty(dpy, w, atom);
+}
+
+
+void set_opacity(Window w, double opacity)
+{
+    unsigned long op = (unsigned long)(opacity * 0xFFFFFFFF);
+    Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+
+    if (opacity < 0.0) {
+		opacity = 0.0;
+	}
+    if (opacity > 1.0) {
+		opacity = 1.0;
+	}
+    XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
+}
+
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 {
 	if (UDIST(pos, 0) <= snap_dist) {
@@ -2628,22 +2674,6 @@ void toggle_floating_global(void)
 
 	tile();
 	update_borders();
-}
-
-void set_opacity(Window w, double opacity)
-{
-    unsigned long op = (unsigned long)(opacity * 0xFFFFFFFF);
-    Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
-
-    if (opacity < 0.0) opacity = 0.0;
-    if (opacity > 1.0) opacity = 1.0;
-    XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
-}
-
-void reset_opacity(Window w)
-{
-	Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
-	XDeleteProperty(dpy, w, atom);
 }
 
 void toggle_fullscreen(void)
