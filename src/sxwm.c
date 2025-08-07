@@ -302,6 +302,7 @@ void change_workspace(int ws)
 
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
+			/* TODO: Turn into helper */
 			Bool is_scratchpad = False;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
@@ -318,6 +319,7 @@ void change_workspace(int ws)
 	current_ws = ws;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
+			/* TODO: Turn into helper */
 			Bool is_scratchpad = False;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
@@ -356,13 +358,12 @@ void change_workspace(int ws)
 
 			/* Update desktop property */
 			long desktop = current_ws;
-			XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-			                (unsigned char *)&desktop, 1);
+			XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+					        PropModeReplace, (unsigned char *)&desktop, 1);
 		}
 	}
 
 	tile();
-
 	focused = NULL;
 
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
@@ -372,26 +373,17 @@ void change_workspace(int ws)
 		}
 	}
 
-	/* if no scratchpad focused, focus regular window */
+	/* if no scratchpad found focus regular window */
 	if (!focused && workspaces[current_ws]) {
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			Bool is_scratchpad = False;
-			for (int j = 0; j < MAX_SCRATCHPADS; j++) {
-				if (scratchpads[j].client == c) {
-					is_scratchpad = True;
-					break;
-				}
-			}
-			if (!is_scratchpad) {
-				focused = c;
-				break;
-			}
+			focused = c;
+			break;
 		}
 	}
 
 	if (focused) {
-		Window focused_win = find_toplevel(focused->win);
-		XSetInputFocus(dpy, focused_win, RevertToPointerRoot, CurrentTime);
+		focused->win = find_toplevel(focused->win);
+		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
 		if (user_config.warp_cursor) {
 			warp_cursor(focused);
 		}
@@ -401,9 +393,9 @@ void change_workspace(int ws)
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 	}
 
-	long cd = current_ws;
-	XChangeProperty(dpy, root, XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&cd, 1);
+	long current_desktop = current_ws;
+	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char *)&current_desktop, 1);
 	update_client_desktop_properties();
 
 	XUngrabServer(dpy);
@@ -430,24 +422,28 @@ void close_focused(void)
 		}
 	}
 
-	Atom *protos;
-	int n;
-	if (XGetWMProtocols(dpy, focused->win, &protos, &n) && protos) {
-		for (int i = 0; i < n; i++) {
-			if (protos[i] == WM_DELETE_WINDOW) {
-				XEvent ev = {.xclient = {.type = ClientMessage,
-				                         .window = focused->win,
-				                         .message_type = XInternAtom(dpy, "WM_PROTOCOLS", False),
-				                         .format = 32}};
+	Atom *protocols;
+	int n_protocols;
+	/* get number of protocols a window possesses and check if any == WM_DELETE_WINDOW (supports it) */
+	if (XGetWMProtocols(dpy, focused->win, &protocols, &n_protocols) && protocols) {
+		for (int i = 0; i < n_protocols; i++) {
+			if (protocols[i] == WM_DELETE_WINDOW) {
+				Atom WM_PROTOCOLS =  XInternAtom(dpy, "WM_PROTOCOLS", False);
+				XEvent ev = {.xclient = {
+					.type = ClientMessage,
+					.window = focused->win,
+					.message_type = WM_PROTOCOLS,
+					.format = 32}};
+
 				ev.xclient.data.l[0] = WM_DELETE_WINDOW;
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
-				XFree(protos);
+				XFree(protocols);
 				return;
 			}
 		}
 		XUnmapWindow(dpy, focused->win);
-		XFree(protos);
+		XFree(protocols);
 	}
 	XUnmapWindow(dpy, focused->win);
 	XKillClient(dpy, focused->win);
@@ -467,13 +463,13 @@ Window find_toplevel(Window w)
 	Window root = None;
 	Window parent;
 	Window *kids;
-	unsigned nkids;
+	unsigned n_kids;
 
 	while (True) {
 		if (w == root) {
 			break;
 		}
-		if (XQueryTree(dpy, w, &root, &parent, &kids, &nkids) == 0) {
+		if (XQueryTree(dpy, w, &root, &parent, &kids, &n_kids) == 0) {
 			break;
 		}
 		XFree(kids);
@@ -499,7 +495,7 @@ void focus_next(void)
 		c = c->next ? c->next : workspaces[current_ws];
 	} while (!c->mapped && c != start);
 
-	/* this stops invisible windows being detected or focused */
+	/* if we return to start: */
 	if (!c->mapped) {
 		return;
 	}
@@ -523,9 +519,10 @@ void focus_prev(void)
 	Client *start = focused ? focused : workspaces[current_ws];
 	Client *c = start;
 
-	/* loop until we find a mapped client or return to start */
+	/* loop until we find a mapped client or return to starting point */
 	do {
-		Client *p = workspaces[current_ws], *prev = NULL;
+		Client *p = workspaces[current_ws];
+		Client *prev = NULL;
 		while (p && p != c) {
 			prev = p;
 			p = p->next;
@@ -559,10 +556,11 @@ void focus_prev(void)
 	update_borders();
 }
 
+/* STARTING POINT TODO */
 void focus_next_mon(void)
 {
 	if (n_mons <= 1) {
-		return; /* only one monitor, nothing to switch to */
+		return;
 	}
 
 	/* use current_monitor if no focused window, otherwise use focused window's monitor */
@@ -1617,8 +1615,8 @@ void move_to_workspace(int ws)
 	workspaces[ws] = focused;
 	focused->ws = ws;
 	long desktop = ws;
-	XChangeProperty(dpy, focused->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-	                (unsigned char *)&desktop, 1);
+	XChangeProperty(dpy, focused->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)&desktop, 1);
 
 	/* tile current ws */
 	tile();
@@ -2040,9 +2038,9 @@ void setup_atoms(void)
 			        PropModeReplace, (unsigned char *)&current_ws, 1);
 
 	/* load supported list */
+	int support_list_len = sizeof(support_list) / sizeof(Atom);
 	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32,
-			        PropModeReplace, (unsigned char *)support_list,
-					sizeof(support_list) / sizeof(Atom));
+			        PropModeReplace, (unsigned char *)support_list, support_list_len);
 
 	update_workarea();
 }
@@ -2051,7 +2049,8 @@ void set_frame_extents(Window w)
 {
 	long extents[4] = {user_config.border_width, user_config.border_width, user_config.border_width,
 	                   user_config.border_width};
-	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32,
+			        PropModeReplace, (unsigned char *)extents, 4);
 }
 
 void set_win_scratchpad(int n)
@@ -2570,8 +2569,8 @@ void toggle_scratchpad(int n)
 		c->ws = current_ws;
 
 		long desktop = current_ws;
-		XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-		                (unsigned char *)&desktop, 1);
+		XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+				        PropModeReplace, (unsigned char *)&desktop, 1);
 	}
 
 	c->mon = focused ? focused->mon : current_monitor;
@@ -2637,7 +2636,8 @@ void update_borders(void)
 	}
 	if (focused) {
 		Window w = focused->win;
-		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&w, 1);
+		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
+				        PropModeReplace, (unsigned char *)&w, 1);
 	}
 }
 
@@ -2646,8 +2646,8 @@ void update_client_desktop_properties(void)
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			long desktop = ws;
-			XChangeProperty(dpy, c->win, XInternAtom(dpy, "_NET_WM_DESKTOP", False), XA_CARDINAL, 32, PropModeReplace,
-			                (unsigned char *)&desktop, 1);
+			XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+					        PropModeReplace, (unsigned char *)&desktop, 1);
 		}
 	}
 }
@@ -2697,8 +2697,8 @@ void update_net_client_list(void)
 			wins[n++] = c->win;
 		}
 	}
-	Atom prop = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
-	XChangeProperty(dpy, root, prop, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
+	XChangeProperty(dpy, root, _NET_CLIENT_LIST, XA_WINDOW, 32,
+			        PropModeReplace, (unsigned char *)wins, n);
 }
 
 void update_struts(void)
