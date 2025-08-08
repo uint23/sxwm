@@ -2883,7 +2883,7 @@ int main(int ac, char **av)
 			backup_binds = True;
 		}
 		else {
-			puts("usege:\n");
+			puts("usage:\n");
 			puts("\t[-v || --version]: See the version of sxwm\n");
 			puts("\t[-b || --backup]: Use backup set of keybinds with sxwm\n");
 			exit(0);
