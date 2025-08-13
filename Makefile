@@ -1,5 +1,4 @@
-CONFIG ?= config.mk
-include $(CONFIG)
+include config.mk
 
 BIN     = sxwm
 SRC_DIR = src
