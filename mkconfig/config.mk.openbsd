@@ -1,5 +1,5 @@
 CC     = cc
-CFLAGS = -I/usr/X11R6/include -Wall -Wextra -O3 -Isrc
+CFLAGS = -std=c99 -I/usr/X11R6/include -Wall -Wextra -O3 -Isrc
 LDFLAGS = -L/usr/X11R6/lib -lX11 -lXinerama -lXcursor
 
 PREFIX  = /usr/local
