@@ -3,5 +3,10 @@ CFLAGS = -I/usr/X11R6/include -Wall -Wextra -O3 -Isrc
 LDFLAGS = -L/usr/X11R6/lib -lX11 -lXinerama -lXcursor
 
 PREFIX  = /usr/local
+BIN     = sxwm
+SRC_DIR = src
+OBJ_DIR = build
+
+MAN     = sxwm.1
 MAN_DIR = $(PREFIX)/share/man/man1
 XSESSIONS = $(DESTDIR)$(PREFIX)/share/xsessions
