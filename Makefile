@@ -1,19 +1,18 @@
-CC      ?= gcc
-CFLAGS  ?= -std=c99 -Wall -Wextra -O3 -Isrc
-LDFLAGS ?= -lX11 -lXinerama -lXcursor
+CC     = cc
+CFLAGS = -std=c99 -Wall -Wextra -O3 -Isrc
+LDFLAGS = -lX11 -lXinerama -lXcursor
 
-PREFIX  ?= /usr/local
-BIN     := sxwm
-SRC_DIR := src
-OBJ_DIR := build
-SRC     := $(wildcard $(SRC_DIR)/*.c)
-OBJ     := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC))
-DEP     := $(OBJ:.o=.d)
+PREFIX  = /usr/local
+BIN     = sxwm
+SRC_DIR = src
+OBJ_DIR = build
 
-MAN     := sxwm.1
-MAN_DIR := $(PREFIX)/share/man/man1
+SRC = $(shell find $(SRC_DIR) -type f -name '*.c')
+OBJ = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
-XSESSIONS := $(DESTDIR)$(PREFIX)/share/xsessions
+MAN     = sxwm.1
+MAN_DIR = $(PREFIX)/share/man/man1
+XSESSIONS = $(DESTDIR)$(PREFIX)/share/xsessions
 
 all: $(BIN)
 
@@ -22,9 +21,7 @@ $(BIN): $(OBJ)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
-
--include $(DEP)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(OBJ_DIR):
 	@mkdir -p $@
