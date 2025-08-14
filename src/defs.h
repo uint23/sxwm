@@ -103,6 +103,7 @@ typedef struct {
 	Bool new_win_focus;
 	Bool warp_cursor;
 	Bool new_win_master;
+	Bool mirror_layout;
 	Binding binds[MAX_ITEMS];
 	char **should_float[MAX_ITEMS];
 	char **start_fullscreen[MAX_ITEMS];
