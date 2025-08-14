@@ -492,6 +492,9 @@ found:
 		else if (!strcmp(key, "new_win_master")) {
 			cfg->new_win_master = !strcmp(rest, "true") ? True : False;
 		}
+		else if (!strcmp(key, "mirror_layout")) {
+			cfg->mirror_layout = !strcmp(rest, "true") ? True : False;
+		}
 		else if (!strcmp(key, "open_in_workspace")) {
 			char *mid = strchr(rest, ':');
 			if (!mid) {
