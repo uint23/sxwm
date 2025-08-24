@@ -188,7 +188,7 @@ found:
 	char line[512];
 	int lineno = 0;
 	int should_floatn = 0;
-	int torun = 0;
+	int to_run = 0;
 
 	/* Initialize should_float matrix */
 	for (int j = 0; j < 256; j++) {
@@ -429,7 +429,7 @@ found:
 			}
 		}
 		else if (!strcmp(key, "exec")) {
-			if (torun >= 256) {
+			if (to_run >= 256) {
 				fprintf(stderr, "sxwmrc:%d: too many exec commands\n", lineno);
 				continue;
 			}
@@ -447,12 +447,12 @@ found:
 				continue;
 			}
 
-			cfg->torun[torun] = strdup(cmd);
-			if (!cfg->torun[torun]) {
+			cfg->to_run[to_run] = strdup(cmd);
+			if (!cfg->to_run[to_run]) {
 				fprintf(stderr, "sxwmrc:%d: failed to allocate memory for exec command\n", lineno);
 				goto cleanup_file;
 			}
-			torun++;
+			to_run++;
 		}
 		else if (!strcmp(key, "can_swallow")) {
 			char *token = strtok(rest, ",");
@@ -615,8 +615,8 @@ cleanup_file:
 			free(cfg->open_in_workspace[j]);
 		}
 	}
-	for (int i = 0; i < torun; i++) {
-		free(cfg->torun[i]);
+	for (int i = 0; i < to_run; i++) {
+		free(cfg->to_run[i]);
 	}
 	return -1;
 }
