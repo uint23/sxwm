@@ -1,7 +1,6 @@
-/*
- *  See LICENSE for more info
+/*  See LICENSE for more info
  *
- *  simple xorg window manager
+ *  simple xorg window manager:
  *  sxwm is a user-friendly, easily configurable yet powerful
  *  tiling window manager inspired by window managers such as
  *  DWM and i3.
@@ -134,6 +133,13 @@ Atom _NET_FRAME_EXTENTS;
 Atom _NET_NUMBER_OF_DESKTOPS;
 Atom _NET_DESKTOP_NAMES;
 
+Atom _NET_WM_WINDOW_TYPE_DOCK;
+Atom _NET_WM_WINDOW_TYPE_UTILITY;
+Atom _NET_WM_WINDOW_TYPE_DIALOG;
+Atom _NET_WM_WINDOW_TYPE_TOOLBAR;
+Atom _NET_WM_WINDOW_TYPE_SPLASH;
+Atom _NET_WM_WINDOW_TYPE_POPUP_MENU;
+
 Cursor cursor_normal;
 Cursor cursor_move;
 Cursor cursor_resize;
@@ -259,6 +265,7 @@ Client *add_client(Window w, int ws)
 
 	if (ws == current_ws && !focused) {
 		focused = c;
+		current_mon = c->mon;
 	}
 
 	long desktop = ws;
@@ -493,10 +500,10 @@ void focus_next(void)
 	/* loop until we find a mapped client or return to start */
 	do {
 		c = c->next ? c->next : workspaces[current_ws];
-	} while (!c->mapped && c != start);
+    } while (( !c->mapped || c->mon != current_mon ) && c != start);
 
 	/* if we return to start: */
-	if (!c->mapped) {
+	if (!c->mapped || c->mon != current_mon) {
 		return;
 	}
 
@@ -538,10 +545,10 @@ void focus_prev(void)
 				p = p->next;
 			c = p;
 		}
-	} while (!c->mapped && c != start);
+    } while (( !c->mapped || c->mon != current_mon ) && c != start);
 
 	/* this stops invisible windows being detected or focused */
-	if (!c->mapped) {
+	if (!c->mapped || c->mon != current_mon) {
 		return;
 	}
 
@@ -669,7 +676,7 @@ int get_workspace_for_window(Window w)
 		return current_ws; /* default to current workspace */
 	}
 
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		if (!user_config.open_in_workspace[i]) {
 			break;
 		}
@@ -710,7 +717,7 @@ void grab_keys(void)
 	                      LockMask | Mod5Mask, Mod2Mask | Mod5Mask, LockMask | Mod2Mask | Mod5Mask};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
-	for (int i = 0; i < user_config.bindsn; i++) {
+	for (int i = 0; i < user_config.n_binds; i++) {
 		Binding *b = &user_config.binds[i];
 
 		if ((b->type == TYPE_WS_CHANGE && b->mods != user_config.modkey) ||
@@ -890,8 +897,8 @@ void hdl_destroy_ntf(XEvent *xev)
 {
 	Window w = xev->xdestroywindow.window;
 
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		Client *prev = NULL, *c = workspaces[ws];
+	for (int i = 0; i < NUM_WORKSPACES; i++) {
+		Client *prev = NULL, *c = workspaces[i];
 		while (c && c->win != w) {
 			prev = c;
 			c = c->next;
@@ -913,21 +920,39 @@ void hdl_destroy_ntf(XEvent *xev)
 			}
 
 			if (focused == c) {
-				if (c->next) {
-					focused = c->next;
+				/* first try next on same monitor */
+				Client *tmp = c->next;
+				while (tmp && tmp->mon != current_mon) {
+					tmp = tmp->next;
 				}
-				else if (prev) {
-					focused = prev;
+
+				if (tmp) {
+					focused = tmp;
 				}
 				else {
-					if (ws == current_ws) {
-						focused = NULL;
+					/* then try previous on same monitor */
+					tmp = prev;
+					while (tmp && tmp->mon != current_mon) {
+						/* walk backwards */
+						Client *p = workspaces[i];
+						Client *p_prev = NULL;
+						while (p && p != tmp) {
+							p_prev = p;
+							p = p->next;
+						}
+						tmp = p_prev;
 					}
+					focused = tmp;
+				}
+
+				/* if nothing found on same monitor, unfocus */
+				if (!focused || focused->mon != current_mon) {
+					focused = NULL;
 				}
 			}
 
 			if (!prev) {
-				workspaces[ws] = c->next;
+				workspaces[i] = c->next;
 			}
 			else {
 				prev->next = c->next;
@@ -937,7 +962,7 @@ void hdl_destroy_ntf(XEvent *xev)
 			update_net_client_list();
 			open_windows--;
 
-			if (ws == current_ws) {
+			if (i == current_ws) {
 				tile();
 				update_borders();
 
@@ -956,39 +981,44 @@ void hdl_destroy_ntf(XEvent *xev)
 
 void hdl_keypress(XEvent *xev)
 {
-	KeySym ks = XkbKeycodeToKeysym(dpy, xev->xkey.keycode, 0, 0);
+	KeySym keysym = XkbKeycodeToKeysym(dpy, xev->xkey.keycode, 0, 0);
 	int mods = clean_mask(xev->xkey.state);
 
-	for (int i = 0; i < user_config.bindsn; i++) {
-		Binding *b = &user_config.binds[i];
-		if (b->keysym == ks && clean_mask(b->mods) == mods) {
-			switch (b->type) {
-				case TYPE_CMD:
-					spawn(b->action.cmd);
-					break;
+	for (int i = 0; i < user_config.n_binds; i++) {
+		Binding *bind = &user_config.binds[i];
+		if (bind->keysym == keysym && clean_mask(bind->mods) == mods) {
+			switch (bind->type) {
+			case TYPE_CMD:
+				spawn(bind->action.cmd);
+				break;
 
-				case TYPE_FUNC:
-					if (b->action.fn) {
-						b->action.fn();
-					}
-					break;
-				case TYPE_WS_CHANGE:
-					change_workspace(b->action.ws);
-					update_net_client_list();
-					break;
-				case TYPE_WS_MOVE:
-					move_to_workspace(b->action.ws);
-					update_net_client_list();
-					break;
-				case TYPE_SP_REMOVE:
-					remove_scratchpad(b->action.sp);
-					break;
-				case TYPE_SP_TOGGLE:
-					toggle_scratchpad(b->action.sp);
-					break;
-				case TYPE_SP_CREATE:
-					set_win_scratchpad(b->action.sp);
-					break;
+			case TYPE_FUNC:
+				if (bind->action.fn) {
+					bind->action.fn();
+				}
+				break;
+
+			case TYPE_WS_CHANGE:
+				change_workspace(bind->action.ws);
+				update_net_client_list();
+				break;
+
+			case TYPE_WS_MOVE:
+				move_to_workspace(bind->action.ws);
+				update_net_client_list();
+				break;
+
+			case TYPE_SP_REMOVE:
+				remove_scratchpad(bind->action.sp);
+				break;
+
+			case TYPE_SP_TOGGLE:
+				toggle_scratchpad(bind->action.sp);
+				break;
+
+			case TYPE_SP_CREATE:
+				set_win_scratchpad(bind->action.sp);
+				break;
 			}
 			return;
 		}
@@ -998,13 +1028,14 @@ void hdl_keypress(XEvent *xev)
 void hdl_map_req(XEvent *xev)
 {
 	Window w = xev->xmaprequest.window;
-	XWindowAttributes wa;
+	XWindowAttributes win_attr;
 
-	if (!XGetWindowAttributes(dpy, w, &wa)) {
+	if (!XGetWindowAttributes(dpy, w, &win_attr)) {
 		return;
 	}
 
-	if (wa.override_redirect || wa.width <= 0 || wa.height <= 0) {
+	/* skips invisible windows */
+	if (win_attr.override_redirect || win_attr.width <= 0 || win_attr.height <= 0) {
 		XMapWindow(dpy, w);
 		return;
 	}
@@ -1035,29 +1066,26 @@ void hdl_map_req(XEvent *xev)
 
 	Atom type;
 	int format;
-	unsigned long nitems, after;
+	unsigned long n_items, after;
 	Atom *types = NULL;
 	Bool should_float = False;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &nitems, &after,
+	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &n_items, &after,
 	                       (unsigned char **)&types) == Success &&
 	    types) {
-		Atom dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
-		Atom util = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
-		Atom dialog = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
-		Atom toolbar = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
-		Atom splash = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
-		Atom popup = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
 
-		for (unsigned long i = 0; i < nitems; i++) {
-			if (types[i] == dock) {
+		for (unsigned long i = 0; i < n_items; i++) {
+			if (types[i] == _NET_WM_WINDOW_TYPE_DOCK) {
 				XFree(types);
 				XMapWindow(dpy, w);
 				return;
 			}
-			if (types[i] == util || types[i] == dialog || types[i] == toolbar || types[i] == splash ||
-			    types[i] == popup) {
-				should_float = True;
+
+			should_float = 
+				types[i] == _NET_WM_WINDOW_TYPE_UTILITY || types[i] == _NET_WM_WINDOW_TYPE_DIALOG ||
+				types[i] == _NET_WM_WINDOW_TYPE_TOOLBAR || types[i] == _NET_WM_WINDOW_TYPE_SPLASH ||
+				types[i] == _NET_WM_WINDOW_TYPE_POPUP_MENU;
+			if (should_float) {
 				break;
 			}
 		}
@@ -1069,7 +1097,7 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	if (open_windows == MAXCLIENTS) {
-		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
+		printf("sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
@@ -1079,15 +1107,18 @@ void hdl_map_req(XEvent *xev)
 		return;
 	}
 
-	Window tr;
-	if (!should_float && XGetTransientForHint(dpy, w, &tr)) {
+	Window transient;
+	if (!should_float && XGetTransientForHint(dpy, w, &transient)) {
 		should_float = True;
 	}
-	XSizeHints sh;
-	long sup;
-	if (!should_float && XGetWMNormalHints(dpy, w, &sh, &sup) && (sh.flags & PMinSize) && (sh.flags & PMaxSize) &&
-	    sh.min_width == sh.max_width && sh.min_height == sh.max_height) {
-		should_float = True;
+
+	XSizeHints size_hints;
+	long supplied_ret;
+	should_float =
+		!should_float && XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&(size_hints.flags & PMinSize) &&
+		(size_hints.flags & PMaxSize) && size_hints.min_width == size_hints.max_width && size_hints.min_height == size_hints.max_height;
+
+	if (should_float) {
 		c->fixed = True;
 	}
 
@@ -1135,7 +1166,8 @@ void hdl_map_req(XEvent *xev)
 
 		if (XGetClassHint(dpy, w, &ch)) {
 			/* check if new window can be swallowed */
-			for (int i = 0; i < 256; i++) {
+			for (int i = 0; i < MAX_ITEMS; i++) {
+				/* TODO: cont. */
 				if (!user_config.can_be_swallowed[i] || !user_config.can_be_swallowed[i][0]) {
 					break;
 				}
@@ -1159,7 +1191,7 @@ void hdl_map_req(XEvent *xev)
 
 					if (XGetClassHint(dpy, p->win, &pch)) {
 						/* check if this existing window can swallow others */
-						for (int i = 0; i < 256; i++) {
+						for (int i = 0; i < MAX_ITEMS; i++) {
 							if (!user_config.can_swallow[i] || !user_config.can_swallow[i][0]) {
 								break;
 							}
@@ -1368,7 +1400,7 @@ void init_defaults(void)
 		default_config.master_width[i] = 50 / 100.0f;
 	}
 
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		default_config.can_be_swallowed[i] = NULL;
 		default_config.can_swallow[i] = NULL;
 		default_config.open_in_workspace[i] = NULL;
@@ -1379,7 +1411,7 @@ void init_defaults(void)
 	default_config.resize_master_amt = 5;
 	default_config.resize_stack_amt = 20;
 	default_config.snap_distance = 5;
-	default_config.bindsn = 0;
+	default_config.n_binds = 0;
 	default_config.new_win_focus = True;
 	default_config.warp_cursor = True;
 	default_config.new_win_master = False;
@@ -1390,7 +1422,7 @@ void init_defaults(void)
 			default_config.binds[i].keysym = binds[i].keysym;
 			default_config.binds[i].action.cmd = binds[i].action.cmd;
 			default_config.binds[i].type = binds[i].type;
-			default_config.bindsn++;
+			default_config.n_binds++;
 		}
 	}
 
@@ -1683,7 +1715,7 @@ void reload_config(void)
 	puts("sxwm: reloading config...");
 
 	/* free binding commands without */
-	for (int i = 0; i < user_config.bindsn; i++) {
+	for (int i = 0; i < user_config.n_binds; i++) {
 		if (user_config.binds[i].type == TYPE_CMD && user_config.binds[i].action.cmd) {
 			free(user_config.binds[i].action.cmd);
 		}
@@ -1695,7 +1727,7 @@ void reload_config(void)
 	}
 
 	/* free swallow-related arrays */
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		if (user_config.can_swallow[i]) {
 			if (user_config.can_swallow[i][0]) {
 				free(user_config.can_swallow[i][0]);
@@ -1730,7 +1762,7 @@ void reload_config(void)
 	}
 
 	/* free should_float arrays */
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		if (user_config.should_float[i]) {
 			if (user_config.should_float[i][0]) {
 				free(user_config.should_float[i][0]);
@@ -1741,7 +1773,7 @@ void reload_config(void)
 	}
 
 	/* free any exec strings */
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < MAX_ITEMS; i++) {
 		if (user_config.torun[i]) {
 			free(user_config.torun[i]);
 			user_config.torun[i] = NULL;
@@ -2010,6 +2042,13 @@ void setup_atoms(void)
 	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
 	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
+
+	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+	_NET_WM_WINDOW_TYPE_UTILITY = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
+	_NET_WM_WINDOW_TYPE_DIALOG = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+	_NET_WM_WINDOW_TYPE_TOOLBAR = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
+	_NET_WM_WINDOW_TYPE_SPLASH = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
+	_NET_WM_WINDOW_TYPE_POPUP_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
 
 	Atom support_list[] = {
 	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
@@ -2796,7 +2835,7 @@ Bool window_should_float(Window w)
 {
 	XClassHint ch;
 	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < 256; i++) {
+		for (int i = 0; i < MAX_ITEMS; i++) {
 			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
 				break;
 			}
@@ -2819,7 +2858,7 @@ Bool window_should_start_fullscreen(Window w)
 {
 	XClassHint ch;
 	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < 256; i++) {
+		for (int i = 0; i < MAX_ITEMS; i++) {
 			if (!user_config.start_fullscreen[i] || !user_config.start_fullscreen[i][0]) {
 				break;
 			}

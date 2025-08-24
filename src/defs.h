@@ -99,7 +99,7 @@ typedef struct {
 	int resize_master_amt;
 	int resize_stack_amt;
 	int snap_distance;
-	int bindsn;
+	int n_binds;
 	Bool new_win_focus;
 	Bool warp_cursor;
 	Bool new_win_master;
