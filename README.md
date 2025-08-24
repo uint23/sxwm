@@ -13,6 +13,12 @@
 > From commit `7a7c6300`, `master_previous` binding has now been renamed to `master_prev`.  
 > Please update your `sxwmrc` accordingly.
 
+
+> [!NOTE]
+> The codebase of `sxwm` has certainly inflated a lot. Although it's nearing the same amount of code as `dwm`,
+> that doesn't mean that it has gotten more bloated--rather the opposite is true. I have been cleaning up and
+> refactoring the code so that it is more readable and faster; this doesn _not_ affect performance.
+
 ## Table of Contents
 - [Launch Args](#launch-args)
 - [Features](#features)
