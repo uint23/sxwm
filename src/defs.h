@@ -19,7 +19,7 @@
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define UDIST(a, b) abs((int)(a) - (int)(b))
 #define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
-#define MAXCLIENTS 99
+#define MAX_CLIENTS 99
 #define MAX_SCRATCHPADS 20
 #define MIN_WINDOW_SIZE 20
 #define MAX_ITEMS 256
@@ -110,7 +110,7 @@ typedef struct {
     char **can_be_swallowed[MAX_ITEMS];
 	char **scratchpads[32];
 	char **open_in_workspace[MAX_ITEMS];
-	char *torun[MAX_ITEMS];
+	char *to_run[MAX_ITEMS];
 } Config;
 
 typedef struct {

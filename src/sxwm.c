@@ -132,6 +132,7 @@ Atom _NET_CLIENT_LIST;
 Atom _NET_FRAME_EXTENTS;
 Atom _NET_NUMBER_OF_DESKTOPS;
 Atom _NET_DESKTOP_NAMES;
+Atom _NET_WM_PID;
 
 Atom _NET_WM_WINDOW_TYPE_DOCK;
 Atom _NET_WM_WINDOW_TYPE_UTILITY;
@@ -383,8 +384,11 @@ void change_workspace(int ws)
 	/* if no scratchpad found focus regular window */
 	if (!focused && workspaces[current_ws]) {
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			focused = c;
-			break;
+			/* TODO TEST */
+			if (c->mon == current_mon) {
+				focused = c;
+				break;
+			}
 		}
 	}
 
@@ -640,9 +644,16 @@ void focus_prev_mon(void)
 
 int get_monitor_for(Client *c)
 {
-	int cx = c->x + c->w / 2, cy = c->y + c->h / 2;
+	int cx = c->x + c->w / 2;
+	int cy = c->y + c->h / 2;
 	for (int i = 0; i < n_mons; i++) {
-		if (cx >= (int)mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h) {
+		Bool in_mon_bounds =
+			cx >= mons[i].x &&
+			cx < mons[i].x + mons[i].w &&
+			cy >= (int)mons[i].y &&
+			cy < mons[i].y + mons[i].h;
+
+		if (in_mon_bounds) {
 			return i;
 		}
 	}
@@ -654,14 +665,12 @@ pid_t get_pid(Window w)
 	pid_t pid = 0;
 	Atom actual_type;
 	int actual_format;
-	unsigned long nitems, bytes_after;
+	unsigned long n_items, bytes_after;
 	unsigned char *prop = NULL;
-	Atom atom_pid = XInternAtom(dpy, "_NET_WM_PID", False);
 
-	if (XGetWindowProperty(dpy, w, atom_pid, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems,
-	                       &bytes_after, &prop) == Success &&
-	    prop) {
-		if (actual_format == 32 && nitems == 1) {
+	if (XGetWindowProperty(dpy, w, _NET_WM_PID, 0, 1, False, XA_CARDINAL, &actual_type,
+				           &actual_format, &n_items, &bytes_after, &prop) == Success && prop) {
+		if (actual_format == 32 && n_items == 1) {
 			pid = *(pid_t *)prop;
 		}
 		XFree(prop);
@@ -671,12 +680,13 @@ pid_t get_pid(Window w)
 
 int get_workspace_for_window(Window w)
 {
-	XClassHint ch;
+	XClassHint ch = {0};
 	if (!XGetClassHint(dpy, w, &ch)) {
-		return current_ws; /* default to current workspace */
+		return current_ws;
 	}
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
+		/* TODO: Add docs for open_in_workspace */
 		if (!user_config.open_in_workspace[i]) {
 			break;
 		}
@@ -697,8 +707,7 @@ int get_workspace_for_window(Window w)
 	XFree(ch.res_class);
 	XFree(ch.res_name);
 
-	/* default to current workspace */
-	return current_ws;
+	return current_ws; /* default */
 }
 
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
@@ -713,8 +722,10 @@ void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
 
 void grab_keys(void)
 {
-	const int guards[] = {0, LockMask, Mod2Mask, LockMask | Mod2Mask, Mod5Mask,
-	                      LockMask | Mod5Mask, Mod2Mask | Mod5Mask, LockMask | Mod2Mask | Mod5Mask};
+	const int guards[] = {
+		0, LockMask, Mod2Mask, LockMask | Mod2Mask, Mod5Mask, LockMask |
+		Mod5Mask, Mod2Mask | Mod5Mask, LockMask | Mod2Mask | Mod5Mask
+	};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (int i = 0; i < user_config.n_binds; i++) {
@@ -740,11 +751,14 @@ void grab_keys(void)
 
 void hdl_button(XEvent *xev)
 {
-	XButtonEvent *e = &xev->xbutton;
-	Window w = (e->subwindow != None) ? e->subwindow : e->window;
+	XButtonEvent *xbutton = &xev->xbutton;
+	Window w = (xbutton->subwindow != None) ? xbutton->subwindow : xbutton->window;
 	w = find_toplevel(w);
 
-	XAllowEvents(dpy, ReplayPointer, e->time);
+	Mask left_click = Button1;
+	Mask right_click = Button3;
+
+	XAllowEvents(dpy, ReplayPointer, xbutton->time);
 	if (!w) {
 		return;
 	}
@@ -755,18 +769,22 @@ void hdl_button(XEvent *xev)
 			continue;
 		}
 
-		/* begin swap drag mode */
-		if ((e->state & user_config.modkey) && (e->state & ShiftMask) && e->button == Button1 && !c->floating) {
+		Bool is_swap_mode =
+			(xbutton->state & user_config.modkey) &&
+			(xbutton->state & ShiftMask) &&
+			xbutton->button == left_click &&
+			!c->floating;
+		if (is_swap_mode) {
 			drag_client = c;
-			drag_start_x = e->x_root;
-			drag_start_y = e->y_root;
+			drag_start_x = xbutton->x_root;
+			drag_start_y = xbutton->y_root;
 			drag_orig_x = c->x;
 			drag_orig_y = c->y;
 			drag_orig_w = c->w;
 			drag_orig_h = c->h;
 			drag_mode = DRAG_SWAP;
-			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None,
-			             cursor_move, CurrentTime);
+			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
+					     GrabModeAsync, GrabModeAsync, None, cursor_move, CurrentTime);
 			focused = c;
 			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
@@ -774,12 +792,19 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		if ((e->state & user_config.modkey) && (e->button == Button1 || e->button == Button3) && !c->floating) {
+		Bool is_move_resize =
+			(xbutton->state & user_config.modkey) &&
+			(xbutton->button == left_click || xbutton->button == right_click) &&
+			!c->floating;
+		if (is_move_resize) {
 			focused = c;
 			toggle_floating();
 		}
 
-		if (!(e->state & user_config.modkey) && e->button == Button1) {
+		Bool is_single_click = 
+			!(xbutton->state & user_config.modkey) &&
+			xbutton->button == left_click;
+		if (is_single_click) {
 			focused = c;
 			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
 			send_wm_take_focus(c->win);
@@ -792,22 +817,22 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		if (c->fixed && e->button == Button3) {
+		if (c->fixed && xbutton->button == right_click) {
 			return;
 		}
 
-		Cursor cur = (e->button == Button1) ? cursor_move : cursor_resize;
-		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, cur,
-		             CurrentTime);
+		Cursor cur = (xbutton->button == left_click) ? cursor_move : cursor_resize;
+		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
+				     GrabModeAsync, GrabModeAsync, None, cur, CurrentTime);
 
 		drag_client = c;
-		drag_start_x = e->x_root;
-		drag_start_y = e->y_root;
+		drag_start_x = xbutton->x_root;
+		drag_start_y = xbutton->y_root;
 		drag_orig_x = c->x;
 		drag_orig_y = c->y;
 		drag_orig_w = c->w;
 		drag_orig_h = c->h;
-		drag_mode = (e->button == Button1) ? DRAG_MOVE : DRAG_RESIZE;
+		drag_mode = (xbutton->button == left_click) ? DRAG_MOVE : DRAG_RESIZE;
 		focused = c;
 
 		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
@@ -823,8 +848,8 @@ void hdl_button_release(XEvent *xev)
 
 	if (drag_mode == DRAG_SWAP) {
 		if (swap_target) {
-			XSetWindowBorder(dpy, swap_target->win,
-			                 (swap_target == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+			XSetWindowBorder(dpy, swap_target->win, (swap_target == focused ?
+						     user_config.border_foc_col : user_config.border_ufoc_col));
 			swap_clients(drag_client, swap_target);
 		}
 		tile();
@@ -859,12 +884,12 @@ void hdl_config_ntf(XEvent *xev)
 
 void hdl_config_req(XEvent *xev)
 {
-	XConfigureRequestEvent *e = &xev->xconfigurerequest;
+	XConfigureRequestEvent *config_ev = &xev->xconfigurerequest;
 	Client *c = NULL;
 
-	for (int ws = 0; ws < NUM_WORKSPACES && !c; ws++) {
-		for (c = workspaces[ws]; c; c = c->next) {
-			if (c->win == e->window) {
+	for (int i = 0; i < NUM_WORKSPACES && !c; i++) {
+		for (c = workspaces[i]; c; c = c->next) {
+			if (c->win == config_ev->window) {
 				break;
 			}
 		}
@@ -872,18 +897,16 @@ void hdl_config_req(XEvent *xev)
 
 	if (!c || c->floating || c->fullscreen) {
 		/* allow client to configure itself */
-		XWindowChanges wc = {.x = e->x,
-		                     .y = e->y,
-		                     .width = e->width,
-		                     .height = e->height,
-		                     .border_width = e->border_width,
-		                     .sibling = e->above,
-		                     .stack_mode = e->detail};
-		XConfigureWindow(dpy, e->window, e->value_mask, &wc);
-		return;
-	}
-
-	if (c->fixed) {
+		XWindowChanges wc = {
+			.x = config_ev->x,
+			.y = config_ev->y,
+			.width = config_ev->width,
+			.height = config_ev->height,
+			.border_width = config_ev->border_width,
+			.sibling = config_ev->above,
+			.stack_mode = config_ev->detail
+		};
+		XConfigureWindow(dpy, config_ev->window, config_ev->value_mask, &wc);
 		return;
 	}
 }
@@ -1070,9 +1093,8 @@ void hdl_map_req(XEvent *xev)
 	Atom *types = NULL;
 	Bool should_float = False;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &n_items, &after,
-	                       (unsigned char **)&types) == Success &&
-	    types) {
+	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format,
+				           &n_items, &after, (unsigned char **)&types) == Success && types) {
 
 		for (unsigned long i = 0; i < n_items; i++) {
 			if (types[i] == _NET_WM_WINDOW_TYPE_DOCK) {
@@ -1096,7 +1118,7 @@ void hdl_map_req(XEvent *xev)
 		should_float = window_should_float(w);
 	}
 
-	if (open_windows == MAXCLIENTS) {
+	if (open_windows == MAX_CLIENTS) {
 		printf("sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
@@ -1115,14 +1137,12 @@ void hdl_map_req(XEvent *xev)
 	XSizeHints size_hints;
 	long supplied_ret;
 	should_float =
-		!should_float && XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&(size_hints.flags & PMinSize) &&
-		(size_hints.flags & PMaxSize) && size_hints.min_width == size_hints.max_width && size_hints.min_height == size_hints.max_height;
-
-	if (should_float) {
-		c->fixed = True;
-	}
+		!should_float && XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&
+		(size_hints.flags & PMinSize) && (size_hints.flags & PMaxSize) &&
+		size_hints.min_width == size_hints.max_width && size_hints.min_height == size_hints.max_height;
 
 	if (should_float || global_floating) {
+		c->fixed = True;
 		c->floating = True;
 	}
 
@@ -1145,13 +1165,12 @@ void hdl_map_req(XEvent *xev)
 		XSetWindowBorderWidth(dpy, w, user_config.border_width);
 	}
 
+	update_net_client_list();
 	if (target_ws != current_ws) {
-		update_net_client_list();
 		return;
 	}
 
 	/* map & borders */
-	update_net_client_list();
 	if (!global_floating && !c->floating) {
 		tile();
 	}
@@ -1161,13 +1180,12 @@ void hdl_map_req(XEvent *xev)
 
 	/* check for swallowing opportunities */
 	{
-		XClassHint ch;
+		XClassHint ch = {0};
 		Bool can_be_swallowed = False;
 
 		if (XGetClassHint(dpy, w, &ch)) {
 			/* check if new window can be swallowed */
 			for (int i = 0; i < MAX_ITEMS; i++) {
-				/* TODO: cont. */
 				if (!user_config.can_be_swallowed[i] || !user_config.can_be_swallowed[i][0]) {
 					break;
 				}
@@ -1186,7 +1204,7 @@ void hdl_map_req(XEvent *xev)
 						continue;
 					}
 
-					XClassHint pch;
+					XClassHint pch = {0};
 					Bool can_swallow = False;
 
 					if (XGetClassHint(dpy, p->win, &pch)) {
@@ -1205,7 +1223,7 @@ void hdl_map_req(XEvent *xev)
 
 						/* check process relationship */
 						if (can_swallow) {
-							/* we know class matches — swallow now */
+							/* we know class matches -> swallow now */
 							swallow_window(p, c);
 							XFree(pch.res_class);
 							XFree(pch.res_name);
@@ -1243,24 +1261,29 @@ void hdl_map_req(XEvent *xev)
 
 void hdl_motion(XEvent *xev)
 {
-	XMotionEvent *e = &xev->xmotion;
+	XMotionEvent *motion_ev = &xev->xmotion;
 
 	if ((drag_mode == DRAG_NONE || !drag_client) ||
-	    (e->time - last_motion_time <= (1000 / (long unsigned int)user_config.motion_throttle))) {
+			(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle))) {
 		return;
 	}
-	last_motion_time = e->time;
+	last_motion_time = motion_ev->time;
 
 	/* figure out which monitor the pointer is in right now */
 	int mon = 0;
 	for (int i = 0; i < n_mons; i++) {
-		if (e->x_root >= mons[i].x && e->x_root < mons[i].x + mons[i].w && e->y_root >= mons[i].y &&
-		    e->y_root < mons[i].y + mons[i].h) {
+		Bool is_current_mon =
+			motion_ev->x_root >= mons[i].x &&
+			motion_ev->x_root < mons[i].x + mons[i].w &&
+			motion_ev->y_root >= mons[i].y &&
+			motion_ev->y_root < mons[i].y + mons[i].h;
+
+		if (is_current_mon) {
 			mon = i;
 			break;
 		}
 	}
-	Monitor *m = &mons[mon];
+	Monitor *current_mon = &mons[mon];
 
 	if (drag_mode == DRAG_SWAP) {
 		Window root_ret, child;
@@ -1268,7 +1291,7 @@ void hdl_motion(XEvent *xev)
 		unsigned int mask;
 		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
 
-		static Client *last_swap_target = NULL;
+		Client *last_swap_target = NULL;
 		Client *new_target = NULL;
 
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -1284,8 +1307,9 @@ void hdl_motion(XEvent *xev)
 		if (new_target != last_swap_target) {
 			if (last_swap_target) {
 				XSetWindowBorder(
-				    dpy, last_swap_target->win,
-				    (last_swap_target == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+						dpy, last_swap_target->win, (last_swap_target == focused ?
+						user_config.border_foc_col : user_config.border_ufoc_col)
+				);
 			}
 			if (new_target) {
 				XSetWindowBorder(dpy, new_target->win, user_config.border_swap_col);
@@ -1297,8 +1321,8 @@ void hdl_motion(XEvent *xev)
 		return;
 	}
 	else if (drag_mode == DRAG_MOVE) {
-		int dx = e->x_root - drag_start_x;
-		int dy = e->y_root - drag_start_y;
+		int dx = motion_ev->x_root - drag_start_x;
+		int dy = motion_ev->y_root - drag_start_y;
 		int nx = drag_orig_x + dx;
 		int ny = drag_orig_y + dy;
 
@@ -1306,17 +1330,17 @@ void hdl_motion(XEvent *xev)
 		int outer_h = drag_client->h + 2 * user_config.border_width;
 
 		/* snap relative to this mons bounds: */
-		int rel_x = nx - m->x;
-		int rel_y = ny - m->y;
+		int rel_x = nx - current_mon->x;
+		int rel_y = ny - current_mon->y;
 
-		rel_x = snap_coordinate(rel_x, outer_w, m->w, user_config.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, m->h, user_config.snap_distance);
+		rel_x = snap_coordinate(rel_x, outer_w, current_mon->w, user_config.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, current_mon->h, user_config.snap_distance);
 
-		nx = m->x + rel_x;
-		ny = m->y + rel_y;
+		nx = current_mon->x + rel_x;
+		ny = current_mon->y + rel_y;
 
 		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
-		                               UDIST(ny, drag_client->y) > user_config.snap_distance)) {
+			UDIST(ny, drag_client->y) > user_config.snap_distance)) {
 			toggle_floating();
 		}
 
@@ -1325,14 +1349,14 @@ void hdl_motion(XEvent *xev)
 		drag_client->y = ny;
 	}
 	else if (drag_mode == DRAG_RESIZE) {
-		int dx = e->x_root - drag_start_x;
-		int dy = e->y_root - drag_start_y;
+		int dx = motion_ev->x_root - drag_start_x;
+		int dy = motion_ev->y_root - drag_start_y;
 		int nw = drag_orig_w + dx;
 		int nh = drag_orig_h + dy;
 
 		/* clamp relative to this mon */
-		int max_w = (m->w - (drag_client->x - m->x));
-		int max_h = (m->h - (drag_client->y - m->y));
+		int max_w = (current_mon->w - (drag_client->x - current_mon->x));
+		int max_h = (current_mon->h - (drag_client->y - current_mon->y));
 
 		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
 		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
@@ -1343,20 +1367,19 @@ void hdl_motion(XEvent *xev)
 
 void hdl_root_property(XEvent *xev)
 {
-	XPropertyEvent *e = &xev->xproperty;
-	if (e->atom == _NET_CURRENT_DESKTOP) {
+	XPropertyEvent *property_ev = &xev->xproperty;
+	if (property_ev->atom == _NET_CURRENT_DESKTOP) {
 		long *val = NULL;
 		Atom actual;
 		int fmt;
 		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
-		                       (unsigned char **)&val) == Success &&
-		    val) {
+		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual,
+					           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
 			change_workspace((int)val[0]);
 			XFree(val);
 		}
 	}
-	else if (e->atom == _NET_WM_STRUT_PARTIAL) {
+	else if (property_ev->atom == _NET_WM_STRUT_PARTIAL) {
 		update_struts();
 		tile();
 		update_borders();
@@ -1774,9 +1797,9 @@ void reload_config(void)
 
 	/* free any exec strings */
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.torun[i]) {
-			free(user_config.torun[i]);
-			user_config.torun[i] = NULL;
+		if (user_config.to_run[i]) {
+			free(user_config.to_run[i]);
+			user_config.to_run[i] = NULL;
 		}
 	}
 
@@ -1951,7 +1974,12 @@ void send_wm_take_focus(Window w)
 		for (int i = 0; i < n; i++) {
 			if (protos[i] == wm_take_focus) {
 				XEvent ev = {
-				    .xclient = {.type = ClientMessage, .window = w, .message_type = wm_protocols, .format = 32}};
+				    .xclient = {
+						.type = ClientMessage,
+						.window = w,
+						.message_type = wm_protocols,
+						.format = 32}
+				};
 				ev.xclient.data.l[0] = wm_take_focus;
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, w, False, NoEventMask, &ev);
@@ -2042,6 +2070,7 @@ void setup_atoms(void)
 	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
 	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
+	_NET_WM_PID = XInternAtom(dpy, "_NET_WM_PID", False);
 
 	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
 	_NET_WM_WINDOW_TYPE_UTILITY = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
@@ -2054,7 +2083,10 @@ void setup_atoms(void)
 	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
 		_NET_WM_WINDOW_TYPE, _NET_WM_WINDOW_TYPE_DOCK, _NET_WORKAREA, _NET_WM_STRUT,
 		_NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW, _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,
-		UTF8_STRING, _NET_WM_DESKTOP, _NET_CLIENT_LIST, _NET_FRAME_EXTENTS,
+		UTF8_STRING, _NET_WM_DESKTOP, _NET_CLIENT_LIST, _NET_FRAME_EXTENTS, _NET_WM_PID,
+
+		_NET_WM_WINDOW_TYPE_DOCK, _NET_WM_WINDOW_TYPE_UTILITY, _NET_WM_WINDOW_TYPE_DIALOG,
+		_NET_WM_WINDOW_TYPE_TOOLBAR, _NET_WM_WINDOW_TYPE_SPLASH, _NET_WM_WINDOW_TYPE_POPUP_MENU,
 	};
 
 	/* workspace setup */
@@ -2080,12 +2112,15 @@ void setup_atoms(void)
 
 void set_frame_extents(Window w)
 {
-	long extents[4] = {user_config.border_width, user_config.border_width, user_config.border_width,
-	                   user_config.border_width};
+	long extents[4] = {
+		user_config.border_width,
+		user_config.border_width,
+		user_config.border_width,
+		user_config.border_width
+	};
 	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32,
 			        PropModeReplace, (unsigned char *)extents, 4);
 }
-
 void set_win_scratchpad(int n)
 {
 	if (focused == NULL) {
@@ -2217,8 +2252,8 @@ void spawn(const char **argv)
 void startup_exec(void)
 {
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.torun[i]) {
-			const char **argv = build_argv(user_config.torun[i]);
+		if (user_config.to_run[i]) {
+			const char **argv = build_argv(user_config.to_run[i]);
 			if (argv) {
 				spawn(argv);
 				for (int j = 0; argv[j]; j++) {
@@ -2300,6 +2335,7 @@ void swap_clients(Client *a, Client *b)
 	ta->next = tb_next == ta ? tb : tb_next;
 }
 
+/* TODO: cont. */
 void tile(void)
 {
 	update_struts();
@@ -2324,9 +2360,9 @@ void tile(void)
 		int mon_x = mons[m].x, mon_y = mons[m].y + mons[m].reserve_top;
 		int mon_w = mons[m].w, mon_h = mons[m].h - mons[m].reserve_top - mons[m].reserve_bottom;
 
-		Client *stackers[MAXCLIENTS];
+		Client *stackers[MAX_CLIENTS];
 		int N = 0;
-		for (Client *c = head; c && N < MAXCLIENTS; c = c->next) {
+		for (Client *c = head; c && N < MAX_CLIENTS; c = c->next) {
 			if (c->mapped && !c->floating && !c->fullscreen && c->mon == m) {
 				stackers[N++] = c;
 			}
@@ -2347,11 +2383,13 @@ void tile(void)
 		{
 			Client *c = stackers[0];
 			int bw2 = 2 * user_config.border_width;
-			XWindowChanges wc = {.x = tile_x,
-			                     .y = tile_y,
-			                     .width = MAX(1, master_w - bw2),
-			                     .height = MAX(1, tile_h - bw2),
-			                     .border_width = user_config.border_width};
+			XWindowChanges wc = {
+				.x = tile_x,
+				.y = tile_y,
+				.width = MAX(1, master_w - bw2),
+				.height = MAX(1, tile_h - bw2),
+				.border_width = user_config.border_width
+			};
 
 			if (c->x != wc.x || c->y != wc.y || c->w != wc.width || c->h != wc.height) {
 				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
@@ -2372,8 +2410,8 @@ void tile(void)
 		int num_stack = N - 1;
 		int min_raw = bw2 + 1;
 		int total_fixed_heights = 0, auto_count = 0;
-		int heights_final[MAXCLIENTS] = {0};
-		Bool is_fixed[MAXCLIENTS] = {0};
+		int heights_final[MAX_CLIENTS] = {0};
+		Bool is_fixed[MAX_CLIENTS] = {0};
 
 		for (int i = 1; i < N; i++) {
 			if (stackers[i]->custom_stack_height > 0) {
@@ -2723,7 +2761,7 @@ void update_mons(void)
 
 void update_net_client_list(void)
 {
-	Window wins[MAXCLIENTS];
+	Window wins[MAX_CLIENTS];
 	int n = 0;
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
@@ -2833,7 +2871,7 @@ void warp_cursor(Client *c)
 
 Bool window_should_float(Window w)
 {
-	XClassHint ch;
+	XClassHint ch = {0};
 	if (XGetClassHint(dpy, w, &ch)) {
 		for (int i = 0; i < MAX_ITEMS; i++) {
 			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
@@ -2856,7 +2894,7 @@ Bool window_should_float(Window w)
 
 Bool window_should_start_fullscreen(Window w)
 {
-	XClassHint ch;
+	XClassHint ch = {0};
 	if (XGetClassHint(dpy, w, &ch)) {
 		for (int i = 0; i < MAX_ITEMS; i++) {
 			if (!user_config.start_fullscreen[i] || !user_config.start_fullscreen[i][0]) {
