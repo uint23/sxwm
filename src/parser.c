@@ -39,11 +39,11 @@ static const CommandEntry call_table[] = {{"close_window", close_focused},
 
 static void remap_and_dedupe_binds(Config *cfg)
 {
-	for (int i = 0; i < cfg->bindsn; i++) {
-		for (int j = i + 1; j < cfg->bindsn; j++) {
+	for (int i = 0; i < cfg->n_binds; i++) {
+		for (int j = i + 1; j < cfg->n_binds; j++) {
 			if (cfg->binds[i].mods == cfg->binds[j].mods && cfg->binds[i].keysym == cfg->binds[j].keysym) {
-				memmove(&cfg->binds[j], &cfg->binds[j + 1], sizeof(Binding) * (cfg->bindsn - j - 1));
-				cfg->bindsn--;
+				memmove(&cfg->binds[j], &cfg->binds[j + 1], sizeof(Binding) * (cfg->n_binds - j - 1));
+				cfg->n_binds--;
 				j--;
 			}
 		}
@@ -81,15 +81,15 @@ static char *strip_quotes(char *s)
 
 static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks)
 {
-	for (int i = 0; i < cfg->bindsn; i++) {
+	for (int i = 0; i < cfg->n_binds; i++) {
 		if (cfg->binds[i].mods == (int)mods && cfg->binds[i].keysym == ks) {
 			return &cfg->binds[i];
 		}
 	}
-	if (cfg->bindsn >= MAX_BINDS) {
+	if (cfg->n_binds >= MAX_BINDS) {
 		return NULL;
 	}
-	Binding *b = &cfg->binds[cfg->bindsn++];
+	Binding *b = &cfg->binds[cfg->n_binds++];
 	b->mods = mods;
 	b->keysym = ks;
 	return b;
