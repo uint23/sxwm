@@ -382,18 +382,16 @@ void change_workspace(int ws)
 	}
 
 	/* if no scratchpad found focus regular window */
-	Client *cached = NULL;
 	if (!focused && workspaces[current_ws]) {
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
 			/* TODO TEST */
-			cached = c;
 			if (c->mon == current_mon) {
 				focused = c;
 				current_mon = c->mon;
 				break;
 			}
-			focused = cached;
-			current_mon = cached->mon;
+			focused = c;
+			current_mon = c->mon;
 		}
 	}
 
