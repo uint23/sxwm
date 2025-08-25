@@ -1,23 +1,23 @@
 <div align="center">
   <img src="images/sxwm_logo.png" width="50%">
   <br>
-  <b>Minimal. Fast. Configurable. Tiling Window Manager for X11</b>
-  <br>
-  <sub>Abhinav Prasai (2025)</sub>
+  <b>Minimal, fast, configurable. Tiling X11 window manager.</b>
   <br><br>
   <img src="https://img.shields.io/github/v/release/uint23/sxwm?style=flat-square">
   <img src="https://img.shields.io/github/license/uint23/sxwm?style=flat-square">
 </div>
 
+Feel free to join our IRC channel on [Libera.Chat at #sxwm](https://web.libera.chat/?channels=#sxwm).
+Contributions are welcome! Please read CONTRIBUTIONS.md for more information.
+
 > [!WARNING]
 > From commit `7a7c6300`, `master_previous` binding has now been renamed to `master_prev`.  
 > Please update your `sxwmrc` accordingly.
 
-
 > [!NOTE]
-> The codebase of `sxwm` has certainly inflated a lot. Although it's nearing the same amount of code as `dwm`,
-> that doesn't mean that it has gotten more bloated--rather the opposite is true. I have been cleaning up and
-> refactoring the code so that it is more readable and faster; this doesn _not_ affect performance.
+> The codebase of `SXWM` has certainly inflated a lot. Although it's nearing the same amount of code as `dwm`,
+> that doesn't mean that it's gotten more bloated, rather the opposite is true. I have been cleaning up and
+> refactoring the code so that it's more readable and faster; this does _not_ affect the performance.
 
 ## Table of Contents
 - [Launch Args](#launch-args)
@@ -34,10 +34,10 @@
 
 ---
 
-## Launch Args
+## Launch Arguments
 
 ### `-v` or `--version`
-Displays the version of `sxwm`
+Displays the current version of `sxwm`
 
 ### `-b` or `--backup`
 Allows user to use backup keybinds with `sxwm`
@@ -50,20 +50,14 @@ Allows user to use backup keybinds with `sxwm`
 - **Workspaces**: 9 workspaces, fully integrated with your bar.
 - **Scratchpads**: Floating windows you can summon/hide instantly.
 - **Window Swallowing**: Native window swallowing support.
-- **Live Config Reload**: Change your config and reload instantly with a keybind.
-- **Easy Configuration**: Human-friendly `sxwmrc` file, no C required.
+- **Hot Reload**: Apply custom configuration and reload with custom keybind.
+- **Easy Config**: User-friendly `sxwmrc` file, no C required.
 - **Master-Stack Layout**: DWM-inspired productive workflow.
 - **Mouse Support**: Move, swap, and resize windows with the mouse.
-- **Zero Dependencies**: Only `libX11` and `Xinerama` required.
+- **Minimal Dependencies**: Only `libX11`, `Xinerama` and `XCursor` are required.
 - **Lightweight**: Single C file, minimal headers, compiles in seconds.
-- **Bar Friendly**: Works great with [sxbar](https://github.com/uint23/sxbar).
 - **Xinerama Support**: Multi-monitor ready.
-- **Fast**: Designed for speed and low resource usage.
-
----
-
-## Screenshots
-See on the [website](https://uint23.xyz/sxwm.html)
+- **Efficient**: Designed for speed and low resource usage(2-3 Mbs of RAM).
 
 ---
 
@@ -366,5 +360,5 @@ exec sxwm
 ---
 
 <p align="center">
-  <em>Contributions welcome, Please read CONTRIBUTIONS.md for more info!</em>
+  <em>Abhinav Prasai [2025]</em>
 </p>
