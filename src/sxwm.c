@@ -16,7 +16,13 @@
 #include <X11/X.h>
 #include <err.h>
 #include <stdio.h>
+
+#ifdef __linux__
 #include <linux/limits.h>
+#else
+#include <limits.h>
+#endif
+
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -575,11 +581,7 @@ void focus_next_mon(void)
 		return;
 	}
 
-	if (focused) {
-		current_mon = focused->mon;
-	}
 	int target_mon = (current_mon + 1) % n_mons;
-
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -616,11 +618,7 @@ void focus_prev_mon(void)
 		return; /* only one monitor, nothing to switch to */
 	}
 
-	if (focused) {
-		current_mon = focused->mon;
-	}
 	int target_mon = (current_mon - 1 + n_mons) % n_mons;
-
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
