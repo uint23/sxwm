@@ -575,7 +575,9 @@ void focus_next_mon(void)
 		return;
 	}
 
-	current_mon = focused->mon;
+	if (focused) {
+		current_mon = focused->mon;
+	}
 	int target_mon = (current_mon + 1) % n_mons;
 
 	/* find the first window on the target monitor in current workspace */
@@ -614,7 +616,9 @@ void focus_prev_mon(void)
 		return; /* only one monitor, nothing to switch to */
 	}
 
-	current_mon = focused->mon;
+	if (focused) {
+		current_mon = focused->mon;
+	}
 	int target_mon = (current_mon - 1 + n_mons) % n_mons;
 
 	/* find the first window on the target monitor in current workspace */

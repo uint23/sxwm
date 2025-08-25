@@ -1,6 +1,6 @@
 CC      ?= gcc
-CFLAGS  ?= -std=c99 -Wall -Wextra -O3 -Isrc
-LDFLAGS ?= -lX11 -lXinerama -lXcursor
+CFLAGS  ?= -std=c99 -Wall -Wextra -Os
+LDFLAGS ?= -lX11 -lXinerama -lXcursor -Isrc
 
 PREFIX  ?= /usr/local
 BIN     := sxwm
@@ -56,4 +56,11 @@ uninstall:
 	@rm -f $(DESTDIR)$(MAN_DIR)/$(MAN)
 	@echo "Uninstallation complete."
 
-.PHONY: all clean install uninstall
+clangd:
+	@echo "Generating compile_flags.txt"
+	@rm -f compile_flags.txt
+	@for flag in $(CFLAGS) $(LDFLAGS); do \
+		echo $$flag >> compile_flags.txt; \
+	done
+
+.PHONY: all clean install uninstall clangd
