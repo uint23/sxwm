@@ -293,6 +293,7 @@ void centre_window()
 		return;
 	}
 
+	focused->mon = get_monitor_for(focused);
 	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
 	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
 
