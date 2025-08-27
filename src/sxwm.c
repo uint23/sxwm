@@ -16,13 +16,7 @@
 #include <X11/X.h>
 #include <err.h>
 #include <stdio.h>
-
-#ifdef __linux__
-#include <linux/limits.h>
-#else
 #include <limits.h>
-#endif
-
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +33,10 @@
 #include <X11/extensions/Xinerama.h>
 #include <X11/Xcursor/Xcursor.h>
 
+#ifdef __linux__
+#include <linux/limits.h>
+#endif
+
 #include "defs.h"
 #include "parser.h"
 
@@ -48,6 +46,7 @@ void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
+Client *find_client(Window w);
 Window find_toplevel(Window w);
 /* void focus_next(void); */
 /* void focus_prev(void); */
@@ -95,6 +94,7 @@ void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
 void set_frame_extents(Window w);
+void set_input_focus(Client *c, Bool raise_win, Bool warp);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char **argv);
@@ -146,6 +146,12 @@ Atom _NET_WM_WINDOW_TYPE_DIALOG;
 Atom _NET_WM_WINDOW_TYPE_TOOLBAR;
 Atom _NET_WM_WINDOW_TYPE_SPLASH;
 Atom _NET_WM_WINDOW_TYPE_POPUP_MENU;
+Atom _NET_WM_WINDOW_TYPE_MENU;
+Atom _NET_WM_WINDOW_TYPE_DROPDOWN_MENU;
+Atom _NET_WM_WINDOW_TYPE_TOOLTIP;
+Atom _NET_WM_WINDOW_TYPE_NOTIFICATION;
+Atom _NET_WM_STATE_MODAL;
+
 
 Cursor cursor_normal;
 Cursor cursor_move;
@@ -399,18 +405,7 @@ void change_workspace(int ws)
 			current_mon = c->mon;
 		}
 	}
-
-	if (focused) {
-		focused->win = find_toplevel(focused->win);
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		if (user_config.warp_cursor) {
-			warp_cursor(focused);
-		}
-		update_borders();
-	}
-	else {
-		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
-	}
+	set_input_focus(focused, False, True);
 
 	long current_desktop = current_ws;
 	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
@@ -477,6 +472,18 @@ void dec_gaps(void)
 	}
 }
 
+Client *find_client(Window w)
+{
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			if (c->win == w) {
+				return c;
+			}
+		}
+	}
+	return NULL;
+}
+
 Window find_toplevel(Window w)
 {
 	Window root = None;
@@ -521,12 +528,7 @@ void focus_next(void)
 
 	focused = c;
 	current_mon = c->mon;
-	XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-	XRaiseWindow(dpy, c->win);
-	if (user_config.warp_cursor) {
-		warp_cursor(c);
-	}
-	update_borders();
+	set_input_focus(focused, True, True);
 }
 
 void focus_prev(void)
@@ -566,13 +568,7 @@ void focus_prev(void)
 
 	focused = c;
 	current_mon = c->mon;
-
-	XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-	XRaiseWindow(dpy, c->win);
-	if (user_config.warp_cursor) {
-		warp_cursor(c);
-	}
-	update_borders();
+	set_input_focus(focused, True, True);
 }
 
 void focus_next_mon(void)
@@ -595,12 +591,7 @@ void focus_next_mon(void)
 		/* focus the window on target monitor */
 		focused = target_client;
 		current_mon = target_mon;
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		XRaiseWindow(dpy, focused->win);
-		if (user_config.warp_cursor) {
-			warp_cursor(focused);
-		}
-		update_borders();
+		set_input_focus(focused, True, True);
 	}
 	else {
 		/* no windows on target monitor, just move cursor to center and update current_mon */
@@ -632,12 +623,7 @@ void focus_prev_mon(void)
 		/* focus the window on target monitor */
 		focused = target_client;
 		current_mon = target_mon;
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-		XRaiseWindow(dpy, focused->win);
-		if (user_config.warp_cursor) {
-			warp_cursor(focused);
-		}
-		update_borders();
+		set_input_focus(focused, True, True);
 	}
 	else {
 		current_mon = target_mon;
@@ -778,8 +764,7 @@ void hdl_button(XEvent *xev)
 		Bool is_swap_mode =
 			(xbutton->state & user_config.modkey) &&
 			(xbutton->state & ShiftMask) &&
-			xbutton->button == left_click &&
-			!c->floating;
+			xbutton->button == left_click && !c->floating;
 		if (is_swap_mode) {
 			drag_client = c;
 			drag_start_x = xbutton->x_root;
@@ -792,16 +777,15 @@ void hdl_button(XEvent *xev)
 			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
 					     GrabModeAsync, GrabModeAsync, None, cursor_move, CurrentTime);
 			focused = c;
-			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
+			set_input_focus(focused, False, False);
 			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
-			XRaiseWindow(dpy, c->win);
 			return;
 		}
 
 		Bool is_move_resize =
 			(xbutton->state & user_config.modkey) &&
-			(xbutton->button == left_click || xbutton->button == right_click) &&
-			!c->floating;
+			(xbutton->button == left_click ||
+			 xbutton->button == right_click) && !c->floating;
 		if (is_move_resize) {
 			focused = c;
 			toggle_floating();
@@ -812,10 +796,7 @@ void hdl_button(XEvent *xev)
 			xbutton->button == left_click;
 		if (is_single_click) {
 			focused = c;
-			XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-			send_wm_take_focus(c->win);
-			XRaiseWindow(dpy, c->win);
-			update_borders();
+			set_input_focus(focused, True, False);
 			return;
 		}
 
@@ -827,9 +808,9 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		Cursor cur = (xbutton->button == left_click) ? cursor_move : cursor_resize;
+		Cursor cursor = (xbutton->button == left_click) ? cursor_move : cursor_resize;
 		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
-				     GrabModeAsync, GrabModeAsync, None, cur, CurrentTime);
+				     GrabModeAsync, GrabModeAsync, None, cursor, CurrentTime);
 
 		drag_client = c;
 		drag_start_x = xbutton->x_root;
@@ -841,9 +822,7 @@ void hdl_button(XEvent *xev)
 		drag_mode = (xbutton->button == left_click) ? DRAG_MOVE : DRAG_RESIZE;
 		focused = c;
 
-		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-		update_borders();
-		XRaiseWindow(dpy, c->win);
+		set_input_focus(focused, True, False);
 		return;
 	}
 }
@@ -996,11 +975,7 @@ void hdl_destroy_ntf(XEvent *xev)
 				update_borders();
 
 				if (focused) {
-					XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
-					XRaiseWindow(dpy, focused->win);
-					if (user_config.warp_cursor) {
-						warp_cursor(focused);
-					}
+					set_input_focus(focused, True, True);
 				}
 			}
 			return;
@@ -1070,28 +1045,23 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	/* check if this window is already managed on any workspace */
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
-			if (c->win == w) {
-				if (ws == current_ws) {
-					if (!c->mapped) {
-						XMapWindow(dpy, w);
-						c->mapped = True;
-					}
-					if (user_config.new_win_focus) {
-						focused = c;
-						XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-						send_wm_take_focus(c->win);
-						if (user_config.warp_cursor) {
-							warp_cursor(c);
-						}
-					}
-					update_borders();
-				}
-				return;
+	Client *c = find_client(w);
+	if (c) {
+		if (c->ws == current_ws) {
+			if (!c->mapped) {
+				XMapWindow(dpy, w);
+				c->mapped = True;
 			}
+			if (user_config.new_win_focus) {
+				focused = c;
+				set_input_focus(c, True, True);
+				return; /* set_input_focus already calls update_borders */
+			}
+			update_borders();
 		}
+		return;
 	}
+
 
 	Atom type;
 	int format;
@@ -1109,11 +1079,16 @@ void hdl_map_req(XEvent *xev)
 				return;
 			}
 
-			should_float = 
-				types[i] == _NET_WM_WINDOW_TYPE_UTILITY || types[i] == _NET_WM_WINDOW_TYPE_DIALOG ||
-				types[i] == _NET_WM_WINDOW_TYPE_TOOLBAR || types[i] == _NET_WM_WINDOW_TYPE_SPLASH ||
-				types[i] == _NET_WM_WINDOW_TYPE_POPUP_MENU;
-			if (should_float) {
+			if (types[i] == _NET_WM_WINDOW_TYPE_UTILITY ||
+				types[i] == _NET_WM_WINDOW_TYPE_DIALOG  ||
+				types[i] == _NET_WM_WINDOW_TYPE_TOOLBAR ||
+				types[i] == _NET_WM_WINDOW_TYPE_SPLASH  ||
+				types[i] == _NET_WM_WINDOW_TYPE_POPUP_MENU ||
+				types[i] == _NET_WM_WINDOW_TYPE_DROPDOWN_MENU ||
+				types[i] == _NET_WM_WINDOW_TYPE_MENU ||
+				types[i] == _NET_WM_WINDOW_TYPE_TOOLTIP ||
+				types[i] == _NET_WM_WINDOW_TYPE_NOTIFICATION) {
+				should_float = True;
 				break;
 			}
 		}
@@ -1124,13 +1099,32 @@ void hdl_map_req(XEvent *xev)
 		should_float = window_should_float(w);
 	}
 
+	if (!should_float) {
+		Atom state_type;
+		Atom *state_atoms = NULL;
+		int state_format;
+		unsigned long n_items;
+		unsigned long bytes_after;
+
+		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, False, XA_ATOM, &state_type, &state_format,&n_items,
+					           &bytes_after, (unsigned char**)&state_atoms) == Success && state_atoms) {
+			for (unsigned long i = 0; i < n_items; i++) {
+				if (state_atoms[i] == _NET_WM_STATE_MODAL) {
+					should_float = True;
+					break;
+				}
+			}
+			XFree(state_atoms);
+		}
+	}
+
 	if (open_windows == MAX_CLIENTS) {
 		printf("sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
 	int target_ws = get_workspace_for_window(w);
-	Client *c = add_client(w, target_ws);
+	c = add_client(w, target_ws);
 	if (!c) {
 		return;
 	}
@@ -1142,14 +1136,14 @@ void hdl_map_req(XEvent *xev)
 
 	XSizeHints size_hints;
 	long supplied_ret;
-	should_float =
-		!should_float && XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&
-		(size_hints.flags & PMinSize) && (size_hints.flags & PMaxSize) &&
-		size_hints.min_width == size_hints.max_width && size_hints.min_height == size_hints.max_height;
 
-	if (should_float || global_floating) {
-		c->fixed = True;
-		c->floating = True;
+	if (!should_float &&
+		XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&
+		(size_hints.flags & PMinSize) && (size_hints.flags & PMaxSize) &&
+		size_hints.min_width  == size_hints.max_width &&
+		size_hints.min_height == size_hints.max_height) {
+
+		should_float = True;
 	}
 
 	if (window_should_start_fullscreen(w)) {
@@ -1256,11 +1250,8 @@ void hdl_map_req(XEvent *xev)
 
 	if (user_config.new_win_focus) {
 		focused = c;
-		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-		send_wm_take_focus(c->win);
-		if (user_config.warp_cursor) {
-			warp_cursor(c);
-		}
+		set_input_focus(focused, False, True);
+		return;
 	}
 	update_borders();
 }
@@ -1677,7 +1668,7 @@ void move_to_workspace(int ws)
 	tile();
 	focused = workspaces[current_ws];
 	if (focused) {
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		set_input_focus(focused, False, False);
 	}
 }
 
@@ -2084,6 +2075,12 @@ void setup_atoms(void)
 	_NET_WM_WINDOW_TYPE_TOOLBAR = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
 	_NET_WM_WINDOW_TYPE_SPLASH = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
 	_NET_WM_WINDOW_TYPE_POPUP_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
+	_NET_WM_WINDOW_TYPE_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
+	_NET_WM_WINDOW_TYPE_DROPDOWN_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", False);
+	_NET_WM_WINDOW_TYPE_TOOLTIP = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLTIP", False);
+	_NET_WM_WINDOW_TYPE_NOTIFICATION = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
+	_NET_WM_STATE_MODAL = XInternAtom(dpy, "_NET_WM_STATE_MODAL", False);
+
 
 	Atom support_list[] = {
 	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
@@ -2093,6 +2090,8 @@ void setup_atoms(void)
 
 		_NET_WM_WINDOW_TYPE_DOCK, _NET_WM_WINDOW_TYPE_UTILITY, _NET_WM_WINDOW_TYPE_DIALOG,
 		_NET_WM_WINDOW_TYPE_TOOLBAR, _NET_WM_WINDOW_TYPE_SPLASH, _NET_WM_WINDOW_TYPE_POPUP_MENU,
+		_NET_WM_WINDOW_TYPE_MENU, _NET_WM_WINDOW_TYPE_DROPDOWN_MENU, _NET_WM_WINDOW_TYPE_TOOLTIP,
+		_NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_STATE_MODAL,
 	};
 
 	/* workspace setup */
@@ -2127,6 +2126,42 @@ void set_frame_extents(Window w)
 	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32,
 			        PropModeReplace, (unsigned char *)extents, 4);
 }
+
+void set_input_focus(Client *c, Bool raise_win, Bool warp)
+{
+	if (c && c->mapped) {
+		focused = c;
+		current_mon = c->mon;
+		Window w = find_toplevel(c->win);
+
+		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
+		send_wm_take_focus(w);
+
+		if (raise_win) {
+			XRaiseWindow(dpy, w);
+		}
+
+		/* EWMH */
+		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
+				PropModeReplace, (unsigned char *)&w, 1);
+
+		update_borders();
+
+		if (warp && user_config.warp_cursor) {
+			warp_cursor(c);
+		}
+	} else {
+		/* no client */
+		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
+		XDeleteProperty(dpy, root, _NET_ACTIVE_WINDOW);
+
+		focused = NULL;
+		update_borders();
+	}
+
+	XFlush(dpy);
+}
+
 void set_win_scratchpad(int n)
 {
 	if (focused == NULL) {
@@ -2537,9 +2572,12 @@ void toggle_floating(void)
 			focused->w = wa.width;
 			focused->h = wa.height;
 
-			XConfigureWindow(
-			    dpy, focused->win, CWX | CWY | CWWidth | CWHeight,
-			    &(XWindowChanges){.x = focused->x, .y = focused->y, .width = focused->w, .height = focused->h});
+			XConfigureWindow(dpy, focused->win, CWX | CWY | CWWidth | CWHeight, &(XWindowChanges){
+					.x = focused->x,
+					.y = focused->y,
+					.width = focused->w,
+					.height = focused->h
+			});
 		}
 	}
 	else {
@@ -2554,8 +2592,7 @@ void toggle_floating(void)
 
 	/* raise and refocus floating window */
 	if (focused->floating) {
-		XRaiseWindow(dpy, focused->win);
-		XSetInputFocus(dpy, focused->win, RevertToPointerRoot, CurrentTime);
+		set_input_focus(focused, True, False);
 	}
 }
 
@@ -2667,23 +2704,14 @@ void toggle_scratchpad(int n)
 		c->mapped = False;
 		scratchpads[n].enabled = False;
 		focus_prev();
-		if (focused) {
-			send_wm_take_focus(focused->win);
-		}
 	}
 	else {
 		XMapWindow(dpy, c->win);
 		c->mapped = True;
-		XRaiseWindow(dpy, c->win);
 		scratchpads[n].enabled = True;
 
 		focused = c;
-		XSetInputFocus(dpy, c->win, RevertToPointerRoot, CurrentTime);
-		send_wm_take_focus(c->win);
-
-		if (user_config.warp_cursor) {
-			warp_cursor(focused);
-		}
+		set_input_focus(focused, True, True);
 	}
 
 	tile();
@@ -2708,8 +2736,7 @@ void unswallow_window(Client *c)
 		swallower->mapped = True;
 
 		focused = swallower;
-		XSetInputFocus(dpy, swallower->win, RevertToPointerRoot, CurrentTime);
-		XRaiseWindow(dpy, swallower->win);
+		set_input_focus(focused, False, True);
 	}
 
 	tile();
