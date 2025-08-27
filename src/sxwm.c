@@ -152,7 +152,6 @@ Atom _NET_WM_WINDOW_TYPE_TOOLTIP;
 Atom _NET_WM_WINDOW_TYPE_NOTIFICATION;
 Atom _NET_WM_STATE_MODAL;
 
-
 Cursor cursor_normal;
 Cursor cursor_move;
 Cursor cursor_resize;
@@ -1144,6 +1143,11 @@ void hdl_map_req(XEvent *xev)
 		size_hints.min_height == size_hints.max_height) {
 
 		should_float = True;
+		c->fixed = True;
+	}
+
+	if (should_float || global_floating) {
+		c->floating = True;
 	}
 
 	if (window_should_start_fullscreen(w)) {
