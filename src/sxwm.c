@@ -41,7 +41,7 @@
 #include "parser.h"
 
 Client *add_client(Window w, int ws);
-/* void centre_window(); */
+/* void centre_window(void); */
 void change_workspace(int ws);
 int clean_mask(int mask);
 /* void close_focused(void); */
@@ -78,7 +78,7 @@ Bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_prev_mon(void); */
 void move_to_workspace(int ws);
 void other_wm(void);
-int other_wm_err(Display *dpy, XErrorEvent *ee);
+int other_wm_err(Display *d, XErrorEvent *ee);
 /* long parse_col(const char *hex); */
 /* void quit(void); */
 /* void reload_config(void); */
@@ -97,7 +97,7 @@ void set_frame_extents(Window w);
 void set_input_focus(Client *c, Bool raise_win, Bool warp);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
-void spawn(const char **argv);
+void spawn(const char * const *argv);
 void startup_exec(void);
 void swallow_window(Client *swallower, Client *swallowed);
 void swap_clients(Client *a, Client *b);
@@ -116,7 +116,7 @@ void update_workarea(void);
 void warp_cursor(Client *c);
 Bool window_should_float(Window w);
 Bool window_should_start_fullscreen(Window w);
-int xerr(Display *dpy, XErrorEvent *ee);
+int xerr(Display *d, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 #include "config.h"
 
@@ -286,7 +286,7 @@ Client *add_client(Window w, int ws)
 	return c;
 }
 
-void centre_window()
+void centre_window(void)
 {
 	if (!focused || !focused->mapped || !focused->floating) {
 		return;
@@ -485,20 +485,20 @@ Client *find_client(Window w)
 
 Window find_toplevel(Window w)
 {
-	Window root = None;
+	Window root_win = None;
 	Window parent;
 	Window *kids;
 	unsigned n_kids;
 
 	while (True) {
-		if (w == root) {
+		if (w == root_win) {
 			break;
 		}
-		if (XQueryTree(dpy, w, &root, &parent, &kids, &n_kids) == 0) {
+		if (XQueryTree(dpy, w, &root_win, &parent, &kids, &n_kids) == 0) {
 			break;
 		}
 		XFree(kids);
-		if (parent == root || parent == None) {
+		if (parent == root_win || parent == None) {
 			break;
 		}
 		w = parent;
@@ -1102,10 +1102,10 @@ void hdl_map_req(XEvent *xev)
 		Atom state_type;
 		Atom *state_atoms = NULL;
 		int state_format;
-		unsigned long n_items;
 		unsigned long bytes_after;
+		n_items = 0;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, False, XA_ATOM, &state_type, &state_format,&n_items,
+		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, False, XA_ATOM, &state_type, &state_format, &n_items,
 					           &bytes_after, (unsigned char**)&state_atoms) == Success && state_atoms) {
 			for (unsigned long i = 0; i < n_items; i++) {
 				if (state_atoms[i] == _NET_WM_STATE_MODAL) {
@@ -1284,7 +1284,7 @@ void hdl_motion(XEvent *xev)
 			break;
 		}
 	}
-	Monitor *current_mon = &mons[mon];
+	Monitor *current_mon_motion = &mons[mon];
 
 	if (drag_mode == DRAG_SWAP) {
 		Window root_ret, child;
@@ -1331,14 +1331,14 @@ void hdl_motion(XEvent *xev)
 		int outer_h = drag_client->h + 2 * user_config.border_width;
 
 		/* snap relative to this mons bounds: */
-		int rel_x = nx - current_mon->x;
-		int rel_y = ny - current_mon->y;
+		int rel_x = nx - current_mon_motion->x;
+		int rel_y = ny - current_mon_motion->y;
 
-		rel_x = snap_coordinate(rel_x, outer_w, current_mon->w, user_config.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, current_mon->h, user_config.snap_distance);
+		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, user_config.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, user_config.snap_distance);
 
-		nx = current_mon->x + rel_x;
-		ny = current_mon->y + rel_y;
+		nx = current_mon_motion->x + rel_x;
+		ny = current_mon_motion->y + rel_y;
 
 		if (!drag_client->floating && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
 			UDIST(ny, drag_client->y) > user_config.snap_distance)) {
@@ -1356,8 +1356,8 @@ void hdl_motion(XEvent *xev)
 		int nh = drag_orig_h + dy;
 
 		/* clamp relative to this mon */
-		int max_w = (current_mon->w - (drag_client->x - current_mon->x));
-		int max_h = (current_mon->h - (drag_client->y - current_mon->y));
+		int max_w = (current_mon_motion->w - (drag_client->x - current_mon_motion->x));
+		int max_h = (current_mon_motion->h - (drag_client->y - current_mon_motion->y));
 
 		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
 		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
@@ -1686,11 +1686,11 @@ void other_wm(void)
 	XSync(dpy, False);
 }
 
-int other_wm_err(Display *dpy, XErrorEvent *ee)
+int other_wm_err(Display *d, XErrorEvent *ee)
 {
 	errx(0, "can't start because another window manager is already running");
 	return 0;
-	(void)dpy;
+	(void)d;
 	(void)ee;
 }
 
@@ -2100,20 +2100,20 @@ void setup_atoms(void)
 	/* workspace setup */
 	long num_workspaces = NUM_WORKSPACES;
 	XChangeProperty(dpy, root, _NET_NUMBER_OF_DESKTOPS, XA_CARDINAL, 32,
-			        PropModeReplace, (unsigned char *)&num_workspaces, 1);
+			        PropModeReplace, (const unsigned char *)&num_workspaces, 1);
 
 	const char workspace_names[] = WORKSPACE_NAMES;
 	int names_len = sizeof(workspace_names);
 	XChangeProperty(dpy, root, _NET_DESKTOP_NAMES, UTF8_STRING, 8,
-			        PropModeReplace, (unsigned char *)workspace_names, names_len);
+			        PropModeReplace, (const unsigned char *)workspace_names, names_len);
 
 	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
-			        PropModeReplace, (unsigned char *)&current_ws, 1);
+			        PropModeReplace, (const unsigned char *)&current_ws, 1);
 
 	/* load supported list */
 	int support_list_len = sizeof(support_list) / sizeof(Atom);
 	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32,
-			        PropModeReplace, (unsigned char *)support_list, support_list_len);
+			        PropModeReplace, (const unsigned char *)support_list, support_list_len);
 
 	update_workarea();
 }
@@ -2193,11 +2193,12 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 	return pos;
 }
 
-void spawn(const char **argv)
+void spawn(const char * const *argv)
 {
 	int argc = 0;
-	while (argv[argc])
+	while (argv[argc]) {
 		argc++;
+	}
 
 	int cmd_count = 1;
 	for (int i = 0; i < argc; i++) {
@@ -2206,7 +2207,7 @@ void spawn(const char **argv)
 		}
 	}
 
-	char ***commands = malloc(cmd_count * sizeof(char **));
+	const char ***commands = malloc(cmd_count * sizeof(char **)); /* *** bruh */
 	if (!commands) {
 		perror("malloc commands");
 		return;
@@ -2217,7 +2218,7 @@ void spawn(const char **argv)
 	for (int i = 0; i <= argc; i++) {
 		if (!argv[i] || strcmp(argv[i], "|") == 0) {
 			int len = i - arg_start;
-			char **cmd_args = malloc((len + 1) * sizeof(char *));
+			const char **cmd_args = malloc((len + 1) * sizeof(char *));
 			if (!cmd_args) {
 				perror("malloc cmd_args");
 				for (int j = 0; j < cmd_idx; j++) {
@@ -2227,7 +2228,7 @@ void spawn(const char **argv)
 				return;
 			}
 			for (int j = 0; j < len; j++) {
-				cmd_args[j] = (char *)argv[arg_start + j];
+				cmd_args[j] = argv[arg_start + j];
 			}
 			cmd_args[len] = NULL;
 			commands[cmd_idx++] = cmd_args;
@@ -2235,7 +2236,11 @@ void spawn(const char **argv)
 		}
 	}
 
-	int pipes[cmd_count - 1][2];
+	int (*pipes)[2] = malloc(sizeof(int[2]) * (cmd_count - 1));
+	if (!pipes) {
+		perror("malloc pipes");
+		return;
+	}
 	for (int i = 0; i < cmd_count - 1; i++) {
 		if (pipe(pipes[i]) == -1) {
 			perror("pipe");
@@ -2243,6 +2248,7 @@ void spawn(const char **argv)
 				free(commands[j]);
 			}
 			free(commands);
+			free(pipes);
 			return;
 		}
 	}
@@ -2259,6 +2265,7 @@ void spawn(const char **argv)
 				free(commands[j]);
 			}
 			free(commands);
+			free(pipes);
 			return;
 		}
 		if (pid == 0) {
@@ -2276,7 +2283,7 @@ void spawn(const char **argv)
 				close(pipes[k][1]);
 			}
 
-			execvp(commands[i][0], commands[i]);
+			execvp(commands[i][0], (char* const*)(void*)commands[i]);
 			fprintf(stderr, "sxwm: execvp '%s' failed\n", commands[i][0]);
 			exit(EXIT_FAILURE);
 		}
@@ -2291,6 +2298,7 @@ void spawn(const char **argv)
 		free(commands[i]);
 	}
 	free(commands);
+	free(pipes);
 }
 
 void startup_exec(void)
@@ -2301,7 +2309,7 @@ void startup_exec(void)
 			if (argv) {
 				spawn(argv);
 				for (int j = 0; argv[j]; j++) {
-					free((char*)argv[j]);
+					free((void*)(uintptr_t)argv[j]);
 				}
 				free(argv);
 			}
@@ -2961,7 +2969,7 @@ Bool window_should_start_fullscreen(Window w)
 	return False;
 }
 
-int xerr(Display *dpy, XErrorEvent *ee)
+int xerr(Display *d, XErrorEvent *ee)
 {
 	/* ignore noise & non fatal errors */
 	const struct {
@@ -2980,7 +2988,7 @@ int xerr(Display *dpy, XErrorEvent *ee)
 	}
 
 	return 0;
-	(void)dpy;
+	(void)d;
 	(void)ee;
 }
 
