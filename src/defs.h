@@ -66,6 +66,7 @@ typedef union {
 typedef struct {
 	int mods;
 	KeySym keysym;
+	KeyCode keycode;
 	Action action;
 	int type;
 } Binding;

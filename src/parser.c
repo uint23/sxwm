@@ -1,16 +1,20 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
-#include <linux/limits.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef __linux__
-#include <wordexp.h>
-#endif
+
 #include <X11/keysym.h>
 #include <X11/XF86keysym.h>
 #include <X11/Xlib.h>
+
+#ifdef __linux__
+#include <wordexp.h>
+#include <linux/limits.h>
+#endif
+
 #include "parser.h"
 #include "defs.h"
 
