@@ -2783,10 +2783,10 @@ void update_modifier_masks(void)
 			/* keycode at mod[i][j] */
 			KeyCode keycode = mod_mapping->modifiermap[i * mod_mapping->max_keypermod + j];
 			if (keycode == num) {
-				numlock_mask = (1 << i); /* which mod bit == NumLock key */
+				numlock_mask = (1u << i); /* which mod bit == NumLock key */
 			}
 			if (keycode == mode) {
-				mode_switch_mask = (1 << i); /* which mod bit == Mode_switch key */
+				mode_switch_mask = (1u << i); /* which mod bit == Mode_switch key */
 			}
 		}
 	}
