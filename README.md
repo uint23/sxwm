@@ -244,7 +244,7 @@ sudo emaint -a sync
 <details>
 <summary>Void Linux</summary>
 <pre><code>sudo xbps-install -S
-sudo xbps-install libX11-devel libXinerama-devel gcc make</code></pre>
+sudo xbps-install libX11-devel libXinerama-devel libXcursor-devel gcc make</code></pre>
 </details>
 
 <details>
