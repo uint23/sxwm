@@ -65,6 +65,7 @@ void hdl_config_req(XEvent *xev);
 void hdl_dummy(XEvent *xev);
 void hdl_destroy_ntf(XEvent *xev);
 void hdl_keypress(XEvent *xev);
+void hdl_mapping_ntf(XEvent *xev);
 void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
 void hdl_root_property(XEvent *xev);
@@ -109,6 +110,7 @@ void toggle_scratchpad(int n);
 void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
+void update_modifier_masks(void);
 void update_mons(void);
 void update_net_client_list(void);
 void update_struts(void);
@@ -118,7 +120,6 @@ Bool window_should_float(Window w);
 Bool window_should_start_fullscreen(Window w);
 int xerr(Display *d, XErrorEvent *ee);
 void xev_case(XEvent *xev);
-#include "config.h"
 
 Atom _NET_ACTIVE_WINDOW;
 Atom _NET_CURRENT_DESKTOP;
@@ -132,6 +133,7 @@ Atom _NET_WM_STRUT_PARTIAL;
 Atom _NET_SUPPORTING_WM_CHECK;
 Atom _NET_WM_NAME;
 Atom UTF8_STRING;
+
 Atom _NET_WM_DESKTOP;
 Atom _NET_CLIENT_LIST;
 Atom _NET_FRAME_EXTENTS;
@@ -158,7 +160,6 @@ Cursor cursor_resize;
 Client *workspaces[NUM_WORKSPACES] = {NULL};
 Config default_config;
 Config user_config;
-int current_ws = 0;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
 Client *swap_target = NULL;
@@ -172,14 +173,18 @@ Scratchpad scratchpads[MAX_SCRATCHPADS];
 int scratchpad_count = 0;
 int current_scratchpad = 0;
 int n_mons = 0;
+int current_ws = 0;
 int current_mon = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool backup_binds = False;
 Bool running = False;
 Bool next_should_float = False;
-
 long last_motion_time = 0;
+
+Mask numlock_mask = 0;
+Mask mode_switch_mask = 0;
+
 int scr_width;
 int scr_height;
 int open_windows = 0;
@@ -418,7 +423,7 @@ void change_workspace(int ws)
 
 int clean_mask(int mask)
 {
-	return mask & ~(LockMask | Mod2Mask | Mod3Mask);
+	return mask & ~(LockMask | numlock_mask | mode_switch_mask);
 }
 
 void close_focused(void)
@@ -713,29 +718,29 @@ void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
 
 void grab_keys(void)
 {
-	const int guards[] = {
-		0, LockMask, Mod2Mask, LockMask | Mod2Mask, Mod5Mask, LockMask |
-		Mod5Mask, Mod2Mask | Mod5Mask, LockMask | Mod2Mask | Mod5Mask
+	Mask guards[] = {
+		0, LockMask, numlock_mask, LockMask | numlock_mask, mode_switch_mask,
+		LockMask | mode_switch_mask, numlock_mask | mode_switch_mask,
+		LockMask | numlock_mask | mode_switch_mask
 	};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
 	for (int i = 0; i < user_config.n_binds; i++) {
-		Binding *b = &user_config.binds[i];
+		Binding *bind = &user_config.binds[i];
 
-		if ((b->type == TYPE_WS_CHANGE && b->mods != user_config.modkey) ||
-		    (b->type == TYPE_WS_MOVE && b->mods != (user_config.modkey | ShiftMask))) {
+		if ((bind->type == TYPE_WS_CHANGE && bind->mods != user_config.modkey) ||
+			(bind->type == TYPE_WS_MOVE   && bind->mods != (user_config.modkey | ShiftMask))) {
 			continue;
 		}
 
-		KeyCode key_code = XKeysymToKeycode(dpy, b->keysym);
-		if (!key_code) {
+		bind->keycode = XKeysymToKeycode(dpy, bind->keysym);
+		if (!bind->keycode) {
 			continue;
 		}
 
-		size_t guards_len = sizeof(guards) / sizeof(*guards);
-		for (size_t guard = 0; guard < guards_len; guard++) {
-			XGrabKey(dpy, key_code, b->mods | guards[guard],
-			         root, True, GrabModeAsync, GrabModeAsync);
+		for (size_t guard = 0; guard < sizeof(guards)/sizeof(guards[0]); guard++) {
+			XGrabKey(dpy, bind->keycode, bind->mods | guards[guard],
+					root, True, GrabModeAsync, GrabModeAsync);
 		}
 	}
 }
@@ -984,48 +989,31 @@ void hdl_destroy_ntf(XEvent *xev)
 
 void hdl_keypress(XEvent *xev)
 {
-	KeySym keysym = XkbKeycodeToKeysym(dpy, xev->xkey.keycode, 0, 0);
+	KeyCode code = xev->xkey.keycode;
 	int mods = clean_mask(xev->xkey.state);
 
 	for (int i = 0; i < user_config.n_binds; i++) {
 		Binding *bind = &user_config.binds[i];
-		if (bind->keysym == keysym && clean_mask(bind->mods) == mods) {
+		if (bind->keycode == code && clean_mask(bind->mods) == mods) {
 			switch (bind->type) {
-			case TYPE_CMD:
-				spawn(bind->action.cmd);
-				break;
-
-			case TYPE_FUNC:
-				if (bind->action.fn) {
-					bind->action.fn();
-				}
-				break;
-
-			case TYPE_WS_CHANGE:
-				change_workspace(bind->action.ws);
-				update_net_client_list();
-				break;
-
-			case TYPE_WS_MOVE:
-				move_to_workspace(bind->action.ws);
-				update_net_client_list();
-				break;
-
-			case TYPE_SP_REMOVE:
-				remove_scratchpad(bind->action.sp);
-				break;
-
-			case TYPE_SP_TOGGLE:
-				toggle_scratchpad(bind->action.sp);
-				break;
-
-			case TYPE_SP_CREATE:
-				set_win_scratchpad(bind->action.sp);
-				break;
+				case TYPE_CMD: spawn(bind->action.cmd); break;
+				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
+				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
+				case TYPE_WS_MOVE: move_to_workspace(bind->action.ws); update_net_client_list(); break;
+				case TYPE_SP_REMOVE: remove_scratchpad(bind->action.sp); break;
+				case TYPE_SP_TOGGLE: toggle_scratchpad(bind->action.sp); break;
+				case TYPE_SP_CREATE: set_win_scratchpad(bind->action.sp); break;
 			}
 			return;
 		}
 	}
+}
+
+void hdl_mapping_ntf(XEvent *xev)
+{
+	XRefreshKeyboardMapping(&xev->xmapping);
+	update_modifier_masks();
+	grab_keys();
 }
 
 void hdl_map_req(XEvent *xev)
@@ -1440,6 +1428,7 @@ void init_defaults(void)
 	default_config.warp_cursor = True;
 	default_config.new_win_master = False;
 
+	/*
 	if (backup_binds) {
 		for (unsigned long i = 0; i < LENGTH(binds); i++) {
 			default_config.binds[i].mods = binds[i].mods;
@@ -1449,6 +1438,7 @@ void init_defaults(void)
 			default_config.n_binds++;
 		}
 	}
+	*/
 
 	user_config = default_config;
 }
@@ -2004,6 +1994,7 @@ void setup(void)
 		fprintf(stderr, "sxwmrc: error parsing config file\n");
 		init_defaults();
 	}
+	update_modifier_masks();
 	grab_keys();
 	startup_exec();
 
@@ -2041,6 +2032,7 @@ void setup(void)
 	evtable[ConfigureRequest] = hdl_config_req;
 	evtable[DestroyNotify] = hdl_destroy_ntf;
 	evtable[KeyPress] = hdl_keypress;
+	evtable[MappingNotify] = hdl_mapping_ntf;
 	evtable[MapRequest] = hdl_map_req;
 	evtable[MotionNotify] = hdl_motion;
 	evtable[PropertyNotify] = hdl_root_property;
@@ -2775,6 +2767,30 @@ void update_client_desktop_properties(void)
 					        PropModeReplace, (unsigned char *)&desktop, 1);
 		}
 	}
+}
+
+void update_modifier_masks(void)
+{
+	XModifierKeymap *mod_mapping = XGetModifierMapping(dpy);
+	KeyCode num = XKeysymToKeycode(dpy, XK_Num_Lock);
+	KeyCode mode = XKeysymToKeycode(dpy, XK_Mode_switch);
+	numlock_mask = 0;
+	mode_switch_mask = 0;
+
+	int n_masks = 8;
+	for (int i = 0; i < n_masks; i++) {
+		for (int j = 0; j < mod_mapping->max_keypermod; j++) {
+			/* keycode at mod[i][j] */
+			KeyCode keycode = mod_mapping->modifiermap[i * mod_mapping->max_keypermod + j];
+			if (keycode == num) {
+				numlock_mask = (1 << i); /* which mod bit == NumLock key */
+			}
+			if (keycode == mode) {
+				mode_switch_mask = (1 << i); /* which mod bit == Mode_switch key */
+			}
+		}
+	}
+	XFreeModifiermap(mod_mapping);
 }
 
 void update_mons(void)
