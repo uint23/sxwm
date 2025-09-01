@@ -1678,7 +1678,7 @@ void other_wm(void)
 
 int other_wm_err(Display *d, XErrorEvent *ee)
 {
-	errx(0, "can't start because another window manager is already running");
+	errx(1, "can't start because another window manager is already running");
 	return 0;
 	(void)d;
 	(void)ee;
@@ -1983,7 +1983,7 @@ void send_wm_take_focus(Window w)
 void setup(void)
 {
 	if ((dpy = XOpenDisplay(NULL)) == False) {
-		errx(0, "can't open display.\nquitting...");
+		errx(1, "can't open display.\nquitting...");
 	}
 	root = XDefaultRootWindow(dpy);
 
