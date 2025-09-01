@@ -39,17 +39,26 @@
 #define TYPE_SP_TOGGLE 5
 #define TYPE_SP_CREATE 6
 
-#define NUM_WORKSPACES		9
-#define WORKSPACE_NAMES		\
-	"1"					"\0"\
-	"2"					"\0"\
-	"3"					"\0"\
-	"4"					"\0"\
-	"5"					"\0"\
-	"6"					"\0"\
-	"7"					"\0"\
-	"8"					"\0"\
-	"9"					"\0"
+#define NUM_WORKSPACES 9
+#define WORKSPACE_NAMES                                                                                                \
+	"1"                                                                                                                \
+	"\0"                                                                                                               \
+	"2"                                                                                                                \
+	"\0"                                                                                                               \
+	"3"                                                                                                                \
+	"\0"                                                                                                               \
+	"4"                                                                                                                \
+	"\0"                                                                                                               \
+	"5"                                                                                                                \
+	"\0"                                                                                                               \
+	"6"                                                                                                                \
+	"\0"                                                                                                               \
+	"7"                                                                                                                \
+	"\0"                                                                                                               \
+	"8"                                                                                                                \
+	"\0"                                                                                                               \
+	"9"                                                                                                                \
+	"\0"
 
 #define MAX_BINDS 256
 
@@ -108,7 +117,7 @@ typedef struct {
 	char **should_float[MAX_ITEMS];
 	char **start_fullscreen[MAX_ITEMS];
 	char **can_swallow[MAX_ITEMS];
-    char **can_be_swallowed[MAX_ITEMS];
+	char **can_be_swallowed[MAX_ITEMS];
 	char **scratchpads[32];
 	char **open_in_workspace[MAX_ITEMS];
 	char *to_run[MAX_ITEMS];
@@ -117,8 +126,7 @@ typedef struct {
 typedef struct {
 	int x, y;
 	int w, h;
-	int reserve_left, reserve_right,
-		reserve_top, reserve_bottom;
+	int reserve_left, reserve_right, reserve_top, reserve_bottom;
 } Monitor;
 
 typedef struct {
