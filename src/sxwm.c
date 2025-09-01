@@ -23,6 +23,7 @@
 #include <strings.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
@@ -55,7 +56,7 @@ Window find_toplevel(Window w);
 int get_monitor_for(Client *c);
 pid_t get_pid(Window w);
 int get_workspace_for_window(Window w);
-void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
+void grab_button(Mask button, Mask mod, Window w, bool owner_events, Mask masks);
 void grab_keys(void);
 void hdl_button(XEvent *xev);
 void hdl_button_release(XEvent *xev);
@@ -72,7 +73,7 @@ void hdl_root_property(XEvent *xev);
 void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
-Bool is_child_proc(pid_t pid1, pid_t pid2);
+bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
 /* void move_next_mon(void); */
@@ -95,7 +96,7 @@ void send_wm_take_focus(Window w);
 void setup(void);
 void setup_atoms(void);
 void set_frame_extents(Window w);
-void set_input_focus(Client *c, Bool raise_win, Bool warp);
+void set_input_focus(Client *c, bool raise_win, bool warp);
 void set_win_scratchpad(int n);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char *const *argv);
@@ -116,8 +117,8 @@ void update_net_client_list(void);
 void update_struts(void);
 void update_workarea(void);
 void warp_cursor(Client *c);
-Bool window_should_float(Window w);
-Bool window_should_start_fullscreen(Window w);
+bool window_should_float(Window w);
+bool window_should_start_fullscreen(Window w);
 int xerr(Display *d, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 
@@ -175,11 +176,11 @@ int current_scratchpad = 0;
 int n_mons = 0;
 int current_ws = 0;
 int current_mon = 0;
-Bool global_floating = False;
-Bool in_ws_switch = False;
-Bool backup_binds = False;
-Bool running = False;
-Bool next_should_float = False;
+bool global_floating = False;
+bool in_ws_switch = False;
+bool backup_binds = False;
+bool running = False;
+bool next_should_float = False;
 long last_motion_time = 0;
 
 Mask numlock_mask = 0;
@@ -256,7 +257,7 @@ Client *add_client(Window w, int ws)
 
 	if (XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &masks)) {
 		for (int i = 0; i < n_mons; i++) {
-			Bool in_mon = root_x >= mons[i].x && root_x < mons[i].x + mons[i].w && root_y >= mons[i].y &&
+			bool in_mon = root_x >= mons[i].x && root_x < mons[i].x + mons[i].w && root_y >= mons[i].y &&
 			              root_y < mons[i].y + mons[i].h;
 			if (in_mon) {
 				cursor_mon = i;
@@ -311,7 +312,7 @@ void change_workspace(int ws)
 	in_ws_switch = True;
 	XGrabServer(dpy);
 
-	Bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
+	bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 		if (scratchpads[i].client && scratchpads[i].enabled) {
 			visible_scratchpads[i] = True;
@@ -323,7 +324,7 @@ void change_workspace(int ws)
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			/* TODO: Turn into helper */
-			Bool is_scratchpad = False;
+			bool is_scratchpad = False;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
 					is_scratchpad = True;
@@ -340,7 +341,7 @@ void change_workspace(int ws)
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			/* TODO: Turn into helper */
-			Bool is_scratchpad = False;
+			bool is_scratchpad = False;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
 					is_scratchpad = True;
@@ -637,7 +638,7 @@ int get_monitor_for(Client *c)
 	int cx = c->x + c->w / 2;
 	int cy = c->y + c->h / 2;
 	for (int i = 0; i < n_mons; i++) {
-		Bool in_mon_bounds =
+		bool in_mon_bounds =
 		    cx >= mons[i].x && cx < mons[i].x + mons[i].w && cy >= (int)mons[i].y && cy < mons[i].y + mons[i].h;
 
 		if (in_mon_bounds) {
@@ -698,7 +699,7 @@ int get_workspace_for_window(Window w)
 	return current_ws; /* default */
 }
 
-void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
+void grab_button(Mask button, Mask mod, Window w, bool owner_events, Mask masks)
 {
 	if (w == root) {
 		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeAsync, GrabModeAsync, None, None);
@@ -759,7 +760,7 @@ void hdl_button(XEvent *xev)
 			continue;
 		}
 
-		Bool is_swap_mode = (xbutton->state & user_config.modkey) && (xbutton->state & ShiftMask) &&
+		bool is_swap_mode = (xbutton->state & user_config.modkey) && (xbutton->state & ShiftMask) &&
 		                    xbutton->button == left_click && !c->floating;
 		if (is_swap_mode) {
 			drag_client = c;
@@ -778,14 +779,14 @@ void hdl_button(XEvent *xev)
 			return;
 		}
 
-		Bool is_move_resize = (xbutton->state & user_config.modkey) &&
+		bool is_move_resize = (xbutton->state & user_config.modkey) &&
 		                      (xbutton->button == left_click || xbutton->button == right_click) && !c->floating;
 		if (is_move_resize) {
 			focused = c;
 			toggle_floating();
 		}
 
-		Bool is_single_click = !(xbutton->state & user_config.modkey) && xbutton->button == left_click;
+		bool is_single_click = !(xbutton->state & user_config.modkey) && xbutton->button == left_click;
 		if (is_single_click) {
 			focused = c;
 			set_input_focus(focused, True, False);
@@ -1056,7 +1057,7 @@ void hdl_map_req(XEvent *xev)
 	int format;
 	unsigned long n_items, after;
 	Atom *types = NULL;
-	Bool should_float = False;
+	bool should_float = False;
 
 	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &n_items, &after,
 	                       (unsigned char **)&types) == Success &&
@@ -1171,7 +1172,7 @@ void hdl_map_req(XEvent *xev)
 	/* check for swallowing opportunities */
 	{
 		XClassHint ch = {0};
-		Bool can_be_swallowed = False;
+		bool can_be_swallowed = False;
 
 		if (XGetClassHint(dpy, w, &ch)) {
 			/* check if new window can be swallowed */
@@ -1195,7 +1196,7 @@ void hdl_map_req(XEvent *xev)
 					}
 
 					XClassHint pch = {0};
-					Bool can_swallow = False;
+					bool can_swallow = False;
 
 					if (XGetClassHint(dpy, p->win, &pch)) {
 						/* check if this existing window can swallow others */
@@ -1259,7 +1260,7 @@ void hdl_motion(XEvent *xev)
 	/* figure out which monitor the pointer is in right now */
 	int mon = 0;
 	for (int i = 0; i < n_mons; i++) {
-		Bool is_current_mon = motion_ev->x_root >= mons[i].x && motion_ev->x_root < mons[i].x + mons[i].w &&
+		bool is_current_mon = motion_ev->x_root >= mons[i].x && motion_ev->x_root < mons[i].x + mons[i].w &&
 		                      motion_ev->y_root >= mons[i].y && motion_ev->y_root < mons[i].y + mons[i].h;
 
 		if (is_current_mon) {
@@ -1438,7 +1439,7 @@ void init_defaults(void)
 	user_config = default_config;
 }
 
-Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
+bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 {
 	if (parent_pid <= 0 || child_pid <= 0) {
 		return False;
@@ -2123,7 +2124,7 @@ void set_frame_extents(Window w)
 	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
 }
 
-void set_input_focus(Client *c, Bool raise_win, Bool warp)
+void set_input_focus(Client *c, bool raise_win, bool warp)
 {
 	if (c && c->mapped) {
 		focused = c;
@@ -2385,7 +2386,7 @@ void tile(void)
 	update_struts();
 	Client *head = workspaces[current_ws];
 	int total = 0;
-	Bool fullscreen_present = False;
+	bool fullscreen_present = False;
 
 	for (Client *c = head; c; c = c->next) {
 		if (c->mapped && !c->floating && !c->fullscreen) {
@@ -2436,7 +2437,7 @@ void tile(void)
 			                     .height = MAX(1, tile_height - border_width),
 			                     .border_width = user_config.border_width};
 
-			Bool geom_differ = c->x != wc.x || c->y != wc.y || c->w != wc.width || c->h != wc.height;
+			bool geom_differ = c->x != wc.x || c->y != wc.y || c->w != wc.width || c->h != wc.height;
 			if (geom_differ) {
 				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 			}
@@ -2530,7 +2531,7 @@ void tile(void)
 			                     .height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
 			                     .border_width = user_config.border_width};
 
-			Bool geom_differ = c->x != wc.x || c->y != wc.y || c->w != wc.width || c->h != wc.height;
+			bool geom_differ = c->x != wc.x || c->y != wc.y || c->w != wc.width || c->h != wc.height;
 			if (geom_differ) {
 				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 			}
@@ -2592,7 +2593,7 @@ void toggle_floating(void)
 void toggle_floating_global(void)
 {
 	global_floating = !global_floating;
-	Bool any_tiled = False;
+	bool any_tiled = False;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (!c->floating) {
 			any_tiled = True;
@@ -2857,7 +2858,7 @@ void update_struts(void)
 			continue;
 		}
 
-		Bool is_dock = False;
+		bool is_dock = False;
 		for (unsigned long j = 0; j < n_items; j++) {
 			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
 				is_dock = True;
@@ -2925,7 +2926,7 @@ void warp_cursor(Client *c)
 	XSync(dpy, False);
 }
 
-Bool window_should_float(Window w)
+bool window_should_float(Window w)
 {
 	XClassHint ch = {0};
 	if (XGetClassHint(dpy, w, &ch)) {
@@ -2948,7 +2949,7 @@ Bool window_should_float(Window w)
 	return False;
 }
 
-Bool window_should_start_fullscreen(Window w)
+bool window_should_start_fullscreen(Window w)
 {
 	XClassHint ch = {0};
 	if (XGetClassHint(dpy, w, &ch)) {

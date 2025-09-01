@@ -1,6 +1,8 @@
 /* See LICENSE for more information on use */
 #pragma once
 #include <X11/Xlib.h>
+#include <stdbool.h>
+
 #define SXWM_VERSION "sxwm ver. 1.7"
 #define SXWM_AUTHOR "(C) Abhinav Prasai 2025"
 #define SXWM_LICINFO "See LICENSE for more info"
@@ -87,10 +89,10 @@ typedef struct Client {
 	int custom_stack_height;
 	int mon;
 	int ws;
-	Bool fixed;
-	Bool floating;
-	Bool fullscreen;
-	Bool mapped;
+	bool fixed;
+	bool floating;
+	bool fullscreen;
+	bool mapped;
 	pid_t pid;
 	struct Client *next;
 	struct Client *swallowed;
@@ -110,9 +112,9 @@ typedef struct {
 	int resize_stack_amt;
 	int snap_distance;
 	int n_binds;
-	Bool new_win_focus;
-	Bool warp_cursor;
-	Bool new_win_master;
+	bool new_win_focus;
+	bool warp_cursor;
+	bool new_win_master;
 	Binding binds[MAX_ITEMS];
 	char **should_float[MAX_ITEMS];
 	char **start_fullscreen[MAX_ITEMS];
@@ -131,7 +133,7 @@ typedef struct {
 
 typedef struct {
 	Client *client;
-	Bool enabled;
+	bool enabled;
 } Scratchpad;
 
 typedef struct {

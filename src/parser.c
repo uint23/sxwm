@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
+#include <stdbool.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -342,7 +343,7 @@ found:
 			}
 			else {
 				b->type = TYPE_FUNC;
-				Bool found = False;
+				bool found = False;
 				for (int i = 0; call_table[i].name; i++) {
 					if (!strcmp(act, call_table[i].name)) {
 						b->action.fn = call_table[i].fn;
