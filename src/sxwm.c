@@ -176,11 +176,11 @@ int current_scratchpad = 0;
 int n_mons = 0;
 int current_ws = 0;
 int current_mon = 0;
-bool global_floating = False;
-bool in_ws_switch = False;
-bool backup_binds = False;
-bool running = False;
-bool next_should_float = False;
+bool global_floating = false;
+bool in_ws_switch = false;
+bool backup_binds = false;
+bool running = false;
+bool next_should_float = false;
 long last_motion_time = 0;
 
 Mask numlock_mask = 0;
@@ -233,10 +233,10 @@ Client *add_client(Window w, int ws)
 	Mask window_masks = EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask |
 	                    ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	select_input(w, window_masks);
-	grab_button(Button1, None, w, False, ButtonPressMask);
-	grab_button(Button1, user_config.modkey, w, False, ButtonPressMask);
-	grab_button(Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask);
-	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
+	grab_button(Button1, None, w, false, ButtonPressMask);
+	grab_button(Button1, user_config.modkey, w, false, ButtonPressMask);
+	grab_button(Button1, user_config.modkey | ShiftMask, w, false, ButtonPressMask);
+	grab_button(Button3, user_config.modkey, w, false, ButtonPressMask);
 
 	/* allow for more graceful exitting */
 	Atom protos[] = {WM_DELETE_WINDOW};
@@ -267,14 +267,14 @@ Client *add_client(Window w, int ws)
 	}
 
 	c->mon = cursor_mon;
-	c->fixed = False;
-	c->floating = False;
-	c->fullscreen = False;
-	c->mapped = True;
+	c->fixed = false;
+	c->floating = false;
+	c->fullscreen = false;
+	c->mapped = true;
 	c->custom_stack_height = 0;
 
 	if (global_floating) {
-		c->floating = True;
+		c->floating = true;
 	}
 
 	if (ws == current_ws && !focused) {
@@ -309,25 +309,25 @@ void change_workspace(int ws)
 		return;
 	}
 
-	in_ws_switch = True;
+	in_ws_switch = true;
 	XGrabServer(dpy);
 
-	bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
+	bool visible_scratchpads[MAX_SCRATCHPADS] = {false};
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 		if (scratchpads[i].client && scratchpads[i].enabled) {
-			visible_scratchpads[i] = True;
+			visible_scratchpads[i] = true;
 			XUnmapWindow(dpy, scratchpads[i].client->win);
-			scratchpads[i].client->mapped = False;
+			scratchpads[i].client->mapped = false;
 		}
 	}
 
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			/* TODO: Turn into helper */
-			bool is_scratchpad = False;
+			bool is_scratchpad = false;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
-					is_scratchpad = True;
+					is_scratchpad = true;
 					break;
 				}
 			}
@@ -341,10 +341,10 @@ void change_workspace(int ws)
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
 			/* TODO: Turn into helper */
-			bool is_scratchpad = False;
+			bool is_scratchpad = false;
 			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 				if (scratchpads[i].client == c) {
-					is_scratchpad = True;
+					is_scratchpad = true;
 					break;
 				}
 			}
@@ -374,7 +374,7 @@ void change_workspace(int ws)
 			c->ws = current_ws;
 
 			XMapWindow(dpy, c->win);
-			c->mapped = True;
+			c->mapped = true;
 			XRaiseWindow(dpy, c->win);
 
 			/* Update desktop property */
@@ -406,7 +406,7 @@ void change_workspace(int ws)
 			current_mon = c->mon;
 		}
 	}
-	set_input_focus(focused, False, True);
+	set_input_focus(focused, false, true);
 
 	long current_desktop = current_ws;
 	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32, PropModeReplace,
@@ -414,8 +414,8 @@ void change_workspace(int ws)
 	update_client_desktop_properties();
 
 	XUngrabServer(dpy);
-	XSync(dpy, False);
-	in_ws_switch = False;
+	XSync(dpy, false);
+	in_ws_switch = false;
 }
 
 int clean_mask(int mask)
@@ -432,7 +432,7 @@ void close_focused(void)
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 		if (scratchpads[i].client == focused) {
 			scratchpads[i].client = NULL;
-			scratchpads[i].enabled = False;
+			scratchpads[i].enabled = false;
 			break;
 		}
 	}
@@ -443,14 +443,14 @@ void close_focused(void)
 	if (XGetWMProtocols(dpy, focused->win, &protocols, &n_protocols) && protocols) {
 		for (int i = 0; i < n_protocols; i++) {
 			if (protocols[i] == WM_DELETE_WINDOW) {
-				Atom WM_PROTOCOLS = XInternAtom(dpy, "WM_PROTOCOLS", False);
+				Atom WM_PROTOCOLS = XInternAtom(dpy, "WM_PROTOCOLS", false);
 				XEvent ev = {
 				    .xclient = {
 				        .type = ClientMessage, .window = focused->win, .message_type = WM_PROTOCOLS, .format = 32}};
 
 				ev.xclient.data.l[0] = WM_DELETE_WINDOW;
 				ev.xclient.data.l[1] = CurrentTime;
-				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
+				XSendEvent(dpy, focused->win, false, NoEventMask, &ev);
 				XFree(protocols);
 				return;
 			}
@@ -490,7 +490,7 @@ Window find_toplevel(Window w)
 	Window *kids;
 	unsigned n_kids;
 
-	while (True) {
+	while (true) {
 		if (w == root_win) {
 			break;
 		}
@@ -527,7 +527,7 @@ void focus_next(void)
 
 	focused = c;
 	current_mon = c->mon;
-	set_input_focus(focused, True, True);
+	set_input_focus(focused, true, True);
 }
 
 void focus_prev(void)
@@ -567,7 +567,7 @@ void focus_prev(void)
 
 	focused = c;
 	current_mon = c->mon;
-	set_input_focus(focused, True, True);
+	set_input_focus(focused, true, True);
 }
 
 void focus_next_mon(void)
@@ -590,7 +590,7 @@ void focus_next_mon(void)
 		/* focus the window on target monitor */
 		focused = target_client;
 		current_mon = target_mon;
-		set_input_focus(focused, True, True);
+		set_input_focus(focused, true, True);
 	}
 	else {
 		/* no windows on target monitor, just move cursor to center and update current_mon */
@@ -598,7 +598,7 @@ void focus_next_mon(void)
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
-		XSync(dpy, False);
+		XSync(dpy, false);
 	}
 }
 
@@ -622,14 +622,14 @@ void focus_prev_mon(void)
 		/* focus the window on target monitor */
 		focused = target_client;
 		current_mon = target_mon;
-		set_input_focus(focused, True, True);
+		set_input_focus(focused, true, True);
 	}
 	else {
 		current_mon = target_mon;
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
-		XSync(dpy, False);
+		XSync(dpy, false);
 	}
 }
 
@@ -656,7 +656,7 @@ pid_t get_pid(Window w)
 	unsigned long n_items, bytes_after;
 	unsigned char *prop = NULL;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_PID, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &n_items,
+	if (XGetWindowProperty(dpy, w, _NET_WM_PID, 0, 1, false, XA_CARDINAL, &actual_type, &actual_format, &n_items,
 	                       &bytes_after, &prop) == Success &&
 	    prop) {
 		if (actual_format == 32 && n_items == 1) {
@@ -735,7 +735,7 @@ void grab_keys(void)
 		}
 
 		for (size_t guard = 0; guard < sizeof(guards) / sizeof(guards[0]); guard++) {
-			XGrabKey(dpy, bind->keycode, bind->mods | guards[guard], root, True, GrabModeAsync, GrabModeAsync);
+			XGrabKey(dpy, bind->keycode, bind->mods | guards[guard], root, true, GrabModeAsync, GrabModeAsync);
 		}
 	}
 }
@@ -771,10 +771,10 @@ void hdl_button(XEvent *xev)
 			drag_orig_w = c->w;
 			drag_orig_h = c->h;
 			drag_mode = DRAG_SWAP;
-			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None,
+			XGrabPointer(dpy, root, true, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None,
 			             cursor_move, CurrentTime);
 			focused = c;
-			set_input_focus(focused, False, False);
+			set_input_focus(focused, false, False);
 			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
 			return;
 		}
@@ -789,7 +789,7 @@ void hdl_button(XEvent *xev)
 		bool is_single_click = !(xbutton->state & user_config.modkey) && xbutton->button == left_click;
 		if (is_single_click) {
 			focused = c;
-			set_input_focus(focused, True, False);
+			set_input_focus(focused, true, false);
 			return;
 		}
 
@@ -802,7 +802,7 @@ void hdl_button(XEvent *xev)
 		}
 
 		Cursor cursor = (xbutton->button == left_click) ? cursor_move : cursor_resize;
-		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, cursor,
+		XGrabPointer(dpy, root, true, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, cursor,
 		             CurrentTime);
 
 		drag_client = c;
@@ -815,7 +815,7 @@ void hdl_button(XEvent *xev)
 		drag_mode = (xbutton->button == left_click) ? DRAG_MOVE : DRAG_RESIZE;
 		focused = c;
 
-		set_input_focus(focused, True, False);
+		set_input_focus(focused, true, false);
 		return;
 	}
 }
@@ -914,7 +914,7 @@ void hdl_destroy_ntf(XEvent *xev)
 
 				/* show swallowed window */
 				XMapWindow(dpy, swallowed->win);
-				swallowed->mapped = True;
+				swallowed->mapped = true;
 				focused = swallowed;
 			}
 
@@ -966,7 +966,7 @@ void hdl_destroy_ntf(XEvent *xev)
 				update_borders();
 
 				if (focused) {
-					set_input_focus(focused, True, True);
+					set_input_focus(focused, true, True);
 				}
 			}
 			return;
@@ -1041,11 +1041,11 @@ void hdl_map_req(XEvent *xev)
 		if (c->ws == current_ws) {
 			if (!c->mapped) {
 				XMapWindow(dpy, w);
-				c->mapped = True;
+				c->mapped = true;
 			}
 			if (user_config.new_win_focus) {
 				focused = c;
-				set_input_focus(c, True, True);
+				set_input_focus(c, true, True);
 				return; /* set_input_focus already calls update_borders */
 			}
 			update_borders();
@@ -1057,9 +1057,9 @@ void hdl_map_req(XEvent *xev)
 	int format;
 	unsigned long n_items, after;
 	Atom *types = NULL;
-	bool should_float = False;
+	bool should_float = false;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format, &n_items, &after,
+	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, false, XA_ATOM, &type, &format, &n_items, &after,
 	                       (unsigned char **)&types) == Success &&
 	    types) {
 
@@ -1075,7 +1075,7 @@ void hdl_map_req(XEvent *xev)
 			    types[i] == _NET_WM_WINDOW_TYPE_POPUP_MENU || types[i] == _NET_WM_WINDOW_TYPE_DROPDOWN_MENU ||
 			    types[i] == _NET_WM_WINDOW_TYPE_MENU || types[i] == _NET_WM_WINDOW_TYPE_TOOLTIP ||
 			    types[i] == _NET_WM_WINDOW_TYPE_NOTIFICATION) {
-				should_float = True;
+				should_float = true;
 				break;
 			}
 		}
@@ -1093,12 +1093,12 @@ void hdl_map_req(XEvent *xev)
 		unsigned long bytes_after;
 		n_items = 0;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, False, XA_ATOM, &state_type, &state_format, &n_items,
+		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, false, XA_ATOM, &state_type, &state_format, &n_items,
 		                       &bytes_after, (unsigned char **)&state_atoms) == Success &&
 		    state_atoms) {
 			for (unsigned long i = 0; i < n_items; i++) {
 				if (state_atoms[i] == _NET_WM_STATE_MODAL) {
-					should_float = True;
+					should_float = true;
 					break;
 				}
 			}
@@ -1119,7 +1119,7 @@ void hdl_map_req(XEvent *xev)
 
 	Window transient;
 	if (!should_float && XGetTransientForHint(dpy, w, &transient)) {
-		should_float = True;
+		should_float = true;
 	}
 
 	XSizeHints size_hints;
@@ -1129,17 +1129,17 @@ void hdl_map_req(XEvent *xev)
 	    (size_hints.flags & PMaxSize) && size_hints.min_width == size_hints.max_width &&
 	    size_hints.min_height == size_hints.max_height) {
 
-		should_float = True;
-		c->fixed = True;
+		should_float = true;
+		c->fixed = true;
 	}
 
 	if (should_float || global_floating) {
-		c->floating = True;
+		c->floating = true;
 	}
 
 	if (window_should_start_fullscreen(w)) {
-		c->fullscreen = True;
-		c->floating = False;
+		c->fullscreen = true;
+		c->floating = false;
 	}
 
 	/* center floating windows & set border */
@@ -1172,7 +1172,7 @@ void hdl_map_req(XEvent *xev)
 	/* check for swallowing opportunities */
 	{
 		XClassHint ch = {0};
-		bool can_be_swallowed = False;
+		bool can_be_swallowed = false;
 
 		if (XGetClassHint(dpy, w, &ch)) {
 			/* check if new window can be swallowed */
@@ -1183,7 +1183,7 @@ void hdl_map_req(XEvent *xev)
 
 				if ((ch.res_class && strcasecmp(ch.res_class, user_config.can_be_swallowed[i][0]) == 0) ||
 				    (ch.res_name && strcasecmp(ch.res_name, user_config.can_be_swallowed[i][0]) == 0)) {
-					can_be_swallowed = True;
+					can_be_swallowed = true;
 					break;
 				}
 			}
@@ -1196,7 +1196,7 @@ void hdl_map_req(XEvent *xev)
 					}
 
 					XClassHint pch = {0};
-					bool can_swallow = False;
+					bool can_swallow = false;
 
 					if (XGetClassHint(dpy, p->win, &pch)) {
 						/* check if this existing window can swallow others */
@@ -1207,7 +1207,7 @@ void hdl_map_req(XEvent *xev)
 
 							if ((pch.res_class && strcasecmp(pch.res_class, user_config.can_swallow[i][0]) == 0) ||
 							    (pch.res_name && strcasecmp(pch.res_name, user_config.can_swallow[i][0]) == 0)) {
-								can_swallow = True;
+								can_swallow = true;
 								break;
 							}
 						}
@@ -1231,7 +1231,7 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	XMapWindow(dpy, w);
-	c->mapped = True;
+	c->mapped = true;
 	if (c->fullscreen) {
 		int m = c->mon;
 		XSetWindowBorderWidth(dpy, w, 0);
@@ -1241,7 +1241,7 @@ void hdl_map_req(XEvent *xev)
 
 	if (user_config.new_win_focus) {
 		focused = c;
-		set_input_focus(focused, False, True);
+		set_input_focus(focused, false, true);
 		return;
 	}
 	update_borders();
@@ -1357,7 +1357,7 @@ void hdl_root_property(XEvent *xev)
 		Atom actual;
 		int fmt;
 		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual, &fmt, &n, &after,
+		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, false, XA_CARDINAL, &actual, &fmt, &n, &after,
 		                       (unsigned char **)&val) == Success &&
 		    val) {
 			change_workspace((int)val[0]);
@@ -1377,7 +1377,7 @@ void hdl_unmap_ntf(XEvent *xev)
 		Window w = xev->xunmap.window;
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
 			if (c->win == w) {
-				c->mapped = False;
+				c->mapped = false;
 				break;
 			}
 		}
@@ -1420,9 +1420,9 @@ void init_defaults(void)
 	default_config.resize_stack_amt = 20;
 	default_config.snap_distance = 5;
 	default_config.n_binds = 0;
-	default_config.new_win_focus = True;
-	default_config.warp_cursor = True;
-	default_config.new_win_master = False;
+	default_config.new_win_focus = true;
+	default_config.warp_cursor = true;
+	default_config.new_win_master = false;
 
 	/*
 	if (backup_binds) {
@@ -1442,7 +1442,7 @@ void init_defaults(void)
 bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 {
 	if (parent_pid <= 0 || child_pid <= 0) {
-		return False;
+		return false;
 	}
 
 	char path[PATH_MAX];
@@ -1454,20 +1454,25 @@ bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 		snprintf(path, sizeof(path), "/proc/%d/stat", current_pid);
 		f = fopen(path, "r");
 		if (!f) {
+<<<<<<< HEAD
 			printf("sxwm: could not open %s\n", path);
 			return False;
+=======
+			fprintf(stderr, "sxwm: could not open %s\n", path);
+			return false;
+>>>>>>> 314886f (use stdbool.h's false/true instead of False/True from _Bool)
 		}
 
 		int ppid = 0;
 		if (fscanf(f, "%*d %*s %*c %d", &ppid) != 1) {
 			printf("sxwm: failed to read ppid from %s\n", path);
 			fclose(f);
-			return False;
+			return false;
 		}
 		fclose(f);
 
 		if (ppid == parent_pid) {
-			return True;
+			return true;
 		}
 
 		if (ppid <= 1) {
@@ -1477,7 +1482,7 @@ bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 		}
 		current_pid = ppid;
 	}
-	return False;
+	return false;
 }
 
 void move_master_next(void)
@@ -1657,7 +1662,7 @@ void move_to_workspace(int ws)
 	tile();
 	focused = workspaces[current_ws];
 	if (focused) {
-		set_input_focus(focused, False, False);
+		set_input_focus(focused, false, False);
 	}
 }
 
@@ -1665,10 +1670,10 @@ void other_wm(void)
 {
 	XSetErrorHandler(other_wm_err);
 	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){.event_mask = SubstructureRedirectMask});
-	XSync(dpy, False);
+	XSync(dpy, false);
 	XSetErrorHandler(xerr);
 	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){.event_mask = 0});
-	XSync(dpy, False);
+	XSync(dpy, false);
 }
 
 int other_wm_err(Display *d, XErrorEvent *ee)
@@ -1710,13 +1715,18 @@ void quit(void)
 	}
 	*/
 
-	XSync(dpy, False);
+	XSync(dpy, false);
 	XCloseDisplay(dpy);
 	XFreeCursor(dpy, cursor_move);
 	XFreeCursor(dpy, cursor_normal);
 	XFreeCursor(dpy, cursor_resize);
+<<<<<<< HEAD
 	printf("quitting...\n");
 	running = False;
+=======
+	puts("quitting...");
+	running = false;
+>>>>>>> 314886f (use stdbool.h's false/true instead of False/True from _Bool)
 }
 
 void reload_config(void)
@@ -1809,22 +1819,22 @@ void reload_config(void)
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
-	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
+	grab_button(Button1, user_config.modkey, root, true, root_click_masks);
+	grab_button(Button1, user_config.modkey | ShiftMask, root, true, root_swap_masks);
+	grab_button(Button3, user_config.modkey, root, true, root_resize_masks);
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
-			grab_button(Button1, None, c->win, False, ButtonPressMask);
-			grab_button(Button1, user_config.modkey, c->win, False, ButtonPressMask);
-			grab_button(Button1, user_config.modkey | ShiftMask, c->win, False, ButtonPressMask);
-			grab_button(Button2, user_config.modkey, c->win, False, ButtonPressMask);
+			grab_button(Button1, None, c->win, false, ButtonPressMask);
+			grab_button(Button1, user_config.modkey, c->win, false, ButtonPressMask);
+			grab_button(Button1, user_config.modkey | ShiftMask, c->win, false, ButtonPressMask);
+			grab_button(Button2, user_config.modkey, c->win, false, ButtonPressMask);
 		}
 	}
 
 	update_client_desktop_properties();
 	update_net_client_list();
-	XSync(dpy, False);
+	XSync(dpy, false);
 
 	tile();
 	update_borders();
@@ -1840,11 +1850,11 @@ void remove_scratchpad(int n)
 
 	if (c->win) {
 		XMapWindow(dpy, c->win);
-		c->mapped = True;
+		c->mapped = true;
 	}
 
 	scratchpads[n].client = NULL;
-	scratchpads[n].enabled = False;
+	scratchpads[n].enabled = false;
 
 	update_net_client_list();
 	update_borders();
@@ -1911,7 +1921,7 @@ void resize_stack_sub(void)
 
 void run(void)
 {
-	running = True;
+	running = true;
 	XEvent xev;
 	while (running) {
 		XNextEvent(dpy, &xev);
@@ -1951,8 +1961,8 @@ void select_input(Window w, Mask masks)
 
 void send_wm_take_focus(Window w)
 {
-	Atom wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
-	Atom wm_take_focus = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
+	Atom wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", false);
+	Atom wm_take_focus = XInternAtom(dpy, "WM_TAKE_FOCUS", false);
 	Atom *protos;
 	int n;
 	if (XGetWMProtocols(dpy, w, &protos, &n)) {
@@ -1962,7 +1972,7 @@ void send_wm_take_focus(Window w)
 				    .xclient = {.type = ClientMessage, .window = w, .message_type = wm_protocols, .format = 32}};
 				ev.xclient.data.l[0] = wm_take_focus;
 				ev.xclient.data.l[1] = CurrentTime;
-				XSendEvent(dpy, w, False, NoEventMask, &ev);
+				XSendEvent(dpy, w, false, NoEventMask, &ev);
 			}
 		}
 		XFree(protos);
@@ -1971,8 +1981,13 @@ void send_wm_take_focus(Window w)
 
 void setup(void)
 {
+<<<<<<< HEAD
 	if ((dpy = XOpenDisplay(NULL)) == False) {
 		errx(0, "can't open display.\nquitting...");
+=======
+	if ((dpy = XOpenDisplay(NULL)) == false) {
+		errx(1, "can't open display.\nquitting...");
+>>>>>>> 982dd20 (use stdbool.h's false/true instead of False/True from _Bool)
 	}
 	root = XDefaultRootWindow(dpy);
 
@@ -2006,10 +2021,10 @@ void setup(void)
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
-	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
-	XSync(dpy, False);
+	grab_button(Button1, user_config.modkey, root, true, root_click_masks);
+	grab_button(Button1, user_config.modkey | ShiftMask, root, true, root_swap_masks);
+	grab_button(Button3, user_config.modkey, root, true, root_resize_masks);
+	XSync(dpy, false);
 
 	for (int i = 0; i < LASTEvent; i++) {
 		evtable[i] = hdl_dummy;
@@ -2034,36 +2049,36 @@ void setup(void)
 
 void setup_atoms(void)
 {
-	_NET_NUMBER_OF_DESKTOPS = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
-	_NET_DESKTOP_NAMES = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
-	_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
-	_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
-	_NET_SUPPORTED = XInternAtom(dpy, "_NET_SUPPORTED", False);
-	_NET_WM_STRUT_PARTIAL = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
-	_NET_WM_STRUT = XInternAtom(dpy, "_NET_WM_STRUT", False); /* legacy struts */
-	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
-	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", False);
-	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
-	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
-	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_NAME", False);
-	UTF8_STRING = XInternAtom(dpy, "UTF8_STRING", False);
-	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
-	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
-	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
-	_NET_WM_PID = XInternAtom(dpy, "_NET_WM_PID", False);
+	_NET_NUMBER_OF_DESKTOPS = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", false);
+	_NET_DESKTOP_NAMES = XInternAtom(dpy, "_NET_DESKTOP_NAMES", false);
+	_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", false);
+	_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", false);
+	_NET_SUPPORTED = XInternAtom(dpy, "_NET_SUPPORTED", false);
+	_NET_WM_STRUT_PARTIAL = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", false);
+	_NET_WM_STRUT = XInternAtom(dpy, "_NET_WM_STRUT", false); /* legacy struts */
+	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", false);
+	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", false);
+	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", false);
+	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", false);
+	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", false);
+	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_NAME", false);
+	UTF8_STRING = XInternAtom(dpy, "UTF8_STRING", false);
+	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", false);
+	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", false);
+	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", false);
+	_NET_WM_PID = XInternAtom(dpy, "_NET_WM_PID", false);
 
-	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
-	_NET_WM_WINDOW_TYPE_UTILITY = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
-	_NET_WM_WINDOW_TYPE_DIALOG = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
-	_NET_WM_WINDOW_TYPE_TOOLBAR = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
-	_NET_WM_WINDOW_TYPE_SPLASH = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
-	_NET_WM_WINDOW_TYPE_POPUP_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
-	_NET_WM_WINDOW_TYPE_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
-	_NET_WM_WINDOW_TYPE_DROPDOWN_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", False);
-	_NET_WM_WINDOW_TYPE_TOOLTIP = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLTIP", False);
-	_NET_WM_WINDOW_TYPE_NOTIFICATION = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
-	_NET_WM_STATE_MODAL = XInternAtom(dpy, "_NET_WM_STATE_MODAL", False);
+	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", false);
+	_NET_WM_WINDOW_TYPE_UTILITY = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", false);
+	_NET_WM_WINDOW_TYPE_DIALOG = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", false);
+	_NET_WM_WINDOW_TYPE_TOOLBAR = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", false);
+	_NET_WM_WINDOW_TYPE_SPLASH = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", false);
+	_NET_WM_WINDOW_TYPE_POPUP_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", false);
+	_NET_WM_WINDOW_TYPE_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_MENU", false);
+	_NET_WM_WINDOW_TYPE_DROPDOWN_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", false);
+	_NET_WM_WINDOW_TYPE_TOOLTIP = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLTIP", false);
+	_NET_WM_WINDOW_TYPE_NOTIFICATION = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NOTIFICATION", false);
+	_NET_WM_STATE_MODAL = XInternAtom(dpy, "_NET_WM_STATE_MODAL", false);
 
 	Atom support_list[] = {
 	    _NET_CURRENT_DESKTOP,
@@ -2168,12 +2183,12 @@ void set_win_scratchpad(int n)
 	Client *pad_client = focused;
 	if (scratchpads[n].client != NULL) {
 		XMapWindow(dpy, scratchpads[n].client->win);
-		scratchpads[n].enabled = False;
+		scratchpads[n].enabled = false;
 		scratchpads[n].client = NULL;
 	}
 	scratchpads[n].client = pad_client;
 	XUnmapWindow(dpy, scratchpads[n].client->win);
-	scratchpads[n].enabled = False;
+	scratchpads[n].enabled = false;
 }
 
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
@@ -2318,7 +2333,7 @@ void swallow_window(Client *swallower, Client *swallowed)
 	}
 
 	XUnmapWindow(dpy, swallower->win);
-	swallower->mapped = False;
+	swallower->mapped = false;
 
 	swallower->swallowed = swallowed;
 	swallowed->swallower = swallower;
@@ -2386,14 +2401,14 @@ void tile(void)
 	update_struts();
 	Client *head = workspaces[current_ws];
 	int total = 0;
-	bool fullscreen_present = False;
+	bool fullscreen_present = false;
 
 	for (Client *c = head; c; c = c->next) {
 		if (c->mapped && !c->floating && !c->fullscreen) {
 			total++;
 		}
 		if (!c->floating && c->fullscreen) {
-			fullscreen_present = True;
+			fullscreen_present = true;
 		}
 	}
 
@@ -2554,7 +2569,7 @@ void toggle_floating(void)
 	}
 
 	if (focused->fullscreen) {
-		focused->fullscreen = False;
+		focused->fullscreen = false;
 		tile();
 		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
 	}
@@ -2586,17 +2601,17 @@ void toggle_floating(void)
 
 	/* raise and refocus floating window */
 	if (focused->floating) {
-		set_input_focus(focused, True, False);
+		set_input_focus(focused, true, false);
 	}
 }
 
 void toggle_floating_global(void)
 {
 	global_floating = !global_floating;
-	bool any_tiled = False;
+	bool any_tiled = false;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (!c->floating) {
-			any_tiled = True;
+			any_tiled = true;
 			break;
 		}
 	}
@@ -2628,7 +2643,7 @@ void toggle_fullscreen(void)
 	}
 
 	if (focused->floating) {
-		focused->floating = False;
+		focused->floating = false;
 	}
 
 	focused->fullscreen = !focused->fullscreen;
@@ -2694,17 +2709,17 @@ void toggle_scratchpad(int n)
 
 	if (scratchpads[n].enabled) {
 		XUnmapWindow(dpy, c->win);
-		c->mapped = False;
-		scratchpads[n].enabled = False;
+		c->mapped = false;
+		scratchpads[n].enabled = false;
 		focus_prev();
 	}
 	else {
 		XMapWindow(dpy, c->win);
-		c->mapped = True;
-		scratchpads[n].enabled = True;
+		c->mapped = true;
+		scratchpads[n].enabled = true;
 
 		focused = c;
-		set_input_focus(focused, True, True);
+		set_input_focus(focused, true, True);
 	}
 
 	tile();
@@ -2726,10 +2741,10 @@ void unswallow_window(Client *c)
 
 	if (swallower->win) {
 		XMapWindow(dpy, swallower->win);
-		swallower->mapped = True;
+		swallower->mapped = true;
 
 		focused = swallower;
-		set_input_focus(focused, False, True);
+		set_input_focus(focused, false, true);
 	}
 
 	tile();
@@ -2852,16 +2867,16 @@ void update_struts(void)
 		unsigned long n_items, bytes_after;
 		Atom *types = NULL;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &actual_type, &actual_format,
+		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, false, XA_ATOM, &actual_type, &actual_format,
 		                       &n_items, &bytes_after, (unsigned char **)&types) != Success ||
 		    !types) {
 			continue;
 		}
 
-		bool is_dock = False;
+		bool is_dock = false;
 		for (unsigned long j = 0; j < n_items; j++) {
 			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
-				is_dock = True;
+				is_dock = true;
 				break;
 			}
 		}
@@ -2875,7 +2890,7 @@ void update_struts(void)
 		int sfmt;
 		unsigned long len, rem;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
+		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, false, XA_CARDINAL, &actual, &sfmt, &len, &rem,
 		                       (unsigned char **)&str) == Success &&
 		    str && len >= 4) {
 
@@ -2923,7 +2938,7 @@ void warp_cursor(Client *c)
 	int center_y = c->y + (c->h / 2);
 
 	XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
-	XSync(dpy, False);
+	XSync(dpy, false);
 }
 
 bool window_should_float(Window w)
@@ -2939,14 +2954,14 @@ bool window_should_float(Window w)
 			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
 				XFree(ch.res_class);
 				XFree(ch.res_name);
-				return True;
+				return true;
 			}
 		}
 		XFree(ch.res_class);
 		XFree(ch.res_name);
 	}
 
-	return False;
+	return false;
 }
 
 bool window_should_start_fullscreen(Window w)
@@ -2962,14 +2977,14 @@ bool window_should_start_fullscreen(Window w)
 			    (ch.res_name && !strcmp(ch.res_name, user_config.start_fullscreen[i][0]))) {
 				XFree(ch.res_class);
 				XFree(ch.res_name);
-				return True;
+				return true;
 			}
 		}
 		XFree(ch.res_class);
 		XFree(ch.res_name);
 	}
 
-	return False;
+	return false;
 }
 
 int xerr(Display *d, XErrorEvent *ee)
@@ -3014,7 +3029,7 @@ int main(int ac, char **av)
 		}
 		else if (strcmp(av[1], "-b") == 0 || strcmp(av[1], "--backup") == 0) {
 			puts("sxwm: using backup keybinds");
-			backup_binds = True;
+			backup_binds = true;
 		}
 		else {
 			puts("usage:\n");

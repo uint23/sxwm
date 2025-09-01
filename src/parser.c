@@ -245,10 +245,10 @@ found:
 			cfg->border_swap_col = parse_col(rest);
 		}
 		else if (!strcmp(key, "new_win_focus")) {
-			cfg->new_win_focus = !strcmp(rest, "true") ? True : False;
+			cfg->new_win_focus = !strcmp(rest, "true") ? true : false;
 		}
 		else if (!strcmp(key, "warp_cursor")) {
-			cfg->warp_cursor = !strcmp(rest, "true") ? True : False;
+			cfg->warp_cursor = !strcmp(rest, "true") ? true : false;
 		}
 		else if (!strcmp(key, "master_width")) {
 			float mf = (float)atoi(rest) / 100.0f;
@@ -343,11 +343,11 @@ found:
 			}
 			else {
 				b->type = TYPE_FUNC;
-				bool found = False;
+				bool found = false;
 				for (int i = 0; call_table[i].name; i++) {
 					if (!strcmp(act, call_table[i].name)) {
 						b->action.fn = call_table[i].fn;
-						found = True;
+						found = true;
 						break;
 					}
 				}
@@ -495,7 +495,7 @@ found:
 			}
 		}
 		else if (!strcmp(key, "new_win_master")) {
-			cfg->new_win_master = !strcmp(rest, "true") ? True : False;
+			cfg->new_win_master = !strcmp(rest, "true") ? true : false;
 		}
 		else if (!strcmp(key, "open_in_workspace")) {
 			char *mid = strchr(rest, ':');

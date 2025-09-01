@@ -25,8 +25,8 @@
 #define MAX_SCRATCHPADS 20
 #define MIN_WINDOW_SIZE 20
 #define MAX_ITEMS 256
-#define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, False}
-#define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
+#define BIND(mod, key, cmdstr) {(mod), XK_##key, {cmdstr}, false}
+#define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, true}
 #define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
 
 /* workspaces */
