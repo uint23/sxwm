@@ -1106,7 +1106,7 @@ void hdl_map_req(XEvent *xev)
 	}
 
 	if (open_windows == MAX_CLIENTS) {
-		printf("sxwm: max clients reached, ignoring map request\n");
+		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
@@ -1458,13 +1458,13 @@ Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 		snprintf(path, sizeof(path), "/proc/%d/stat", current_pid);
 		f = fopen(path, "r");
 		if (!f) {
-			printf("sxwm: could not open %s\n", path);
+			fprintf(stderr, "sxwm: could not open %s\n", path);
 			return False;
 		}
 
 		int ppid = 0;
 		if (fscanf(f, "%*d %*s %*c %d", &ppid) != 1) {
-			printf("sxwm: failed to read ppid from %s\n", path);
+			fprintf(stderr, "sxwm: failed to read ppid from %s\n", path);
 			fclose(f);
 			return False;
 		}
@@ -1476,7 +1476,7 @@ Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
 
 		if (ppid <= 1) {
 			/* Reached init or kernel */
-			printf("sxwm: reached init/kernel, no relationship found\n");
+			fprintf(stderr, "sxwm: reached init/kernel, no relationship found\n");
 			break;
 		}
 		current_pid = ppid;
@@ -1720,7 +1720,7 @@ void quit(void)
 	XFreeCursor(dpy, cursor_move);
 	XFreeCursor(dpy, cursor_normal);
 	XFreeCursor(dpy, cursor_resize);
-	printf("quitting...\n");
+	puts("quitting...");
 	running = False;
 }
 
@@ -3014,7 +3014,7 @@ void xev_case(XEvent *xev)
 		evtable[xev->type](xev);
 	}
 	else {
-		printf("sxwm: invalid event type: %d\n", xev->type);
+		fprintf(stderr, "sxwm: invalid event type: %d\n", xev->type);
 	}
 }
 
@@ -3037,7 +3037,7 @@ int main(int ac, char **av)
 		}
 	}
 	setup();
-	printf("sxwm: starting...\n");
+	puts("sxwm: starting...");
 	run();
 	return 0;
 }
