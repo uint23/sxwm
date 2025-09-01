@@ -3023,7 +3023,7 @@ int main(int ac, char **av)
 	if (ac > 1) {
 		if (strcmp(av[1], "-v") == 0 || strcmp(av[1], "--version") == 0) {
 			printf("%s\n%s\n%s\n", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
-			return 0;
+			return EXIT_SUCCESS;
 		}
 		else if (strcmp(av[1], "-b") == 0 || strcmp(av[1], "--backup") == 0) {
 			puts("sxwm: using backup keybinds");
@@ -3033,11 +3033,11 @@ int main(int ac, char **av)
 			puts("usage:\n");
 			puts("\t[-v || --version]: See the version of sxwm\n");
 			puts("\t[-b || --backup]: Use backup set of keybinds with sxwm\n");
-			return 0;
+			return EXIT_SUCCESS;
 		}
 	}
 	setup();
 	puts("sxwm: starting...");
 	run();
-	return 0;
+	return EXIT_SUCCESS;
 }
