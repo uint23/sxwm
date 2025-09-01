@@ -1678,10 +1678,10 @@ void other_wm(void)
 
 int other_wm_err(Display *d, XErrorEvent *ee)
 {
-	(void)d;
-	(void)ee;
 	errx(1, "can't start because another window manager is already running");
 	return 0;
+	(void)d;
+	(void)ee;
 }
 
 long parse_col(const char *hex)
