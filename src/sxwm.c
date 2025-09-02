@@ -2176,29 +2176,6 @@ void set_win_scratchpad(int n)
 	scratchpads[n].enabled = False;
 }
 
-Bool window_should_float(Window w)
-{
-	XClassHint ch;
-	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < 256; i++) {
-			if (!user_config.should_float[i] || !user_config.should_float[i][0]) {
-				break;
-			}
-
-			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
-			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
-				XFree(ch.res_class);
-				XFree(ch.res_name);
-				return True;
-			}
-		}
-		XFree(ch.res_class);
-		XFree(ch.res_name);
-	}
-
-	return False;
-}
-
 void reset_opacity(Window w)
 {
 	Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
