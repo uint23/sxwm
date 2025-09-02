@@ -105,7 +105,7 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 {
 	unsigned m = 0;
 	KeySym ks = NoSymbol;
-	char buf[256];
+	char buf[MAX_ITEMS];
 
 	strncpy(buf, combo, sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
@@ -195,7 +195,7 @@ found:
 	int to_run = 0;
 
 	/* Initialize should_float matrix */
-	for (int j = 0; j < 256; j++) {
+	for (int j = 0; j < MAX_ITEMS; j++) {
 		cfg->should_float[j] = calloc(2, sizeof(char *));
 		if (!cfg->should_float[j]) {
 			goto cleanup_file;
@@ -268,7 +268,7 @@ found:
 			cfg->snap_distance = atoi(rest);
 		}
 		else if (!strcmp(key, "should_float")) {
-			if (should_floatn >= 256) {
+			if (should_floatn >= MAX_ITEMS) {
 				fprintf(stderr, "sxwmrc:%d: too many should_float entries\n", lineno);
 				continue;
 			}
@@ -287,7 +287,7 @@ found:
 			char *comma = strtok_r(final, ",", &comma_ptr);
 
 			/* store each comma separated value in a seperate row */
-			while (comma && should_floatn < 256) {
+			while (comma && should_floatn < MAX_ITEMS) {
 				comma = strip(comma);
 				if (*comma == '"') {
 					comma++;
@@ -433,7 +433,7 @@ found:
 			}
 		}
 		else if (!strcmp(key, "exec")) {
-			if (to_run >= 256) {
+			if (to_run >= MAX_ITEMS) {
 				fprintf(stderr, "sxwmrc:%d: too many exec commands\n", lineno);
 				continue;
 			}
@@ -461,7 +461,7 @@ found:
 		else if (!strcmp(key, "can_swallow")) {
 			char *token = strtok(rest, ",");
 			int i = 0;
-			while (token && i < 256) {
+			while (token && i < MAX_ITEMS) {
 				char *item = strip_quotes(strip(token));
 				if (*item) {
 					cfg->can_swallow[i] = malloc(2 * sizeof(char *));
@@ -479,7 +479,7 @@ found:
 		else if (!strcmp(key, "can_be_swallowed")) {
 			char *token = strtok(rest, ",");
 			int i = 0;
-			while (token && i < 256) {
+			while (token && i < MAX_ITEMS) {
 				char *item = strip_quotes(strip(token));
 				if (*item) {
 					cfg->can_be_swallowed[i] = malloc(2 * sizeof(char *));
@@ -516,7 +516,7 @@ found:
 
 			/* find free slot in open_in_workspace */
 			int slot = -1;
-			for (int i = 0; i < 256; i++) {
+			for (int i = 0; i < MAX_ITEMS; i++) {
 				if (!cfg->open_in_workspace[i]) {
 					slot = i;
 					break;
@@ -549,7 +549,7 @@ found:
 
 			int start_fullscreen_idx = 0;
 			/* find first empty slot */
-			for (int i = 0; i < 256; i++) {
+			for (int i = 0; i < MAX_ITEMS; i++) {
 				if (!cfg->start_fullscreen[i]) {
 					start_fullscreen_idx = i;
 					break;
@@ -557,7 +557,7 @@ found:
 			}
 
 			/* store each comma separated value in a separate row */
-			while (comma && start_fullscreen_idx < 256) {
+			while (comma && start_fullscreen_idx < MAX_ITEMS) {
 				comma = strip(comma);
 				if (*comma == '"') {
 					comma++;
@@ -600,7 +600,7 @@ cleanup_file:
 	if (f) {
 		fclose(f);
 	}
-	for (int j = 0; j < 256; j++) {
+	for (int j = 0; j < MAX_ITEMS; j++) {
 		if (cfg->should_float[j]) {
 			free(cfg->should_float[j][0]);
 			free(cfg->should_float[j]);
