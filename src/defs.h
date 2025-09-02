@@ -108,13 +108,8 @@ typedef struct {
 	char **should_float[MAX_ITEMS];
 	char **start_fullscreen[MAX_ITEMS];
 	char **can_swallow[MAX_ITEMS];
-<<<<<<< HEAD
-    char **can_be_swallowed[MAX_ITEMS];
-	char **scratchpads[32];
-=======
 	char **can_be_swallowed[MAX_ITEMS];
 	char **scratchpads[MAX_SCRATCHPADS];
->>>>>>> e770299 (replace random 20 (???) with MAX_SCRATCHPADS)
 	char **open_in_workspace[MAX_ITEMS];
 	char *to_run[MAX_ITEMS];
 } Config;
