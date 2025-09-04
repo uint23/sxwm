@@ -1,0 +1,128 @@
+Author: palsmo
+Date: 2025-09-04
+Description: add mirror layout option
+Commit Version: 591c550 (Merge pull request #227 from dehroox/main)
+
+Add 'mirror_layout' configuration option to flip master-stack layout.
+When enabled, master window stays on the right side instead of the default left,
+and resize controls are reversed to maintain intuitive behavior.
+---
+ src/defs.h   |  1 +
+ src/parser.c |  3 +++
+ src/sxwm.c   | 40 ++++++++++++++++++++++++++++++++++------
+ 3 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/src/defs.h b/src/defs.h
+index 27d16fd..592ba47 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -104,6 +104,7 @@ typedef struct {
+ 	Bool new_win_focus;
+ 	Bool warp_cursor;
+ 	Bool new_win_master;
++    Bool mirror_layout;
+ 	Binding binds[MAX_ITEMS];
+ 	char **should_float[MAX_ITEMS];
+ 	char **start_fullscreen[MAX_ITEMS];
+diff --git a/src/parser.c b/src/parser.c
+index 6bfaeeb..ba19028 100644
+--- a/src/parser.c
++++ b/src/parser.c
+@@ -496,6 +496,9 @@ found:
+ 		else if (!strcmp(key, "new_win_master")) {
+ 			cfg->new_win_master = !strcmp(rest, "true") ? True : False;
+ 		}
++        else if (!strcmp(key, "mirror_layout")) {
++            cfg->mirror_layout = !strcmp(rest, "true") ? True : False;
++        }
+ 		else if (!strcmp(key, "open_in_workspace")) {
+ 			char *mid = strchr(rest, ':');
+ 			if (!mid) {
+diff --git a/src/sxwm.c b/src/sxwm.c
+index 843b133..ce0cb1c 100644
+--- a/src/sxwm.c
++++ b/src/sxwm.c
+@@ -1427,6 +1427,7 @@ void init_defaults(void)
+ 	default_config.new_win_focus = True;
+ 	default_config.warp_cursor = True;
+ 	default_config.new_win_master = False;
++    default_config.mirror_layout = False;
+
+ 	/*
+ 	if (backup_binds) {
+@@ -1861,9 +1862,17 @@ void resize_master_add(void)
+ 	int m = focused ? focused->mon : 0;
+ 	float *mw = &user_config.master_width[m];
+
+-	if (*mw < MF_MAX - 0.001f) {
+-		*mw += ((float)user_config.resize_master_amt / 100);
++	if (user_config.mirror_layout) {
++		if (*mw < MF_MAX + 0.001f) {
++			*mw -= ((float)user_config.resize_master_amt / 100);
++		}
+ 	}
++	else {
++		if (*mw < MF_MAX - 0.001f) {
++			*mw += ((float)user_config.resize_master_amt / 100);
++		}
++ 	}
++
+ 	tile();
+ 	update_borders();
+ }
+@@ -1874,9 +1883,17 @@ void resize_master_sub(void)
+ 	int m = focused ? focused->mon : 0;
+ 	float *mw = &user_config.master_width[m];
+
+-	if (*mw > MF_MIN + 0.001f) {
+-		*mw -= ((float)user_config.resize_master_amt / 100);
++	if (user_config.mirror_layout) {
++		if (*mw > MF_MIN - 0.001f) {
++			*mw += ((float)user_config.resize_master_amt / 100);
++		}
+ 	}
++	else {
++		if (*mw > MF_MIN + 0.001f) {
++			*mw -= ((float)user_config.resize_master_amt / 100);
++		}
++ 	}
++
+ 	tile();
+ 	update_borders();
+ }
+@@ -2426,11 +2443,22 @@ void tile(void)
+ 		int master_width = (n_tileable > 1) ? (int)(tile_width * master_frac) : tile_width;
+ 		int stack_width = (n_tileable > 1) ? (tile_width - master_width - gaps) : 0;
+
++		int master_x, stack_x;
++		if (user_config.mirror_layout) {
++			master_x = tile_x + stack_width + (n_tileable > 1 ? gaps : 0);
++			stack_x = tile_x;
++		}
++		else {
++			master_x = tile_x;
++			stack_x = tile_x + master_width + gaps;
++		}
++
++
+ 		{
+ 			Client *c = tileable[0];
+ 			int border_width = 2 * user_config.border_width;
+ 			XWindowChanges wc = {
+-				.x = tile_x,
++				.x = master_x,
+ 				.y = tile_y,
+ 				.width = MAX(1, master_width - border_width),
+ 				.height = MAX(1, tile_height - border_width),
+@@ -2528,7 +2556,7 @@ void tile(void)
+ 		for (int i = 1; i < n_tileable; i++) {
+ 			Client *c = tileable[i];
+ 			XWindowChanges wc = {
+-				.x = tile_x + master_width + gaps,
++				.x = stack_x,
+ 				.y = stack_y,
+ 				.width = MAX(1, stack_width - (2 * user_config.border_width)),
+ 				.height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
+--
+2.51.0
+
