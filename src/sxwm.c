@@ -310,23 +310,6 @@ void centre_window(void)
 	XMoveWindow(dpy, focused->win, x, y);
 }
 
-pid_t get_parent_process(pid_t c)
-{
-	unsigned int v = 0;
-	FILE *f;
-	char buf[256];
-
-	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)c);
-	if (!(f = fopen(buf, "r"))) {
-		return 0;
-	}
-
-	int no_error = fscanf(f, "%*u %*s %*c %u", &v);
-	(void)no_error;
-	fclose(f);
-	return (pid_t)v;
-}
-
 void change_workspace(int ws)
 {
 	if (ws >= NUM_WORKSPACES || ws == current_ws) {
@@ -684,6 +667,24 @@ int get_monitor_for(Client *c)
 	}
 	return 0;
 }
+
+pid_t get_parent_process(pid_t c)
+{
+	unsigned int v = 0;
+	FILE *f;
+	char buf[256];
+
+	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)c);
+	if (!(f = fopen(buf, "r"))) {
+		return 0;
+	}
+
+	int no_error = fscanf(f, "%*u %*s %*c %u", &v);
+	(void)no_error;
+	fclose(f);
+	return (pid_t)v;
+}
+
 
 pid_t get_pid(Window w)
 {
