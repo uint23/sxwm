@@ -685,7 +685,6 @@ pid_t get_parent_process(pid_t c)
 	return (pid_t)v;
 }
 
-
 pid_t get_pid(Window w)
 {
 	pid_t pid = 0;
