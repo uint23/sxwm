@@ -43,6 +43,7 @@
 Client *add_client(Window w, int ws);
 /* void centre_window(void); */
 void change_workspace(int ws);
+int check_parent(pid_t p, pid_t c);
 int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
@@ -53,6 +54,7 @@ Window find_toplevel(Window w);
 /* void focus_next_mon(void); */
 /* void focus_prev_mon(void); */
 int get_monitor_for(Client *c);
+pid_t get_parent_process(pid_t c);
 pid_t get_pid(Window w);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
@@ -308,6 +310,23 @@ void centre_window(void)
 	XMoveWindow(dpy, focused->win, x, y);
 }
 
+pid_t get_parent_process(pid_t c)
+{
+	unsigned int v = 0;
+	FILE *f;
+	char buf[256];
+
+	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)c);
+	if (!(f = fopen(buf, "r"))) {
+		return 0;
+	}
+
+	int no_error = fscanf(f, "%*u %*s %*c %u", &v);
+	(void)no_error;
+	fclose(f);
+	return (pid_t)v;
+}
+
 void change_workspace(int ws)
 {
 	if (ws >= NUM_WORKSPACES || ws == current_ws) {
@@ -421,6 +440,14 @@ void change_workspace(int ws)
 	XUngrabServer(dpy);
 	XSync(dpy, False);
 	in_ws_switch = False;
+}
+
+int check_parent(pid_t p, pid_t c)
+{
+	while (p != c && c != 0) {
+		c = get_parent_process(c);
+	}
+	return (int)c;
 }
 
 int clean_mask(int mask)
@@ -1192,7 +1219,6 @@ void hdl_map_req(XEvent *xev)
 			}
 
 			/* if window can be swallowed look for a potential swallower */
-			// Should be swallowed by it's parent and not any windows that can swallow
 			if (can_be_swallowed) {
 				for (Client *p = workspaces[current_ws]; p; p = p->next) {
 					if (p == c || p->swallowed || !p->mapped) {
@@ -1217,8 +1243,8 @@ void hdl_map_req(XEvent *xev)
 						}
 
 						/* check process relationship */
-						if (can_swallow) {
-							/* we know class matches -> swallow now */
+						if (can_swallow && check_parent(p->pid, c->pid)) {
+							/* we know class matches and the swallower is the parent -> swallow now */
 							swallow_window(p, c);
 							XFree(pch.res_class);
 							XFree(pch.res_name);
