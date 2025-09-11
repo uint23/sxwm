@@ -1192,6 +1192,7 @@ void hdl_map_req(XEvent *xev)
 			}
 
 			/* if window can be swallowed look for a potential swallower */
+			// Should be swallowed by it's parent and not any windows that can swallow
 			if (can_be_swallowed) {
 				for (Client *p = workspaces[current_ws]; p; p = p->next) {
 					if (p == c || p->swallowed || !p->mapped) {
