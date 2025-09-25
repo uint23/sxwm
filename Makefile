@@ -40,7 +40,7 @@ CPPFLAGS += $(shell $(PKG_CONFIG) --cflags x11 xinerama xcursor)
 LDLIBS := $(shell $(PKG_CONFIG) --libs   x11 xinerama xcursor)
 endif
 
-# Termux detection for libandroid-wordexp
+# Termux detection for dependency
 ifneq ($(shell if [ "$$PREFIX" = "/data/data/com.termux/files/usr" ]; then echo yes; fi),)
 LDLIBS += -landroid-wordexp
 endif
