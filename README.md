@@ -297,6 +297,14 @@ sudo pkg update
 sudo pkg install gcc gmake libX11 libXinerama</code></pre>
 </details>
 
+<details>
+<summary>Termux</summary>
+<pre><code>
+pkg update
+pkg install xcb-util-keysyms xorgproto libxcursor libx11 libxinerama libandroid-wordexp
+</code></pre>
+</details>
+
 ---
 
 ## Build & Install

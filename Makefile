@@ -34,10 +34,15 @@ LDFLAGS ?= -Wl,-O1 -pie
 # libraries
 LDLIBS ?= -lX11 -lXinerama -lXcursor
 
-# prefer pkg-confgi
+# prefer pkg-config
 ifneq ($(shell $(PKG_CONFIG) --exists x11 xinerama xcursor && echo yes),)
 CPPFLAGS += $(shell $(PKG_CONFIG) --cflags x11 xinerama xcursor)
 LDLIBS := $(shell $(PKG_CONFIG) --libs   x11 xinerama xcursor)
+endif
+
+# Termux detection for libandroid-wordexp
+ifneq ($(shell if [ "$$PREFIX" = "/data/data/com.termux/files/usr" ]; then echo yes; fi),)
+LDLIBS += -landroid-wordexp
 endif
 
 .PHONY: all clean install uninstall clangd
