@@ -301,7 +301,9 @@ sudo pkg install gcc gmake libX11 libXinerama</code></pre>
 <summary>Termux</summary>
 <pre><code>pkg install x11-repo
 pkg update
-pkg install clang make xcb-util-keysyms xorgproto libxcursor libx11 libxinerama libandroid-wordexp</code></pre>
+pkg install clang make xcb-util-keysyms xorgproto libxcursor libx11 libxinerama libandroid-wordexp
+# add `LDFLAGS="${LDFLAGS} -landroid-wordexp"` in the make command
+</code></pre>
 </details>
 
 ---
