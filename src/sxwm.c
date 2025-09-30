@@ -41,6 +41,7 @@
 #include "parser.h"
 
 Client *add_client(Window w, int ws);
+void apply_fullscreen(Client *c, Bool on);
 /* void centre_window(void); */
 void change_workspace(int ws);
 int check_parent(pid_t p, pid_t c);
@@ -70,7 +71,7 @@ void hdl_keypress(XEvent *xev);
 void hdl_mapping_ntf(XEvent *xev);
 void hdl_map_req(XEvent *xev);
 void hdl_motion(XEvent *xev);
-void hdl_root_property(XEvent *xev);
+void hdl_property_ntf(XEvent *xev);
 void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
@@ -121,6 +122,8 @@ void update_net_client_list(void);
 void update_struts(void);
 void update_workarea(void);
 void warp_cursor(Client *c);
+Bool window_has_ewmh_state(Window w, Atom state);
+void window_set_ewmh_state(Window w, Atom state, Bool add);
 Bool window_should_float(Window w);
 Bool window_should_start_fullscreen(Window w);
 int xerr(Display *d, XErrorEvent *ee);
@@ -130,6 +133,7 @@ Atom _NET_ACTIVE_WINDOW;
 Atom _NET_CURRENT_DESKTOP;
 Atom _NET_SUPPORTED;
 Atom _NET_WM_STATE;
+Atom _NET_WM_STATE_FULLSCREEN;
 Atom WM_STATE;
 Atom _NET_WM_WINDOW_TYPE;
 Atom _NET_WORKAREA;
@@ -295,6 +299,45 @@ Client *add_client(Window w, int ws)
 			        PropModeReplace, (unsigned char *)&desktop, 1);
 	XRaiseWindow(dpy, w);
 	return c;
+}
+
+void apply_fullscreen(Client *c, Bool on)
+{
+	if (!c || !c->mapped || c->fullscreen == on) {
+		return;
+	}
+
+	if (on) {
+		XWindowAttributes win_attr;
+		XGetWindowAttributes(dpy, c->win, &win_attr);
+
+		c->orig_x = win_attr.x;
+		c->orig_y = win_attr.y;
+		c->orig_w = win_attr.width;
+		c->orig_h = win_attr.height;
+
+		c->floating = False;
+		c->fullscreen = True;
+
+		int mon = c->mon;
+		XSetWindowBorderWidth(dpy, c->win, 0);
+		XMoveResizeWindow(dpy, c->win, mons[mon].x, mons[mon].y, mons[mon].w, mons[mon].h);
+		XRaiseWindow(dpy, c->win);
+		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, True);
+	}
+	else {
+		c->fullscreen = False;
+
+		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
+		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
+		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, False);
+
+		if (!c->floating) {
+			c->mon = get_monitor_for(c);
+		}
+		tile();
+		update_borders();
+	}
 }
 
 void centre_window(void)
@@ -885,10 +928,51 @@ void hdl_button_release(XEvent *xev)
 
 void hdl_client_msg(XEvent *xev)
 {
-	/* clickable bar workspace switching */
 	if (xev->xclient.message_type == _NET_CURRENT_DESKTOP) {
 		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
+		return;
+	}
+
+	if (xev->xclient.message_type == _NET_WM_STATE) {
+		XClientMessageEvent *client_msg_ev = &xev->xclient;
+		Window w = client_msg_ev->window;
+		Client *c = find_client(find_toplevel(w));
+		if (!c) {
+			return;
+		}
+
+		/* 0=remove, 1=add, 2=toggle */
+		long action = client_msg_ev->data.l[0];
+		Atom a1 = (Atom)client_msg_ev->data.l[1];
+		Atom a2 = (Atom)client_msg_ev->data.l[2];
+
+		Atom atoms[2] = { a1, a2 };
+		for (int i = 0; i < 2; i++) {
+			if (atoms[i] == None) {
+				continue;
+			}
+
+			if (atoms[i] == _NET_WM_STATE_FULLSCREEN) {
+				Bool want = c->fullscreen;
+				if (action == 0) {
+					want = False;
+				}
+				else if (action == 1) {
+					want = True;
+				}
+				else if (action == 2) {
+					want = !want;
+				}
+
+				apply_fullscreen(c, want);
+
+				if (want) {
+					XRaiseWindow(dpy, c->win);
+				}
+			}
+			/* TODO: other states */
+		}
 		return;
 	}
 }
@@ -1263,12 +1347,15 @@ void hdl_map_req(XEvent *xev)
 		}
 	}
 
+	if (window_has_ewmh_state(w, _NET_WM_STATE_FULLSCREEN)) {
+		c->fullscreen = True;
+		c->floating = False;
+	}
+
 	XMapWindow(dpy, w);
 	c->mapped = True;
 	if (c->fullscreen) {
-		int m = c->mon;
-		XSetWindowBorderWidth(dpy, w, 0);
-		XMoveResizeWindow(dpy, w, mons[m].x, mons[m].y, mons[m].w, mons[m].h);
+		apply_fullscreen(c, True);
 	}
 	set_frame_extents(w);
 
@@ -1386,24 +1473,41 @@ void hdl_motion(XEvent *xev)
 	}
 }
 
-void hdl_root_property(XEvent *xev)
+void hdl_property_ntf(XEvent *xev)
 {
 	XPropertyEvent *property_ev = &xev->xproperty;
-	if (property_ev->atom == _NET_CURRENT_DESKTOP) {
-		long *val = NULL;
-		Atom actual;
-		int fmt;
-		unsigned long n, after;
-		if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual,
-					           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
-			change_workspace((int)val[0]);
-			XFree(val);
+
+	if (property_ev->window == root) {
+		if (property_ev->atom == _NET_CURRENT_DESKTOP) {
+			long *val = NULL;
+			Atom actual;
+			int fmt;
+			unsigned long n;
+			unsigned long after;
+			if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual,
+						           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
+				change_workspace((int)val[0]);
+				XFree(val);
+			}
+		}
+		else if (property_ev->atom == _NET_WM_STRUT_PARTIAL) {
+			update_struts();
+			tile();
+			update_borders();
 		}
 	}
-	else if (property_ev->atom == _NET_WM_STRUT_PARTIAL) {
-		update_struts();
-		tile();
-		update_borders();
+
+	/* client window properties */
+	if (property_ev->atom == _NET_WM_STATE) {
+		Client *c = find_client(find_toplevel(property_ev->window));
+		if (!c) {
+			return;
+		}
+
+		Bool want = window_has_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN);
+		if (want != c->fullscreen) {
+			apply_fullscreen(c, want);
+		}
 	}
 }
 
@@ -2067,7 +2171,7 @@ void setup(void)
 	evtable[MappingNotify] = hdl_mapping_ntf;
 	evtable[MapRequest] = hdl_map_req;
 	evtable[MotionNotify] = hdl_motion;
-	evtable[PropertyNotify] = hdl_root_property;
+	evtable[PropertyNotify] = hdl_property_ntf;
 	evtable[UnmapNotify] = hdl_unmap_ntf;
 	scan_existing_windows();
 
@@ -2087,6 +2191,7 @@ void setup_atoms(void)
 	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", False);
 	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
+	_NET_WM_STATE_FULLSCREEN = XInternAtom(dpy,"_NET_WM_STATE_FULLSCREEN", False);
 	WM_STATE = XInternAtom(dpy, "WM_STATE", False);
 	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
@@ -2111,7 +2216,7 @@ void setup_atoms(void)
 
 	Atom support_list[] = {
 	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
-		_NET_WM_WINDOW_TYPE, _NET_WORKAREA, _NET_WM_STRUT,
+		_NET_WM_STATE_FULLSCREEN, _NET_WM_WINDOW_TYPE, _NET_WORKAREA, _NET_WM_STRUT,
 		_NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW, _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,
 		UTF8_STRING, _NET_WM_DESKTOP, _NET_CLIENT_LIST, _NET_FRAME_EXTENTS, _NET_WM_PID,
 
@@ -2228,16 +2333,17 @@ void reset_opacity(Window w)
 
 void set_opacity(Window w, double opacity)
 {
-    unsigned long op = (unsigned long)(opacity * 0xFFFFFFFF);
-    Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
-
-    if (opacity < 0.0) {
+	if (opacity < 0.0) {
 		opacity = 0.0;
 	}
-    if (opacity > 1.0) {
+
+	if (opacity > 1.0) {
 		opacity = 1.0;
 	}
-    XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
+
+	unsigned long op = (unsigned long)(opacity * 0xFFFFFFFFu);
+	Atom atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+	XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
 }
 
 void set_wm_state(Window w, long state)
@@ -2708,43 +2814,7 @@ void toggle_fullscreen(void)
 	if (!focused) {
 		return;
 	}
-
-	if (focused->floating) {
-		focused->floating = False;
-	}
-
-	focused->fullscreen = !focused->fullscreen;
-
-	if (focused->fullscreen) {
-		XWindowAttributes wa;
-		XGetWindowAttributes(dpy, focused->win, &wa);
-		focused->orig_x = wa.x;
-		focused->orig_y = wa.y;
-		focused->orig_w = wa.width;
-		focused->orig_h = wa.height;
-
-		int m = focused->mon;
-		int fs_x = mons[m].x;
-		int fs_y = mons[m].y;
-		int fs_w = mons[m].w;
-		int fs_h = mons[m].h;
-
-		XSetWindowBorderWidth(dpy, focused->win, 0);
-		XMoveResizeWindow(dpy, focused->win, fs_x, fs_y, fs_w, fs_h);
-		XRaiseWindow(dpy, focused->win);
-		set_opacity(focused->win, 100);
-	}
-	else {
-		XMoveResizeWindow(dpy, focused->win, focused->orig_x, focused->orig_y, focused->orig_w, focused->orig_h);
-		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
-		reset_opacity(focused->win);
-
-		if (!focused->floating) {
-			focused->mon = get_monitor_for(focused);
-		}
-		tile();
-		update_borders();
-	}
+	apply_fullscreen(focused, !focused->fullscreen);
 }
 
 void toggle_scratchpad(int n)
@@ -3012,6 +3082,71 @@ void warp_cursor(Client *c)
 
 	XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 	XSync(dpy, False);
+}
+
+Bool window_has_ewmh_state(Window w, Atom state)
+{
+	Atom type;
+	int format;
+	unsigned long n_atoms = 0;
+	unsigned long unread = 0;
+	Atom *atoms = NULL;
+
+	if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 1024, False, XA_ATOM, &type,
+		&format, &n_atoms, &unread, (unsigned char**)&atoms) == Success && atoms) {
+
+		for (unsigned long i = 0; i < n_atoms; i++) {
+			if (atoms[i] == state) {
+				XFree(atoms);
+				return True;
+			}
+		}
+		XFree(atoms);
+	}
+	return False;
+}
+
+void window_set_ewmh_state(Window w, Atom state, Bool add)
+{
+	Atom type;
+	int format;
+	unsigned long n_atoms = 0;
+	unsigned long unread = 0;
+	Atom *atoms = NULL;
+
+	if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 1024, False, XA_ATOM, &type,
+		&format, &n_atoms, &unread, (unsigned char**)&atoms) != Success) {
+		atoms = NULL;
+		n_atoms = 0;
+	}
+
+	/* build new list */
+	Atom buf[16];
+	Atom *list = buf;
+	unsigned long list_len = 0;
+
+	if (atoms) {
+		for (unsigned long i = 0; i < n_atoms; i++) {
+			if (atoms[i] != state) {
+				list[list_len++] = atoms[i];
+			}	
+		}
+	}
+	if (add && list_len < 16) {
+		list[list_len++] = state;
+	}
+
+	if (list_len == 0) {
+		XDeleteProperty(dpy, w, _NET_WM_STATE);
+	}
+	else {
+		XChangeProperty(dpy, w, _NET_WM_STATE, XA_ATOM, 32,
+				        PropModeReplace, (unsigned char*)list, list_len);
+	}
+
+	if (atoms) {
+		XFree(atoms);
+	}	
 }
 
 Bool window_should_float(Window w)
