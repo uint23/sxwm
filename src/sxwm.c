@@ -99,6 +99,7 @@ void set_frame_extents(Window w);
 void set_input_focus(Client *c, Bool raise_win, Bool warp);
 void set_opacity(Window w, double opacity);
 void set_win_scratchpad(int n);
+void set_wm_state(Window w, long state);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
 void startup_exec(void);
@@ -127,6 +128,7 @@ Atom _NET_ACTIVE_WINDOW;
 Atom _NET_CURRENT_DESKTOP;
 Atom _NET_SUPPORTED;
 Atom _NET_WM_STATE;
+Atom WM_STATE;
 Atom _NET_WM_WINDOW_TYPE;
 Atom _NET_WORKAREA;
 Atom WM_DELETE_WINDOW;
@@ -1117,6 +1119,7 @@ void hdl_map_req(XEvent *xev)
 	if (!c) {
 		return;
 	}
+	set_wm_state(w, NormalState);
 
 	Window transient;
 	if (!should_float && XGetTransientForHint(dpy, w, &transient)) {
@@ -2057,6 +2060,7 @@ void setup_atoms(void)
 	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", False);
 	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
+	WM_STATE = XInternAtom(dpy, "WM_STATE", False);
 	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_NAME", False);
@@ -2078,7 +2082,6 @@ void setup_atoms(void)
 	_NET_WM_WINDOW_TYPE_NOTIFICATION = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
 	_NET_WM_STATE_MODAL = XInternAtom(dpy, "_NET_WM_STATE_MODAL", False);
 
-
 	Atom support_list[] = {
 	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
 		_NET_WM_WINDOW_TYPE, _NET_WORKAREA, _NET_WM_STRUT,
@@ -2090,6 +2093,19 @@ void setup_atoms(void)
 		_NET_WM_WINDOW_TYPE_MENU, _NET_WM_WINDOW_TYPE_DROPDOWN_MENU, _NET_WM_WINDOW_TYPE_TOOLTIP,
 		_NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_STATE_MODAL,
 	};
+
+	/* checking window */
+	wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
+	/* root property -> child window */
+	XChangeProperty(dpy, root, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32,
+			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
+	/* child window -> child window */
+	XChangeProperty(dpy, wm_check_win, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32,
+			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
+	/* name the wm */
+	const char *wmname = "sxwm";
+	XChangeProperty(dpy, wm_check_win, _NET_WM_NAME, UTF8_STRING, 8,
+			        PropModeReplace, (const unsigned char *)wmname, strlen(wmname));
 
 	/* workspace setup */
 	long num_workspaces = NUM_WORKSPACES;
@@ -2195,6 +2211,13 @@ void set_opacity(Window w, double opacity)
 		opacity = 1.0;
 	}
     XChangeProperty(dpy, w, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&op, 1);
+}
+
+void set_wm_state(Window w, long state)
+{
+	long data[2] = { state, None }; /* state, icon window */
+	XChangeProperty(dpy, w, WM_STATE, WM_STATE, 32,
+			        PropModeReplace, (unsigned char *)data, 2);
 }
 
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
