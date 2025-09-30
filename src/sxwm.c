@@ -670,11 +670,11 @@ int get_monitor_for(Client *c)
 
 pid_t get_parent_process(pid_t c)
 {
-	unsigned int v = 0;
+	pid_t v = -1;
 	FILE *f;
 	char buf[256];
 
-	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)c);
+	snprintf(buf, sizeof(buf), "/proc/%u/stat", (unsigned)c);
 	if (!(f = fopen(buf, "r"))) {
 		return 0;
 	}
