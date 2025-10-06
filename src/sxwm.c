@@ -195,7 +195,6 @@ int current_ws = 0;
 int current_mon = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
-Bool backup_binds = False;
 Bool running = False;
 Bool next_should_float = False;
 long last_motion_time = 0;
@@ -1573,18 +1572,6 @@ void init_defaults(void)
 	default_config.new_win_focus = True;
 	default_config.warp_cursor = True;
 	default_config.new_win_master = False;
-
-	/*
-	if (backup_binds) {
-		for (unsigned long i = 0; i < LENGTH(binds); i++) {
-			default_config.binds[i].mods = binds[i].mods;
-			default_config.binds[i].keysym = binds[i].keysym;
-			default_config.binds[i].action.cmd = binds[i].action.cmd;
-			default_config.binds[i].type = binds[i].type;
-			default_config.n_binds++;
-		}
-	}
-	*/
 
 	user_config = default_config;
 }
@@ -3326,7 +3313,6 @@ int main(int ac, char **av)
 		}
 		else if (strcmp(av[1], "-b") == 0 || strcmp(av[1], "--backup") == 0) {
 			puts("sxwm: using backup keybinds");
-			backup_binds = True;
 		}
 		else {
 			puts("usage:\n");
