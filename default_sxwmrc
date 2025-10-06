@@ -9,6 +9,8 @@ border_width            : 1
 master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
 resize_stack_amt        : 20
+move_window_amount      : 50
+resize_window_amount    : 50
 snap_distance           : 5
 motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 should_float            : "pcmanfm", "obs"
@@ -58,6 +60,17 @@ call : mod + h : master_decrease
 # Stack Window Resize
 call : mod + ctrl + l : stack_increase
 call : mod + ctrl + h : stack_decrease
+
+# Keyboard Window Management
+call : mod + Up : move_win_up
+call : mod + Down : move_win_down
+call : mod + Left : move_win_left
+call : mod + Right : move_win_right
+
+call : mod + shift + Up : resize_win_up
+call : mod + shift + Down : resize_win_down
+call : mod + shift + Left : resize_win_left
+call : mod + shift + Right : resize_win_right
 
 # Gaps 
 call : mod + equal : increase_gaps

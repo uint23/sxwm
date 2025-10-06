@@ -81,6 +81,10 @@ Bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_next_mon(void); */
 /* void move_prev_mon(void); */
 void move_to_workspace(int ws);
+/* void move_win_down(void); */
+/* void move_win_left(void); */
+/* void move_win_right(void); */
+/* void move_win_up(void); */
 void other_wm(void);
 int other_wm_err(Display *d, XErrorEvent *ee);
 /* long parse_col(const char *hex); */
@@ -91,6 +95,10 @@ void remove_scratchpad(int n);
 /* void resize_master_sub(void); */
 /* void resize_stack_add(void); */
 /* void resize_stack_sub(void); */
+/* void resize_win_down(void); */
+/* void resize_win_left(void); */
+/* void resize_win_right(void); */
+/* void resize_win_up(void); */
 void run(void);
 void reset_opacity(Window w);
 void scan_existing_windows(void);
@@ -580,7 +588,7 @@ void focus_next(void)
 	/* loop until we find a mapped client or return to start */
 	do {
 		c = c->next ? c->next : workspaces[current_ws];
-    } while (( !c->mapped || c->mon != current_mon ) && c != start);
+	} while (( !c->mapped || c->mon != current_mon ) && c != start);
 
 	/* if we return to start: */
 	if (!c->mapped || c->mon != current_mon) {
@@ -620,7 +628,7 @@ void focus_prev(void)
 				p = p->next;
 			c = p;
 		}
-    } while (( !c->mapped || c->mon != current_mon ) && c != start);
+	} while (( !c->mapped || c->mon != current_mon ) && c != start);
 
 	/* this stops invisible windows being detected or focused */
 	if (!c->mapped || c->mon != current_mon) {
@@ -1543,6 +1551,8 @@ void init_defaults(void)
 	default_config.border_foc_col = parse_col("#c0cbff");
 	default_config.border_ufoc_col = parse_col("#555555");
 	default_config.border_swap_col = parse_col("#fff4c0");
+	default_config.move_window_amt = 10;
+	default_config.resize_window_amt = 10;
 
 	for (int i = 0; i < MAX_MONITORS; i++) {
 		default_config.master_width[i] = 50 / 100.0f;
@@ -1802,6 +1812,42 @@ void move_to_workspace(int ws)
 	}
 }
 
+void move_win_down(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+	focused->y += user_config.move_window_amt;
+	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+}
+
+void move_win_left(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+	focused->x -= user_config.move_window_amt;
+	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+}
+
+void move_win_right(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+	focused->x += user_config.move_window_amt;
+	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+}
+
+void move_win_up(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+	focused->y -= user_config.move_window_amt;
+	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+}
+
 void other_wm(void)
 {
 	XSetErrorHandler(other_wm_err);
@@ -2048,6 +2094,52 @@ void resize_stack_sub(void)
 	}
 	focused->custom_stack_height = raw_new;
 	tile();
+}
+
+void resize_win_down(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+
+	int new_h = focused->h + user_config.resize_stack_amt;
+	int max_h = mons[focused->mon].h - (focused->y - mons[focused->mon].y);
+	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, max_h);
+	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+}
+
+void resize_win_up(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+
+	int new_h = focused->h - user_config.resize_stack_amt;
+	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, focused->h);
+	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+}
+
+void resize_win_right(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+
+	int new_w = focused->w + user_config.resize_stack_amt;
+	int max_w = mons[focused->mon].w - (focused->x - mons[focused->mon].x);
+	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, max_w);
+	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+}
+
+void resize_win_left(void)
+{
+	if (!focused || !focused->floating) {
+		return;
+	}
+
+	int new_w = focused->w - user_config.resize_stack_amt;
+	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, focused->w);
+	XResizeWindow(dpy, focused->win, focused->w, focused->h);
 }
 
 void run(void)
@@ -3010,8 +3102,7 @@ void update_struts(void)
 		Atom *types = NULL;
 
 		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &actual_type, &actual_format,
-		                       &n_items, &bytes_after, (unsigned char **)&types) != Success ||
-		    !types) {
+		                       &n_items, &bytes_after, (unsigned char **)&types) != Success || !types) {
 			continue;
 		}
 
@@ -3033,9 +3124,7 @@ void update_struts(void)
 		unsigned long len, rem;
 
 		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL, &actual, &sfmt, &len, &rem,
-		                       (unsigned char **)&str) == Success &&
-		    str && len >= 4) {
-
+		                       (unsigned char **)&str) == Success && str && len >= 4) {
 			XWindowAttributes wa;
 			if (XGetWindowAttributes(dpy, w, &wa)) {
 				/* find the monitor this dock belongs to */
@@ -3201,10 +3290,10 @@ int xerr(Display *d, XErrorEvent *ee)
 	const struct {
 		int req, code;
 	} ignore[] = {
-	    {0, BadWindow},
-	    {X_GetGeometry, BadDrawable},
-	    {X_SetInputFocus, BadMatch},
-	    {X_ConfigureWindow, BadMatch},
+		{0, BadWindow},
+		{X_GetGeometry, BadDrawable},
+		{X_SetInputFocus, BadMatch},
+		{X_ConfigureWindow, BadMatch},
 	};
 
 	for (size_t i = 0; i < sizeof(ignore) / sizeof(ignore[0]); i++) {

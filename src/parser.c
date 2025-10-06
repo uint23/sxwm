@@ -18,28 +18,38 @@
 #include "parser.h"
 #include "defs.h"
 
-static const CommandEntry call_table[] = {{"close_window", close_focused},
-                                          {"decrease_gaps", dec_gaps},
-                                          {"focus_next", focus_next},
-                                          {"focus_prev", focus_prev},
-                                          {"focus_next_mon", focus_next_mon},
-                                          {"focus_prev_mon", focus_prev_mon},
-                                          {"increase_gaps", inc_gaps},
-                                          {"master_next", move_master_next},
-                                          {"master_prev", move_master_prev},
-                                          {"move_next_mon", move_next_mon},
-                                          {"move_prev_mon", move_prev_mon},
-                                          {"quit", quit},
-                                          {"reload_config", reload_config},
-                                          {"master_increase", resize_master_add},
-                                          {"master_decrease", resize_master_sub},
-                                          {"stack_increase", resize_stack_add},
-                                          {"stack_decrease", resize_stack_sub},
-                                          {"toggle_floating", toggle_floating},
-                                          {"global_floating", toggle_floating_global},
-                                          {"fullscreen", toggle_fullscreen},
-                                          {"centre_window", centre_window},
-                                          {NULL, NULL}};
+static const CommandEntry call_table[] = {
+	{"close_window", close_focused},
+	{"decrease_gaps", dec_gaps},
+	{"focus_next", focus_next},
+	{"focus_prev", focus_prev},
+	{"focus_next_mon", focus_next_mon},
+	{"focus_prev_mon", focus_prev_mon},
+	{"increase_gaps", inc_gaps},
+	{"master_next", move_master_next},
+	{"master_prev", move_master_prev},
+	{"move_next_mon", move_next_mon},
+	{"move_prev_mon", move_prev_mon},
+	{"move_win_up", move_win_up},
+	{"move_win_down", move_win_down},
+	{"move_win_left", move_win_left},
+	{"move_win_right", move_win_right},
+	{"resize_win_up", resize_win_up},
+	{"resize_win_down", resize_win_down},
+	{"resize_win_left", resize_win_left},
+	{"resize_win_right", resize_win_right},
+	{"quit", quit},
+	{"reload_config", reload_config},
+	{"master_increase", resize_master_add},
+	{"master_decrease", resize_master_sub},
+	{"stack_increase", resize_stack_add},
+	{"stack_decrease", resize_stack_sub},
+	{"toggle_floating", toggle_floating},
+	{"global_floating", toggle_floating_global},
+	{"fullscreen", toggle_fullscreen},
+	{"centre_window", centre_window},
+	{NULL, NULL}
+};
 
 static void remap_and_dedupe_binds(Config *cfg)
 {
@@ -263,6 +273,12 @@ found:
 		}
 		else if (!strcmp(key, "resize_stack_amount")) {
 			cfg->resize_stack_amt = atoi(rest);
+		}
+		else if (!strcmp(key, "move_window_amount")) {
+			cfg->move_window_amt = atoi(rest);
+		}
+		else if (!strcmp(key, "resize_window_amount")) {
+			cfg->resize_window_amt = atoi(rest);
 		}
 		else if (!strcmp(key, "snap_distance")) {
 			cfg->snap_distance = atoi(rest);
