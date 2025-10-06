@@ -26,7 +26,8 @@ Check [the man page markdown for relevant info](docs/sxwm.md)
 - `libX11`
 - `Xinerama`
 - `XCursor`
-- CC & Make
+- `CC`
+- `Make`
 
 <details>
 <summary>Debian / Ubuntu / Linux Mint</summary>
@@ -116,10 +117,10 @@ pkg install clang make xcb-util-keysyms xorgproto libxcursor libx11 libxinerama 
 
 ## Build & Install
 
-### Arch Linux (AUR)
-
 > [!NOTE]
 > I don't maintain any packages. Use with caution!
+
+### Arch Linux (AUR)
 
 yay -S sxwm
 # OR for latest features:
