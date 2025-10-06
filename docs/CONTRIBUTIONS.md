@@ -5,12 +5,16 @@ in improving the project is truly appreciated.
 
 ## Code Style and Formatting
 
-There is an included `clangd` formatting file, but it won’t do everything for you.
 Please follow the rules below to keep the codebase consistent and clean.
 
 ### Indentation
 
-* Use **tabs** for indentation — never spaces.
+* Use **tabs** for indentation - never spaces.
+* You can use spaces to pad things e.g. parameters:
+```c
+foo(dpy, root
+    NULL, NULL);
+```
 
 ### Blocks
 
@@ -49,11 +53,11 @@ else {
 Functions should look like this:
 
 ```c
-void function_x(void)
+void f(void)
 {
 }
 
-void function_y(int y)
+void g(int y)
 {
 }
 ```
@@ -71,22 +75,18 @@ float other_variable = 5;
 void do_something(void);
 ```
 
-### Header Guards
+### Headers
 
-If you create a header file, use header guards:
+If you create a header file, use pragma. It is supported on most modern compilers:
 
 ```c
-#ifndef HEADER_NAME_H
-#define HEADER_NAME_H
-
-// content
-
-#endif /* HEADER_NAME_H */
+#pragma once
+/* content */
 ```
 
 ### Line Length
 
-* Keep lines under **100 characters** when possible to improve terminal readability.
+* Keep lines under **100 characters** when possible to improve readability.
 
 ### Whitespace
 
@@ -106,9 +106,9 @@ Organize includes like this:
 
 ## Build
 
-* `make` must succeed **with no warnings** on your system.
+* `make` must succeed **with no warnings or errors**.
 * Don’t commit build artifacts (e.g., `.o`, `sxwm`) or backup files (e.g., `*~`).
-* Test your changes, especially on **multi-monitor setups** using **Xephyr**.
+* Test your changes, if possible on **multi-monitor setups** using **Xephyr**.
 
 ---
 
@@ -122,9 +122,10 @@ Organize includes like this:
 ## Submitting Changes
 
 * Open a pull request with a **clear description** of what and why.
-* Keep **one purpose per commit** — don’t mix unrelated changes.
+* Keep **one purpose per commit** - don’t mix unrelated changes.
 * If fixing a bug, describe **how to reproduce it**.
 * If adding a feature, ensure it fits with `sxwm`’s **minimalist philosophy**.
+    * If said feature doesn't fit, you can make a patch instead.
 * **Open separate PRs** for unrelated changes.
 
 ---
@@ -148,20 +149,10 @@ This patch adds a check for null pointers before accessing window data.
 
 ## Tooling & Analysis
 
-* Use the provided `.clang-format` file where applicable.
-* You may optionally run:
-
+* Avoid committing debug code like stray `printf()` or `fprintf(stderr, ...)`.
+* You _may_ want to run:
   * `cppcheck`
   * `clang-tidy`
-* Avoid committing debug code like stray `printf()` or `fprintf(stderr, ...)`.
-
----
-
-## Editor Configuration
-
-A sample `.editorconfig` file is provided (or you can request one).
-It ensures editors match the project’s formatting conventions.
-
 ---
 
 ## Documentation
