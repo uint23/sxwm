@@ -2102,7 +2102,7 @@ void resize_win_down(void)
 		return;
 	}
 
-	int new_h = focused->h + user_config.resize_stack_amt;
+	int new_h = focused->h + user_config.resize_window_amt;
 	int max_h = mons[focused->mon].h - (focused->y - mons[focused->mon].y);
 	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, max_h);
 	XResizeWindow(dpy, focused->win, focused->w, focused->h);
@@ -2114,7 +2114,7 @@ void resize_win_up(void)
 		return;
 	}
 
-	int new_h = focused->h - user_config.resize_stack_amt;
+	int new_h = focused->h - user_config.resize_window_amt;
 	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, focused->h);
 	XResizeWindow(dpy, focused->win, focused->w, focused->h);
 }
@@ -2125,7 +2125,7 @@ void resize_win_right(void)
 		return;
 	}
 
-	int new_w = focused->w + user_config.resize_stack_amt;
+	int new_w = focused->w + user_config.resize_window_amt;
 	int max_w = mons[focused->mon].w - (focused->x - mons[focused->mon].x);
 	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, max_w);
 	XResizeWindow(dpy, focused->win, focused->w, focused->h);
@@ -2137,7 +2137,7 @@ void resize_win_left(void)
 		return;
 	}
 
-	int new_w = focused->w - user_config.resize_stack_amt;
+	int new_w = focused->w - user_config.resize_window_amt;
 	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, focused->w);
 	XResizeWindow(dpy, focused->win, focused->w, focused->h);
 }
