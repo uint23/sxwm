@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 #### v1.7 (git)
 - **ADD**: `_NET_FRAME_EXTENTS` support
 - **ADD**: `start_fullscreen` which opens specified windows in fullscreen mode
+- **ADD**: Proper EWMH fullscreening
+- **ADD**: Switching to previous workspace
+- **ADD**: Keeping floating windows on top
+- **ADD**: Keyboard driven moving/resizing of windows
+- **CHANGE**: Use `compile_flags.txt` instead of `.clangd`
+- **CHANGE**: Remove backup binds
+- **CHANGE**: General refactoring of code. Much better now
 - **FIX**: Resizing bug on second monitor
+- **FIX**: Fullscreen windows not opaque on compositors
+- **FIX**: Window swallowing problems
+- **FIX**: Handling of input boxes
+- **FIX**: Won't compile on *BSD systems
+- **FIX**: Closing client won't warp cursor back
+- **FIX**: Build instructions
 
 #### v1.6 (current)
 - **NEW**: True multi-monitor support
