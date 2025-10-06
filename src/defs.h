@@ -160,6 +160,7 @@ extern void resize_win_down(void);
 extern void resize_win_left(void);
 extern void resize_win_right(void);
 extern void resize_win_up(void);
+extern void switch_previous_workspace(void);
 extern void toggle_floating(void);
 extern void toggle_floating_global(void);
 extern void toggle_fullscreen(void);

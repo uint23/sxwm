@@ -48,7 +48,8 @@ static const CommandEntry call_table[] = {
 	{"global_floating", toggle_floating_global},
 	{"fullscreen", toggle_fullscreen},
 	{"centre_window", centre_window},
-	{NULL, NULL}
+	{"switch_previous_workspace", switch_previous_workspace},
+	{NULL, NULL},
 };
 
 static void remap_and_dedupe_binds(Config *cfg)

@@ -116,6 +116,7 @@ void spawn(const char * const *argv);
 void startup_exec(void);
 void swallow_window(Client *swallower, Client *swallowed);
 void swap_clients(Client *a, Client *b);
+/* void switch_previous_workspace(void); */
 void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
@@ -191,12 +192,12 @@ Scratchpad scratchpads[MAX_SCRATCHPADS];
 int scratchpad_count = 0;
 int current_scratchpad = 0;
 int n_mons = 0;
+int previous_workspace = 0;
 int current_ws = 0;
 int current_mon = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool running = False;
-Bool next_should_float = False;
 long last_motion_time = 0;
 
 Mask numlock_mask = 0;
@@ -396,6 +397,7 @@ void change_workspace(int ws)
 		}
 	}
 
+	previous_workspace = current_ws;
 	current_ws = ws;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
 		if (c->mapped) {
@@ -2635,6 +2637,11 @@ void swap_clients(Client *a, Client *b)
 
 	*pb = ta;
 	ta->next = tb_next == ta ? tb : tb_next;
+}
+
+void switch_previous_workspace(void)
+{
+	change_workspace(previous_workspace);
 }
 
 void tile(void)
