@@ -105,6 +105,7 @@ typedef struct {
 	int resize_window_amt;
 	Bool new_win_focus;
 	Bool warp_cursor;
+	Bool floating_on_top;
 	Bool new_win_master;
 	Binding binds[MAX_ITEMS];
 	char **should_float[MAX_ITEMS];

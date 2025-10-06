@@ -1574,6 +1574,7 @@ void init_defaults(void)
 	default_config.new_win_focus = True;
 	default_config.warp_cursor = True;
 	default_config.new_win_master = False;
+	default_config.floating_on_top = True;
 
 	user_config = default_config;
 }
@@ -2363,7 +2364,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(w);
 
-		if (raise_win) {
+		if (raise_win && c->floating) {
 			XRaiseWindow(dpy, w);
 		}
 
@@ -2816,6 +2817,16 @@ void tile(void)
 		}
 		update_borders();
 	}
+
+	if (user_config.floating_on_top) {
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			if (c->mapped && c->floating && !c->fullscreen) {
+				XRaiseWindow(dpy, c->win);
+			}
+		}
+	}
+
+	update_borders();
 }
 
 void toggle_floating(void)

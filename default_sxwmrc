@@ -16,9 +16,10 @@ motion_throttle         : 60 # Set to screen refresh rate for smoothest motions
 should_float            : "pcmanfm", "obs"
 new_win_focus           : true
 warp_cursor             : true
+floating_on_top         : true
+new_win_master          : false
 can_swallow             : "st"
 can_be_swallowed        : "mpv", "sxiv"
-new_win_master          : false
 start_fullscreen        : "mpv", "vlc"
 
 # Keybinds:

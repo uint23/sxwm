@@ -272,6 +272,9 @@ found:
 		else if (!strcmp(key, "resize_master_amount")) {
 			cfg->resize_master_amt = atoi(rest);
 		}
+		else if (!strcmp(key, "floating_on_top")) {
+			cfg->floating_on_top = !strcmp(rest, "true") ? True : False;
+		}
 		else if (!strcmp(key, "resize_stack_amount")) {
 			cfg->resize_stack_amt = atoi(rest);
 		}
