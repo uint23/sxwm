@@ -5,7 +5,8 @@ in improving the project is truly appreciated.
 
 ## Code Style and Formatting
 
-Please follow the rules below to keep the codebase consistent and clean.
+Please follow the rules below to keep the codebase consistent and clean.  
+You can also run `make clangd` to generate `compile_flags.txt`
 
 ### Indentation
 
