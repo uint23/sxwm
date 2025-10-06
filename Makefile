@@ -6,7 +6,7 @@ PKG_CONFIG ?= pkg-config
 PREFIX ?= /usr/local
 DESTDIR ?=
 BIN := sxwm
-MAN := sxwm.1
+MAN := docs/sxwm.1
 MAN_DIR := $(PREFIX)/share/man/man1
 XSESSIONS := $(DESTDIR)$(PREFIX)/share/xsessions
 
@@ -66,7 +66,7 @@ install: all
 	@install -m 755 $(BIN) "$(DESTDIR)$(PREFIX)/bin/$(BIN)"
 	@echo "installing sxwm.desktop to $(XSESSIONS)..."
 	@mkdir -p "$(XSESSIONS)"
-	@install -m 644 sxwm.desktop "$(XSESSIONS)/sxwm.desktop"
+	@install -m 644 docs/sxwm.desktop "$(XSESSIONS)/sxwm.desktop"
 	@echo "installing man page to $(DESTDIR)$(MAN_DIR)..."
 	@mkdir -p "$(DESTDIR)$(MAN_DIR)"
 	@install -m 644 $(MAN) "$(DESTDIR)$(MAN_DIR)/"

@@ -120,8 +120,8 @@ typedef struct {
 typedef struct {
 	int x, y;
 	int w, h;
-	int reserve_left, reserve_right,
-		reserve_top, reserve_bottom;
+	int reserve_left, reserve_right;
+	int reserve_top, reserve_bottom;
 } Monitor;
 
 typedef struct {
