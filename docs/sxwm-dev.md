@@ -9,7 +9,7 @@
 
 ## Headers
 
-| Header                      | Job                                                                       |
+| Header                       | Job                                                                      |
 |------------------------------|--------------------------------------------------------------------------|
 | `signal.h`                   | Signal handling functions and definitions                                |
 | `unistd.h`                   | Standard POSIX functionality                                             |
@@ -20,9 +20,9 @@
 | `X11/extensions/Xinerama.h`  | Xinerama extension definitions for multi-monitor setups                  |
 | `X11/Xcursor/Xcursor.h`      | Modern cursor handling                                                   |
 | `linux/limits.h`             | Linux specific limits for various data types                             |
-| | |
+|                              |                                                                          |
 | `defs.h`                     | Custom definitions and macros specific to the application or project     |
-| `parser.h`                   | Config file parser components                         |
+| `parser.h`                   | Config file parser components                                            |
 
 ## sxwm.c
 

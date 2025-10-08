@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +11,6 @@
 
 #ifdef __linux__
 #include <wordexp.h>
-#include <linux/limits.h>
 #endif
 
 #include "parser.h"
