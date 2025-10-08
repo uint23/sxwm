@@ -27,6 +27,8 @@
 #define CALL(mod, key, fnptr) {(mod), XK_##key, {.fn = fnptr}, True}
 #define CMD(name, ...) const char *name[] = {__VA_ARGS__, NULL}
 
+#define PATH_MAX 4096
+
 /* workspaces */
 #define TYPE_FUNC 2
 #define TYPE_WS_CHANGE 0
