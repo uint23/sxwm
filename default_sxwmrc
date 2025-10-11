@@ -37,6 +37,7 @@ bind : mod + p : "dmenu_run"
 call : mod + shift + q : close_window
 call : mod + c : centre_window
 call : mod + shift + e : quit
+call : mod + m : toggle_monocle
 
 # Focus Movement:
 call : mod + j : focus_next

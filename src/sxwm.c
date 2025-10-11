@@ -117,6 +117,7 @@ void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
+/* void toggle_monocle(void); */
 void toggle_scratchpad(int n);
 void unswallow_window(Client *c);
 void update_borders(void);
@@ -191,10 +192,11 @@ int n_mons = 0;
 int previous_workspace = 0;
 int current_ws = 0;
 int current_mon = 0;
+long last_motion_time = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool running = False;
-long last_motion_time = 0;
+Bool monocle = False;
 
 Mask numlock_mask = 0;
 Mask mode_switch_mask = 0;
@@ -2663,6 +2665,42 @@ void tile(void)
 		return;
 	}
 
+	if (monocle) {
+		for (Client *c = head; c; c = c->next) {
+			if (!c->mapped || c->fullscreen) {
+				continue;
+			}
+
+			int border_width = user_config.border_width;
+			int gaps = user_config.gaps;
+
+			int mon = c->mon;
+			int x = mons[mon].x + mons[mon].reserve_left + gaps;
+			int y = mons[mon].y + mons[mon].reserve_top + gaps;
+			int w = mons[mon].w - mons[mon].reserve_left - mons[mon].reserve_right - 2 * gaps;
+			int h = mons[mon].h - mons[mon].reserve_top - mons[mon].reserve_bottom - 2 * gaps;
+
+			XWindowChanges wc = {
+				.x = x,
+				.y = y,
+				.width = MAX(1, w - 2 * border_width),
+				.height = MAX(1, h - 2 * border_width),
+				.border_width = border_width
+			};
+			XConfigureWindow(dpy, c->win,
+					CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
+			XRaiseWindow(dpy, c->win);
+
+			c->x = wc.x;
+			c->y = wc.y;
+			c->w = wc.width;
+			c->h = wc.height;
+		}
+
+		update_borders();
+		return;
+	}
+
 	for (int m = 0; m < n_mons; m++) {
 		int mon_x = mons[m].x + mons[m].reserve_left;
 		int mon_y = mons[m].y + mons[m].reserve_top;
@@ -2910,6 +2948,16 @@ void toggle_fullscreen(void)
 		return;
 	}
 	apply_fullscreen(focused, !focused->fullscreen);
+}
+
+void toggle_monocle(void)
+{
+	monocle = !monocle;
+	tile();
+	update_borders();
+	if (focused) {
+		set_input_focus(focused, True, True);
+	}
 }
 
 void toggle_scratchpad(int n)

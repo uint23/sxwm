@@ -104,6 +104,7 @@ workspace : modifier + ... + key : swap n
 | `stack_decrease`     | Decrease the height of the focused stack window.             |
 | `switch_previous_workspace` | Switch to the previous workspace.                     |
 | `toggle_floating`    | Toggles floating state of current window.                    |
+| `toggle_monocle`     | Toggles the monocle layout.                                  |
 
 ### Example Bindings
 

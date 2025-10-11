@@ -31,3 +31,4 @@ extern void switch_previous_workspace(void);
 extern void toggle_floating(void);
 extern void toggle_floating_global(void);
 extern void toggle_fullscreen(void);
+extern void toggle_monocle(void);

@@ -3,12 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 #### v1.7 (git)
+- **ADD**: Monocle layout
+- **ADD**: Developer documentation
 - **ADD**: `_NET_FRAME_EXTENTS` support
 - **ADD**: `start_fullscreen` which opens specified windows in fullscreen mode
 - **ADD**: Proper EWMH fullscreening
 - **ADD**: Switching to previous workspace
 - **ADD**: Keeping floating windows on top
 - **ADD**: Keyboard driven moving/resizing of windows
+- **CHANGE**: Move externs from `defs.h`->`extern.h`
+- **CHANGE**: Remove unused macros and headers
+- **CHANGE**: Logo
 - **CHANGE**: Use `compile_flags.txt` instead of `.clangd`
 - **CHANGE**: Remove backup binds
 - **CHANGE**: General refactoring of code. Much better now

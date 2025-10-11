@@ -113,6 +113,7 @@
 | [toggle_floating](#toggle_floating)                                   | (void)                                     | void     | Toggle focused floating state.                      |
 | [toggle_floating_global](#toggle_floating_global)                     | (void)                                     | void     | Toggle all clients floating on/off.                 |
 | [toggle_fullscreen](#toggle_fullscreen)                               | (void)                                     | void     | Toggle fullscreen on focused.                       |
+| [toggle_monocle](#toggle_monocle)                                     | (void)                                     | void     | Toggle monocle layout.                              |
 | [toggle_scratchpad](#toggle_scratchpad)                               | (int n)                                    | void     | Map/unmap scratchpad n and focus.                   |
 | [unswallow_window](#unswallow_window)                                 | (Client *c)                                | void     | Restore swallower and unlink relation.              |
 | [update_borders](#update_borders)                                     | (void)                                     | void     | Paint borders and publish active window.            |
@@ -878,7 +879,8 @@ Call change_workspace(previous_workspace).
 ```
 
 Recompute struts, then for each monitor: build list of visible, non-
-floating, non-fullscreen clients on that monitor. Place master at left
+floating, non-fullscreen clients on that monitor. If monocle layout enabled, configure
+every window to take all the space then leave. Otherwise, places master at left
 with width master_width[m], stack on right with gaps. Compute stack
 heights using per-client custom_stack_height or auto-split; enforce
 minimums and absorb rounding remainder at bottom. Configure windows,
@@ -912,6 +914,14 @@ current geometry) and raise them; otherwise leave state. Retile and repaint.
 ```
 
 Toggle fullscreen on focused via apply_fullscreen.
+
+#### toggle_monocle
+
+```c
+(void) -> void
+```
+
+Enable/disable the monocle layout. Most of the logic is near the top of [tile](#tile)
 
 #### toggle_scratchpad
 
