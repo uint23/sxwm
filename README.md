@@ -12,6 +12,7 @@
 ## Contributions & Issues
 
 Please read [the contribution guide](docs/CONTRIBUTIONS.md)
+Please read [the developer docs](docs/sxwm-dev.md)
 
 ---
 

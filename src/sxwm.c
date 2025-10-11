@@ -311,6 +311,7 @@ void apply_fullscreen(Client *c, Bool on)
 		return;
 	}
 
+
 	if (on) {
 		XWindowAttributes win_attr;
 		XGetWindowAttributes(dpy, c->win, &win_attr);
@@ -320,7 +321,6 @@ void apply_fullscreen(Client *c, Bool on)
 		c->orig_w = win_attr.width;
 		c->orig_h = win_attr.height;
 
-		c->floating = False;
 		c->fullscreen = True;
 
 		int mon = c->mon;
