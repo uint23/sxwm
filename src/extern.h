@@ -1,0 +1,33 @@
+#pragma once
+
+extern void centre_window(void);
+extern void close_focused(void);
+extern void dec_gaps(void);
+extern void focus_next(void);
+extern void focus_prev(void);
+extern void focus_next_mon(void);
+extern void focus_prev_mon(void);
+extern void move_next_mon(void);
+extern void move_prev_mon(void);
+extern void inc_gaps(void);
+extern void move_master_next(void);
+extern void move_master_prev(void);
+extern void move_win_down(void);
+extern void move_win_left(void);
+extern void move_win_right(void);
+extern void move_win_up(void);
+extern long parse_col(const char *hex);
+extern void quit(void);
+extern void reload_config(void);
+extern void resize_master_add(void);
+extern void resize_master_sub(void);
+extern void resize_stack_add(void);
+extern void resize_stack_sub(void);
+extern void resize_win_down(void);
+extern void resize_win_left(void);
+extern void resize_win_right(void);
+extern void resize_win_up(void);
+extern void switch_previous_workspace(void);
+extern void toggle_floating(void);
+extern void toggle_floating_global(void);
+extern void toggle_fullscreen(void);

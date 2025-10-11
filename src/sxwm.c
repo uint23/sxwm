@@ -33,6 +33,7 @@
 #include <X11/Xcursor/Xcursor.h>
 
 #include "defs.h"
+#include "extern.h"
 #include "parser.h"
 
 Client *add_client(Window w, int ws);

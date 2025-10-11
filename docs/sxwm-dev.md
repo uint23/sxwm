@@ -23,6 +23,7 @@
 | `linux/limits.h`            | Linux specific limits for various data types                    |
 |                             |                                                                 |
 | `defs.h`                    | Project structs, macros, constants                              |
+| `extern.h`                  | External functions to call to control wm                        |
 | `parser.h`                  | Config file parser components                                   |
 
 ## sxwm.c

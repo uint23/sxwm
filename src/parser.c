@@ -14,6 +14,7 @@
 #endif
 
 #include "parser.h"
+#include "extern.h"
 #include "defs.h"
 
 static const CommandEntry call_table[] = {
