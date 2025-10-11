@@ -13,13 +13,13 @@
  *  (C) Abhinav Prasai 2025
 */
 
-#include <err.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <X11/keysym.h>
@@ -1845,7 +1845,8 @@ void other_wm(void)
 
 int other_wm_err(Display *d, XErrorEvent *ee)
 {
-	errx(1, "can't start because another window manager is already running");
+	fprintf(stderr, "can't start because another window manager is already running");
+	exit(EXIT_FAILURE);
 	return 0;
 	(void)d;
 	(void)ee;
@@ -2196,7 +2197,8 @@ void send_wm_take_focus(Window w)
 void setup(void)
 {
 	if ((dpy = XOpenDisplay(NULL)) == False) {
-		errx(1, "can't open display.\nquitting...");
+		fprintf(stderr, "can't open display.\nquitting...");
+		exit(EXIT_FAILURE);
 	}
 	root = XDefaultRootWindow(dpy);
 
@@ -3324,13 +3326,9 @@ int main(int ac, char **av)
 			printf("%s\n%s\n%s\n", SXWM_VERSION, SXWM_AUTHOR, SXWM_LICINFO);
 			return EXIT_SUCCESS;
 		}
-		else if (strcmp(av[1], "-b") == 0 || strcmp(av[1], "--backup") == 0) {
-			puts("sxwm: using backup keybinds");
-		}
 		else {
-			puts("usage:\n");
-			puts("\t[-v || --version]: See the version of sxwm\n");
-			puts("\t[-b || --backup]: Use backup set of keybinds with sxwm\n");
+			printf("usage:\n");
+			printf("\t[-v || --version]: See the version of sxwm\n");
 			return EXIT_SUCCESS;
 		}
 	}

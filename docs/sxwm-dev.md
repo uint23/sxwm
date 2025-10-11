@@ -1,9 +1,9 @@
 # sxwm developer docs
 
-# Table of Contents
-1. [Headers](#headers)
-2. [sxwm.c](#sxwmc)
-    1. [Functions](#functions)
+## Table of Contents
+- [Headers](#headers)
+- [sxwm.c](#sxwmc)
+    - [Functions](#functions)
 
 
 
