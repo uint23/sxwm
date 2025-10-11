@@ -1,11 +1,11 @@
 # Colour Themes:
-focused_border_colour    : #c0cbff
-unfocused_border_colour  : #555555
-swap_border_colour       : #fff4c0
+focused_border_colour    : #000000
+unfocused_border_colour  : #444444
+swap_border_colour       : #eeeeee
 
 # General Options:
-gaps                    : 10
-border_width            : 1
+gaps                    : 5
+border_width            : 3
 master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
 resize_stack_amt        : 20
@@ -25,7 +25,6 @@ start_fullscreen        : "mpv", "vlc"
 # Keybinds:
 # Commands must be surrounded with ""
 # Function calls don't need this
-
 mod_key : super
 
 # Application Launchers:
