@@ -649,7 +649,7 @@ void focus_next_mon(void)
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->mon == target_mon && c->mapped && !c->fullscreen) {
+		if (c->mon == target_mon && c->mapped) {
 			target_client = c;
 			break;
 		}
@@ -681,7 +681,7 @@ void focus_prev_mon(void)
 	/* find the first window on the target monitor in current workspace */
 	Client *target_client = NULL;
 	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->mon == target_mon && c->mapped && !c->fullscreen) {
+		if (c->mon == target_mon && c->mapped) {
 			target_client = c;
 			break;
 		}
