@@ -160,10 +160,12 @@ This patch adds a check for null pointers before accessing window data.
 
 Update all relevant documentation if applicable:
 
-* `sxwm.1`
-* `README.md`
 * `default_sxwmrc`
-* `CHANGELOG.md`
+* `docs/CHANGELOG.md`
+* `docs/sxwm.1`
+* `docs/sxwm.md`
+* `docs/sxwm-dev.md`
+* `README.md`
 
 ---
 
