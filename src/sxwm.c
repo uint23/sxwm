@@ -2367,11 +2367,13 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(w);
 
-		if (raise_win && c->floating) {
-			XRaiseWindow(dpy, w);
+		if (raise_win) {
+			/* if floating_on_top, don't raise a tiled window above floats. */
+			if (c->floating || !user_config.floating_on_top) {
+				XRaiseWindow(dpy, w);
+			}
 		}
-
-		/* EWMH */
+		/* EWMH focus hint */
 		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
 				PropModeReplace, (unsigned char *)&w, 1);
 
@@ -2856,16 +2858,6 @@ void tile(void)
 		}
 		update_borders();
 	}
-
-	if (user_config.floating_on_top) {
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			if (c->mapped && c->floating && !c->fullscreen) {
-				XRaiseWindow(dpy, c->win);
-			}
-		}
-	}
-
-	update_borders();
 }
 
 void toggle_floating(void)
