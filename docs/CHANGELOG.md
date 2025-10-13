@@ -3,14 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 #### v1.7 (git)
-- **ADD**: Monocle layout
-- **ADD**: Developer documentation
-- **ADD**: `_NET_FRAME_EXTENTS` support
-- **ADD**: `start_fullscreen` which opens specified windows in fullscreen mode
-- **ADD**: Proper EWMH fullscreening
-- **ADD**: Switching to previous workspace
-- **ADD**: Keeping floating windows on top
-- **ADD**: Keyboard driven moving/resizing of windows
+- **NEW**: Monocle layout
+- **NEW**: Developer documentation
+- **NEW**: `_NET_FRAME_EXTENTS` support
+- **NEW**: `start_fullscreen` which opens specified windows in fullscreen mode
+- **NEW**: Proper EWMH fullscreening
+- **NEW**: Switching to previous workspace
+- **NEW**: Keeping floating windows on top
+- **NEW**: Keyboard driven moving/resizing of windows
 - **CHANGE**: Move externs from `defs.h`->`extern.h`
 - **CHANGE**: Remove unused macros and headers
 - **CHANGE**: Logo
