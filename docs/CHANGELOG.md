@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-#### v1.7 (git)
+#### v1.8 (git)
+
+#### v1.7 (current)
 - **NEW**: Monocle layout
 - **NEW**: Developer documentation
 - **NEW**: `_NET_FRAME_EXTENTS` support
@@ -25,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - **FIX**: Closing client won't warp cursor back
 - **FIX**: Build instructions
 
-#### v1.6 (current)
+#### v1.6
 - **NEW**: True multi-monitor support
 - **NEW**: Vertical stack resizing
 - **NEW**: Mouse warping
