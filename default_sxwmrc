@@ -8,7 +8,7 @@ gaps                    : 5
 border_width            : 3
 master_width            : 60 # Percentage of screen width
 resize_master_amount    : 1
-resize_stack_amt        : 20
+resize_stack_amount     : 20
 move_window_amount      : 50
 resize_window_amount    : 50
 snap_distance           : 5
@@ -52,7 +52,7 @@ call : mod + shift + period : move_next_mon
 
 # Master/Stack Movement
 call : mod + shift + j : master_next
-call : mod + shift + k : master_previous
+call : mod + shift + k : master_prev
 
 # Master Area Resize
 call : mod + l : master_increase
