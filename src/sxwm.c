@@ -174,7 +174,6 @@ Cursor cursor_move;
 Cursor cursor_resize;
 
 Client *workspaces[NUM_WORKSPACES] = {NULL};
-Config default_config;
 Config user_config;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
@@ -245,6 +244,7 @@ Client *add_client(Window w, int ws)
 	}
 	open_windows++;
 
+	/* subscribing to certain events */
 	Mask window_masks = EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask |
 		                StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	select_input(w, window_masks);
@@ -284,6 +284,7 @@ Client *add_client(Window w, int ws)
 		}
 	}
 
+	/* set client defaults */
 	c->mon = cursor_mon;
 	c->fixed = False;
 	c->floating = False;
@@ -300,6 +301,7 @@ Client *add_client(Window w, int ws)
 		current_mon = c->mon;
 	}
 
+	/* associate client with workspace n */
 	long desktop = ws;
 	XChangeProperty(dpy, w, _NET_WM_DESKTOP, XA_CARDINAL, 32,
 			        PropModeReplace, (unsigned char *)&desktop, 1);
@@ -326,6 +328,7 @@ void apply_fullscreen(Client *c, Bool on)
 		c->fullscreen = True;
 
 		int mon = c->mon;
+		/* make window fill mon */
 		XSetWindowBorderWidth(dpy, c->win, 0);
 		XMoveResizeWindow(dpy, c->win, mons[mon].x, mons[mon].y, mons[mon].w, mons[mon].h);
 		XRaiseWindow(dpy, c->win);
@@ -334,6 +337,7 @@ void apply_fullscreen(Client *c, Bool on)
 	else {
 		c->fullscreen = False;
 
+		/* restore win attributes */
 		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
 		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
 		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, False);
@@ -368,8 +372,9 @@ void change_workspace(int ws)
 	}
 
 	in_ws_switch = True;
-	XGrabServer(dpy);
+	XGrabServer(dpy); /* freeze rendering for tearless switching */
 
+	/* scratchpads stay visible */
 	Bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
 		if (scratchpads[i].client && scratchpads[i].enabled) {
@@ -479,7 +484,7 @@ void change_workspace(int ws)
 
 int check_parent(pid_t p, pid_t c)
 {
-	while (p != c && c != 0) {
+	while (p != c && c != 0) { /* walk proc tree until parent found */
 		c = get_parent_process(c);
 	}
 	return (int)c;
@@ -789,10 +794,10 @@ int get_workspace_for_window(Window w)
 
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
 {
-	if (w == root) {
+	if (w == root) { /* grabbing for wm */
 		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeAsync, GrabModeAsync, None, None);
 	}
-	else {
+	else { /* grabbing for windows */
 		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeSync, GrabModeAsync, None, None);
 	}
 }
@@ -1544,37 +1549,35 @@ void inc_gaps(void)
 
 void init_defaults(void)
 {
-	default_config.modkey = Mod4Mask;
-	default_config.gaps = 10;
-	default_config.border_width = 1;
-	default_config.border_foc_col = parse_col("#c0cbff");
-	default_config.border_ufoc_col = parse_col("#555555");
-	default_config.border_swap_col = parse_col("#fff4c0");
-	default_config.move_window_amt = 10;
-	default_config.resize_window_amt = 10;
+	user_config.modkey = Mod4Mask;
+	user_config.gaps = 10;
+	user_config.border_width = 1;
+	user_config.border_foc_col = parse_col("#c0cbff");
+	user_config.border_ufoc_col = parse_col("#555555");
+	user_config.border_swap_col = parse_col("#fff4c0");
+	user_config.move_window_amt = 10;
+	user_config.resize_window_amt = 10;
 
 	for (int i = 0; i < MAX_MONITORS; i++) {
-		default_config.master_width[i] = 50 / 100.0f;
+		user_config.master_width[i] = 50 / 100.0f;
 	}
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		default_config.can_be_swallowed[i] = NULL;
-		default_config.can_swallow[i] = NULL;
-		default_config.open_in_workspace[i] = NULL;
-		default_config.start_fullscreen[i] = NULL;
+		user_config.can_be_swallowed[i] = NULL;
+		user_config.can_swallow[i] = NULL;
+		user_config.open_in_workspace[i] = NULL;
+		user_config.start_fullscreen[i] = NULL;
 	}
 
-	default_config.motion_throttle = 60;
-	default_config.resize_master_amt = 5;
-	default_config.resize_stack_amt = 20;
-	default_config.snap_distance = 5;
-	default_config.n_binds = 0;
-	default_config.new_win_focus = True;
-	default_config.warp_cursor = True;
-	default_config.new_win_master = False;
-	default_config.floating_on_top = True;
-
-	user_config = default_config;
+	user_config.motion_throttle = 60;
+	user_config.resize_master_amt = 5;
+	user_config.resize_stack_amt = 20;
+	user_config.snap_distance = 5;
+	user_config.n_binds = 0;
+	user_config.new_win_focus = True;
+	user_config.warp_cursor = True;
+	user_config.new_win_master = False;
+	user_config.floating_on_top = True;
 }
 
 Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
