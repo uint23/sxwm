@@ -123,8 +123,13 @@ pkg install clang make xcb-util-keysyms xorgproto libxcursor libx11 libxinerama 
 
 ### Arch Linux (AUR)
 
+```sh
 yay -S sxwm
-# OR for latest features:
+```
+
+#### OR for latest features
+
+```sh
 yay -S sxwm-git
 ```
 
