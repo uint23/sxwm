@@ -1,0 +1,100 @@
+Author: Dragon-Chicken
+Date: 2025-10-10
+Description: Adds customisable gaps for when there's a single tiled window
+Commit Version: 2aa3e71 (update centre_window to account for border_width)
+
+Adds customisable gaps when there's a single tiled window in the workspace.
+Two new configuration options 'single_horizontal_gap' and 'single_vertical_gap', which can be edited in the sxwmrc file.
+Both options default 'gaps'.
+
+---
+
+diff --git a/src/defs.h b/src/defs.h
+index 9ebfecb..3175487 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -82,6 +82,8 @@ typedef struct Client {
+ typedef struct {
+ 	int modkey;
+ 	int gaps;
++	int single_horizontal_gap;
++	int single_vertical_gap;
+ 	int border_width;
+ 	long border_foc_col;
+ 	long border_ufoc_col;
+diff --git a/src/parser.c b/src/parser.c
+index 0c626f0..3de1857 100644
+--- a/src/parser.c
++++ b/src/parser.c
+@@ -242,6 +242,12 @@ found:
+ 		else if (!strcmp(key, "gaps")) {
+ 			cfg->gaps = atoi(rest);
+ 		}
++		else if (!strcmp(key, "single_horizontal_gap")) {
++			cfg->single_horizontal_gap = atoi(rest);
++		}
++		else if (!strcmp(key, "single_vertical_gap")) {
++			cfg->single_vertical_gap = atoi(rest);
++		}
+ 		else if (!strcmp(key, "border_width")) {
+ 			cfg->border_width = atoi(rest);
+ 		}
+diff --git a/src/sxwm.c b/src/sxwm.c
+index e10e940..0aa6fb6 100644
+--- a/src/sxwm.c
++++ b/src/sxwm.c
+@@ -1553,6 +1553,8 @@ void init_defaults(void)
+ {
+ 	user_config.modkey = Mod4Mask;
+ 	user_config.gaps = 10;
++	user_config.single_horizontal_gap = user_config.gaps;
++	user_config.single_vertical_gap = user_config.gaps;
+ 	user_config.border_width = 1;
+ 	user_config.border_foc_col = parse_col("#c0cbff");
+ 	user_config.border_ufoc_col = parse_col("#555555");
+@@ -2672,6 +2674,45 @@ void tile(void)
+ 		return;
+ 	}
+ 
++	/* gaps when only a single window is tiled */
++  	if (total == 1 && !monocle) {
++		for (Client *c = head; c; c = c->next) {
++
++    		/* skip if not a tiled window */
++    		if (!c->mapped || c->fullscreen || c->floating) {
++				continue;
++			}
++
++    		int border_width = user_config.border_width;
++
++    		int single_horizontal_gap = user_config.single_horizontal_gap;
++    		int single_vertical_gap = user_config.single_vertical_gap;
++
++	    	int mon = c->mon;
++    		int x = mons[mon].x + mons[mon].reserve_left + single_horizontal_gap;
++    		int y = mons[mon].y + mons[mon].reserve_top + single_vertical_gap;
++    		int w = mons[mon].w - mons[mon].reserve_left - mons[mon].reserve_right - 2 * single_horizontal_gap;
++    		int h = mons[mon].h - mons[mon].reserve_top - mons[mon].reserve_bottom - 2 * single_vertical_gap;
++
++    		XWindowChanges wc = {
++        		.x = x,
++    			.y = y,
++    			.width = MAX(1, w - 2 * border_width),
++    			.height = MAX(1, h - 2 * border_width),
++    			.border_width = border_width
++    		};
++      		XConfigureWindow(dpy, c->win,
++    			CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
++
++    		c->x = wc.x;
++    		c->y = wc.y;
++    		c->w = wc.width;
++    		c->h = wc.height;
++    	}
++		update_borders();
++		return;
++	}
++
+ 	if (monocle) {
+ 		for (Client *c = head; c; c = c->next) {
+ 			if (!c->mapped || c->fullscreen) {
