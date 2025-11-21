@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **NEW**: Switching to previous workspace
 - **NEW**: Keeping floating windows on top
 - **NEW**: Keyboard driven moving/resizing of windows
+- **CHANGE**: Windows focus now get saved per workspace
 - **CHANGE**: Move externs from `defs.h`->`extern.h`
 - **CHANGE**: Remove unused macros and headers
 - **CHANGE**: Logo

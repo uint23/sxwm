@@ -179,6 +179,7 @@ DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
 Client *swap_target = NULL;
 Client *focused = NULL;
+Client *ws_focused[NUM_WORKSPACES] = { NULL };
 EventHandler evtable[LASTEvent];
 Display *dpy;
 Window root;
@@ -296,6 +297,11 @@ Client *add_client(Window w, int ws)
 		c->floating = True;
 	}
 
+	/* remember first created client per workspace as a fallback */
+	if (!ws_focused[ws]) {
+		ws_focused[ws] = c;
+	}
+
 	if (ws == current_ws && !focused) {
 		focused = c;
 		current_mon = c->mon;
@@ -372,6 +378,9 @@ void change_workspace(int ws)
 	if (ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
 	}
+
+	/* remember last focus for workspace we are leaving */
+	ws_focused[current_ws] = focused;
 
 	in_ws_switch = True;
 	XGrabServer(dpy); /* freeze rendering for tearless switching */
@@ -451,27 +460,50 @@ void change_workspace(int ws)
 	}
 
 	tile();
-	focused = NULL;
 
+	/* restore last focused client for this workspace */
+	focused = ws_focused[current_ws];
+
+	if (focused) {
+		Client *found = NULL;
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			if (c == focused && c->mapped) {
+				found = c;
+				break;
+			}
+		}
+		if (!found) {
+			focused = NULL;
+		}
+	}
+
+	/* fallback: choose a mapped client on current_ws, preferring current_mon */
+	if (!focused && workspaces[current_ws]) {
+		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+			if (!c->mapped) {
+				continue;
+			}
+			if (c->mon == current_mon) {
+				focused = c;
+				break;
+			}
+			if (!focused) {
+				focused = c;
+			}
+		}
+		if (focused) {
+			current_mon = focused->mon;
+		}
+	}
+
+	/* try focus focus scratchpad if no other window available */
 	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-		if (visible_scratchpads[i] && scratchpads[i].client) {
+		if (!focused && visible_scratchpads[i] && scratchpads[i].client) {
 			focused = scratchpads[i].client;
 			break;
 		}
 	}
 
-	/* if no scratchpad found focus regular window */
-	if (!focused && workspaces[current_ws]) {
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			if (c->mon == current_mon) {
-				focused = c;
-				current_mon = c->mon;
-				break;
-			}
-			focused = c;
-			current_mon = c->mon;
-		}
-	}
 	set_input_focus(focused, False, True);
 
 	long current_desktop = current_ws;
@@ -1039,80 +1071,89 @@ void hdl_destroy_ntf(XEvent *xev)
 	Window w = xev->xdestroywindow.window;
 
 	for (int i = 0; i < NUM_WORKSPACES; i++) {
-		Client *prev = NULL, *c = workspaces[i];
+		Client *prev = NULL;
+		Client *c = workspaces[i];
+
 		while (c && c->win != w) {
 			prev = c;
 			c = c->next;
 		}
-		if (c) {
-			if (c->swallower) {
-				unswallow_window(c);
-			}
 
-			if (c->swallowed) {
-				Client *swallowed = c->swallowed;
-				c->swallowed = NULL;
-				swallowed->swallower = NULL;
+		if (!c) {
+			continue;
+		}
 
-				/* show swallowed window */
-				XMapWindow(dpy, swallowed->win);
-				swallowed->mapped = True;
-				focused = swallowed;
-			}
+		/* if client is swallowed, restore swallower */
+		if (c->swallower) {
+			unswallow_window(c);
+		}
 
-			if (focused == c) {
-				/* first try next on same monitor */
-				Client *tmp = c->next;
-				while (tmp && tmp->mon != current_mon) {
-					tmp = tmp->next;
-				}
+		/* if this client had swallowed another, restore that child */
+		if (c->swallowed) {
+			Client *swallowed = c->swallowed;
+			c->swallowed = NULL;
+			swallowed->swallower = NULL;
 
-				if (tmp) {
-					focused = tmp;
-				}
-				else {
-					/* then try previous on same monitor */
-					tmp = prev;
-					while (tmp && tmp->mon != current_mon) {
-						/* walk backwards */
-						Client *p = workspaces[i];
-						Client *p_prev = NULL;
-						while (p && p != tmp) {
-							p_prev = p;
-							p = p->next;
-						}
-						tmp = p_prev;
-					}
-					focused = tmp;
-				}
-
-				/* if nothing found on same monitor, unfocus */
-				if (!focused || focused->mon != current_mon) {
-					focused = NULL;
-				}
-			}
-
-			if (!prev) {
-				workspaces[i] = c->next;
-			}
-			else {
-				prev->next = c->next;
-			}
-
-			free(c);
-			update_net_client_list();
-			open_windows--;
+			swallowed->mapped = True;
 
 			if (i == current_ws) {
-				tile();
-				update_borders();
+				XMapWindow(dpy, swallowed->win);
+				set_input_focus(swallowed, False, True);
+			}
+			else {
+				ws_focused[i] = swallowed;
+			}
+		}
 
-				if (focused) {
-					set_input_focus(focused, True, True);
+		for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+			if (ws_focused[ws] == c) {
+				ws_focused[ws] = NULL;
+			}
+		}
+		if (focused == c) {
+			focused = NULL;
+		}
+
+		/* unlink from workspace list */
+		if (!prev) {
+			workspaces[i] = c->next;
+		}
+		else {
+			prev->next = c->next;
+		}
+
+		free(c);
+		update_net_client_list();
+		open_windows--;
+
+		if (i == current_ws) {
+			tile();
+			update_borders();
+
+			/* prefer same monitor */
+			Client *newf = NULL;
+			for (Client *p = workspaces[i]; p; p = p->next) {
+				if (!p->mapped) {
+					continue;
+				}
+				if (p->mon == current_mon) {
+					newf = p;
+					break;
+				}
+				if (!newf) {
+					newf = p;
 				}
 			}
-			return;
+
+			if (newf) {
+				set_input_focus(newf, True, True);
+			}
+			else {
+				set_input_focus(NULL, False, False);
+			}
 		}
+
+		return;
 	}
 }
 
@@ -1778,30 +1819,40 @@ void move_to_workspace(int ws)
 	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws) {
 		return;
 	}
-	XUnmapWindow(dpy, focused->win);
+
+	Client *moved = focused;
+	int from_ws = current_ws;
+
+	XUnmapWindow(dpy, moved->win);
 
 	/* remove from current list */
-	Client **pp = &workspaces[current_ws];
-	while (*pp && *pp != focused) {
+	Client **pp = &workspaces[from_ws];
+	while (*pp && *pp != moved) {
 		pp = &(*pp)->next;
 	}
 	if (*pp) {
-		*pp = focused->next;
+		*pp = moved->next;
 	}
 
 	/* push to target list */
-	focused->next = workspaces[ws];
-	workspaces[ws] = focused;
-	focused->ws = ws;
+	moved->next = workspaces[ws];
+	workspaces[ws] = moved;
+	moved->ws = ws;
 	long desktop = ws;
-	XChangeProperty(dpy, focused->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
-			        PropModeReplace, (unsigned char *)&desktop, 1);
+	XChangeProperty(dpy, moved->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+		        PropModeReplace, (unsigned char *)&desktop, 1);
 
-	/* tile current ws */
+	/* remember it as last-focused for the target workspace */
+	ws_focused[ws] = moved;
+
+	/* retile current workspace and pick a new focus there */
 	tile();
-	focused = workspaces[current_ws];
+	focused = workspaces[from_ws];
 	if (focused) {
 		set_input_focus(focused, False, False);
+	}
+	else {
+		set_input_focus(NULL, False, False);
 	}
 }
 
@@ -1876,7 +1927,7 @@ long parse_col(const char *hex)
 	}
 
 	/* possibly unsafe BUT i dont think it can cause any problems */
-	return col.pixel |= 0xff << 24;
+	return ((long)col.pixel) | (0xffL << 24);
 }
 
 void quit(void)
@@ -2364,6 +2415,12 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 	if (c && c->mapped) {
 		focused = c;
 		current_mon = c->mon;
+
+		/* update remembered focus */
+		if (c->ws >= 0 && c->ws < NUM_WORKSPACES) {
+			ws_focused[c->ws] = c;
+		}
+
 		Window w = find_toplevel(c->win);
 
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
@@ -2390,6 +2447,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 		XDeleteProperty(dpy, root, _NET_ACTIVE_WINDOW);
 
 		focused = NULL;
+		ws_focused[current_ws] = NULL;
 		update_borders();
 	}
 
@@ -2998,8 +3056,7 @@ void toggle_scratchpad(int n)
 		c->mapped = True;
 		scratchpads[n].enabled = True;
 
-		focused = c;
-		set_input_focus(focused, True, True);
+		set_input_focus(c, True, True);
 	}
 
 	tile();
@@ -3014,21 +3071,26 @@ void unswallow_window(Client *c)
 	}
 
 	Client *swallower = c->swallower;
+	int ws = swallower->ws;
 
 	/* unlink windows */
 	swallower->swallowed = NULL;
 	c->swallower = NULL;
 
-	if (swallower->win) {
-		XMapWindow(dpy, swallower->win);
-		swallower->mapped = True;
+	/* mark swallower as visible */
+	swallower->mapped = True;
 
-		focused = swallower;
-		set_input_focus(focused, False, True);
+	/* remember it as focused for that workspace */
+	if (ws >= 0 && ws < NUM_WORKSPACES) {
+		ws_focused[ws] = swallower;
 	}
 
-	tile();
-	update_borders();
+	if (ws == current_ws) {
+		XMapWindow(dpy, swallower->win);
+		set_input_focus(swallower, False, True);
+		tile();
+		update_borders();
+	}
 }
 
 void update_borders(void)
