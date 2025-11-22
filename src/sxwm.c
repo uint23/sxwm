@@ -770,7 +770,7 @@ pid_t get_parent_process(pid_t c)
 		return 0;
 	}
 
-	int no_error = fscanf(f, "%*u %*s %*c %u", &v);
+	int no_error = fscanf(f, "%*u %*s %*c %d", &v);
 	(void)no_error;
 	fclose(f);
 	return (pid_t)v;
