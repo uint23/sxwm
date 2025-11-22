@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 #### v1.8 (git)
+- **FIX**: Proper handling of struts of docks and other windows
 - **CHANGE**: Makefile is new and no longer contains legacy bloat
 - **CHANGE**: Windows focus now get saved per workspace
 
