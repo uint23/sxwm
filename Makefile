@@ -1,91 +1,56 @@
-# tools
-CC ?= cc
-PKG_CONFIG ?= pkg-config
+# paths
+PREFIX = /usr/local
+MANPREFIX = ${PREFIX}/share/man
 
-# install dirs
-PREFIX ?= /usr/local
-DESTDIR ?=
-BIN := sxwm
-MAN := docs/sxwm.1
-MAN_DIR := $(PREFIX)/share/man/man1
-XSESSIONS := $(DESTDIR)$(PREFIX)/share/xsessions
-
-# layout
-SRC_DIR := src/
-OBJ_DIR := build/
-SRC := $(wildcard $(SRC_DIR)/*.c)
-OBJ := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC))
-DEP := $(OBJ:.o=.d)
+# libs
+LIBS = -lX11 -lXinerama -lXcursor
 
 # flags
-CPPFLAGS ?= -Isrc -D_FORTIFY_SOURCE=2
+CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
+CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS}
+LDFLAGS = ${LIBS}
 
-# compile flags + warnings, hardening
-CFLAGS ?= -std=c99 -Os -pipe \
-          -Wall -Wextra -Wformat=2 -Werror=format-security \
-          -Wshadow -Wpointer-arith -Wcast-qual -Wwrite-strings \
-          -Wmissing-prototypes -Wstrict-prototypes -Wswitch-enum \
-          -Wundef -Wvla -fno-common -fno-strict-aliasing \
-          -fstack-protector-strong -fPIE
+# tools
+CC = cc
 
-# linker
-LDFLAGS ?= -Wl,-O1 -pie
+# files
+SRC = src/sxwm.c src/parser.c
+OBJ = build/sxwm.o build/parser.o
 
-# libraries
-LDLIBS ?= -lX11 -lXinerama -lXcursor
+all: sxwm
 
-# prefer pkg-confgi
-ifneq ($(shell $(PKG_CONFIG) --exists x11 xinerama xcursor && echo yes),)
-CPPFLAGS += $(shell $(PKG_CONFIG) --cflags x11 xinerama xcursor)
-LDLIBS := $(shell $(PKG_CONFIG) --libs   x11 xinerama xcursor)
-endif
+# rules
+build/sxwm.o: src/sxwm.c
+	mkdir -p build
+	${CC} -c ${CFLAGS} src/sxwm.c -o build/sxwm.o
 
-.PHONY: all clean install uninstall clangd
-.SUFFIXES:
+build/parser.o: src/parser.c
+	mkdir -p build
+	${CC} -c ${CFLAGS} src/parser.c -o build/parser.o
 
-all: $(BIN)
-
-$(BIN): $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c -o $@ $<
-
--include $(DEP)
-
-$(OBJ_DIR):
-	@mkdir -p $@
+sxwm: ${OBJ}
+	${CC} -o sxwm ${OBJ} ${LDFLAGS}
 
 clean:
-	@rm -rf $(OBJ_DIR) $(BIN)
+	rm -rf build sxwm
 
 install: all
-	@echo "installing $(BIN) to $(DESTDIR)$(PREFIX)/bin..."
-	@mkdir -p "$(DESTDIR)$(PREFIX)/bin"
-	@install -m 755 $(BIN) "$(DESTDIR)$(PREFIX)/bin/$(BIN)"
-	@echo "installing sxwm.desktop to $(XSESSIONS)..."
-	@mkdir -p "$(XSESSIONS)"
-	@install -m 644 docs/sxwm.desktop "$(XSESSIONS)/sxwm.desktop"
-	@echo "installing man page to $(DESTDIR)$(MAN_DIR)..."
-	@mkdir -p "$(DESTDIR)$(MAN_DIR)"
-	@install -m 644 $(MAN) "$(DESTDIR)$(MAN_DIR)/"
-	@echo "copying default config to $(DESTDIR)$(PREFIX)/share/sxwmrc..."
-	@mkdir -p "$(DESTDIR)$(PREFIX)/share"
-	@install -m 644 default_sxwmrc "$(DESTDIR)$(PREFIX)/share/sxwmrc"
-	@echo "installation complete :)"
+	mkdir -p ${DESTDIR}${PREFIX}/bin
+	cp -f sxwm ${DESTDIR}${PREFIX}/bin/
+	chmod 755 ${DESTDIR}${PREFIX}/bin/sxwm
+	mkdir -p ${DESTDIR}${MANPREFIX}/man1
+	cp -f docs/sxwm.1 ${DESTDIR}${MANPREFIX}/man1/
+	chmod 644 ${DESTDIR}${MANPREFIX}/man1/sxwm.1
+	mkdir -p ${DESTDIR}${PREFIX}/share
+	cp -f default_sxwmrc ${DESTDIR}${PREFIX}/share/sxwmrc
 
 uninstall:
-	@echo "uninstalling $(BIN) from $(DESTDIR)$(PREFIX)/bin..."
-	@rm -f "$(DESTDIR)$(PREFIX)/bin/$(BIN)"
-	@echo "uninstalling sxwm.desktop from $(XSESSIONS)..."
-	@rm -f "$(XSESSIONS)/sxwm.desktop"
-	@echo "uninstalling man page from $(DESTDIR)$(MAN_DIR)..."
-	@rm -f "$(DESTDIR)$(MAN_DIR)/$(MAN)"
-	@echo "uninstallation complete :)"
+	rm -f ${DESTDIR}${PREFIX}/bin/sxwm \
+	      ${DESTDIR}${MANPREFIX}/man1/sxwm.1 \
+	      ${DESTDIR}${PREFIX}/share/sxwmrc
 
-# dev tools
 clangd:
-	@echo "generating compile_flags.txt"
-	@rm -f compile_flags.txt
-	@for flag in $(CPPFLAGS) $(CFLAGS); do echo $$flag >> compile_flags.txt; done
+	rm -f compile_flags.txt
+	for f in ${CFLAGS}; do echo $$f >> compile_flags.txt; done
+
+.PHONY: all clean install uninstall clangd
