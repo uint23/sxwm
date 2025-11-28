@@ -10,6 +10,10 @@ CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
 CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS}
 LDFLAGS = ${LIBS}
 
+# uncomment this block for OpenBASED
+# CFLAGS += -I/usr/X11R6/include
+# LDFLAGS += -L/usr/X11R6/lib
+
 # tools
 CC = cc
 
