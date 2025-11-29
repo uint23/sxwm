@@ -9,16 +9,15 @@
 
 ---
 
-## Contributions & Issues
+## Contributions and Issues
 
-Please read [the contribution guide](docs/CONTRIBUTIONS.md)
-Please read [the developer docs](docs/sxwm-dev.md)
+Please read [the contribution guide](docs/CONTRIBUTIONS.md) and [the developer docs](docs/sxwm-dev.md).
 
 ---
 
-## Features & Configuration
+## Features and Configuration
 
-Check [the man page markdown for relevant info](docs/sxwm.md)
+Check [the man page markdown](docs/sxwm.md) for relevant info.
 
 ---
 
@@ -27,98 +26,107 @@ Check [the man page markdown for relevant info](docs/sxwm.md)
 - `libX11`
 - `Xinerama`
 - `XCursor`
-- `CC`
-- `Make`
+- `cc` (the C compiler)
+- GNU Make (`gmake`)
 
-<details>
-<summary>Debian / Ubuntu / Linux Mint</summary>
-<pre><code>sudo apt update
-sudo apt install libx11-dev libxcursor-dev libxinerama-dev build-essential</code></pre>
-</details>
+## Platform-specific installation
 
-<details>
-<summary>Arch Linux / Manjaro</summary>
-<pre><code>sudo pacman -Syy
-sudo pacman -S libx11 libxinerama gcc make</code></pre>
-</details>
+### Debian-based distros (Debian, Ubuntu, Linux Mint etc.)
+```
+sudo apt update
+sudo apt install libx11-dev libxcursor-dev libxinerama-dev build-essential
+```
 
-<details>
-<summary>Gentoo</summary>
-<pre><code>sudo emerge --ask x11-libs/libX11 x11-libs/libXinerama sys-devel/gcc sys-devel/make
+### Arch-based distros (Arch Linux, Manjaro, CachyOS etc.)
+
+```
+sudo pacman -Syy
+sudo pacman -S libx11 libxinerama gcc make
+```
+
+### Gentoo
+
+```
+sudo emerge --ask x11-libs/libX11 x11-libs/libXinerama sys-devel/gcc sys-devel/make
 sudo emaint -a sync
-</code></pre>
-</details>
+```
 
-<details>
-<summary>Void Linux</summary>
-<pre><code>sudo xbps-install -S
-sudo xbps-install libX11-devel libXinerama-devel libXcursor-devel gcc make</code></pre>
-</details>
+### Void Linux
 
-<details>
-<summary>Fedora / RHEL / AlmaLinux / Rocky</summary>
-<pre><code>sudo dnf update
-sudo dnf install libX11-devel libXcursor-devel libXinerama-devel gcc make</code></pre>
-</details>
+```
+sudo xbps-install -S
+sudo xbps-install libX11-devel libXinerama-devel libXcursor-devel gcc make
+```
 
-<details>
-<summary>OpenSUSE (Leap / Tumbleweed)</summary>
-<pre><code>sudo zypper refresh
-sudo zypper install libX11-devel libXinerama-devel gcc make</code></pre>
-</details>
+### RHEL-based distros (Fedora, RHEL, Alma Linux, Rocky Linux etc.)
 
-<details>
-<summary>Alpine Linux</summary>
-<pre><code>doas apk update
-doas apk add libx11-dev libxinerama-dev libxcursor-dev gcc make musl-dev linux-headers</code></pre>
-</details>
+```
+sudo dnf update
+sudo dnf install libX11-devel libXcursor-devel libXinerama-devel gcc make
+```
 
-<details>
-<summary>NixOS</summary>
-<pre><code>buildInputs = [
+### openSUSE
+
+```
+sudo zypper refresh
+sudo zypper install libX11-devel libXinerama-devel gcc make
+```
+
+### Alpine Linux
+
+```
+doas apk update
+doas apk add libx11-dev libxinerama-dev libxcursor-dev gcc make musl-dev linux-headers
+```
+
+### NixOS
+
+```
+buildInputs = [
   pkgs.xorg.libX11
   pkgs.xorg.libXinerama
   pkgs.libgcc
   pkgs.gnumake
 ];
 sudo nixos-rebuild switch
-</code></pre>
-</details>
+```
 
-<details>
-<summary>Slackware</summary>
-<pre><code>slackpkg update
-slackpkg install gcc make libX11 libXinerama</code></pre>
-</details>
+### Slackware
 
-<details>
-<summary>OpenBSD</summary>
-<pre><code>doas pkg_add gmake</code></pre>
-You will also need the X sets (<code>xbase</code>, <code>xfonts</code>, <code>xserv</code> and <code>xshare</code>) installed.
-When you make the code, use <code>gmake</code> instead of <code>make</code> (which will be BSD make). Use the following command to build: <code>gmake CFLAGS="-I/usr/X11R6/include -Wall -Wextra -O3 -Isrc" LDFLAGS="-L/usr/X11R6/lib -lX11 -lXinerama -lXcursor"</code>
-</details>
+```
+slackpkg update
+slackpkg install gcc make libX11 libXinerama
+```
 
-<details>
-<summary>FreeBSD</summary>
-<pre><code># If you use doas or su instead of sudo, modify the following commands accordingly.
+### FreeBSD
+
+```
 sudo pkg update
-sudo pkg install gcc gmake libX11 libXinerama</code></pre>
-</details>
+sudo pkg install gcc gmake libX11 libXinerama
+```
 
-<details>
-<summary>Termux</summary>
-<pre><code>pkg install x11-repo
+### OpenBSD
+
+```
+doas pkg_add gmake
+```
+
+You will also need the X sets (`xbase`, `xfonts`, `xserv` and `xshare`) installed.
+
+### Termux
+
+```
+pkg install x11-repo
 pkg update
 pkg install clang make xcb-util-keysyms xorgproto libxcursor libx11 libxinerama libandroid-wordexp
-# add `LDFLAGS="${LDFLAGS} -landroid-wordexp"` in the make command
-</code></pre>
-</details>
+```
 
 ---
 
-## Build & Install
+## Build and Install
 
 > [!NOTE]
+> 
 > I don't maintain any packages. Use with caution!
 
 ### Arch Linux (AUR)
@@ -154,29 +162,39 @@ Add to your `~/.xinitrc`:
 ```sh
 exec sxwm
 ```
-Or use the `sxwm.desktop` file
+or use the `sxwm.desktop` file.
 
 ---
 ## Makefile Targets
 
 | Target                | Description                                              |
 |-----------------------|----------------------------------------------------------|
-| `make` / `make all`   | Build the `sxwm` binary                                  |
-| `make clean`          | Remove build artifacts                                   |
-| `make install`        | Install `sxwm` to `$(PREFIX)/bin` (default `/usr/local`) |
-| `make uninstall`      | Remove installed binary                                  |
-| `make clean install`  | Clean then install                                       |
+| `make` / `make all`   | Build the sxwm binary using detected X11 paths and platform-specific flags                                  |
+| `make clean`          | Remove build artifacts (`$(BUILDDIR)` and binary)                                   |
+| `make distclean`      | Same as clean, plus remove `compile_flags.txt` used for editor support |
+| `make install`        | Install sxwm to `$(PREFIX)/bin` (default `/usr/local`) and man/page/config files |
+| `make uninstall`      | Remove installed binary, man page, and default config                                  |
+| `make clean install`  | Clean build artifacts then install                                       |
+| `make clangd`         | Generate `compile_flags.txt` for editor/IDE integration |
 
-> Override install directory with `PREFIX`:
-> ```sh
-> make install PREFIX=$HOME/.local
-> ```
+> [!NOTE]
+> 
+> - The Makefile auto-detects the platform (Linux, BSD, Termux/Android) and sets `CPPFLAGS` and `LDFLAGS` accordingly.
+> - You can override compiler/linker flags without modifying the Makefile using the various USER_* flags:
+>   ```sh
+>   make USER_CFLAGS="-O2 -Wall" USER_LDFLAGS="-L/opt/lib" USER_LDLIBS="-lm"
+>   ```
+> - You can change the install prefix:
+>   ```sh
+>   make install PREFIX=$HOME/.local
+>   ```
+> - The build directory can be customized via `BUILDDIR` (default `build`).
 
 ---
 
-## Thanks & Inspiration
+## Thanks and Inspiration
 
-- [dwm](https://dwm.suckless.org) - Tiling & source code
+- [dwm](https://dwm.suckless.org) - Tiling and source code
 - [i3](https://i3wm.org) - Easy configuration
 - [sowm](https://github.com/dylanaraps/sowm) - README inspiration
 - [tinywm](http://incise.org/tinywm.html) - Minimal X11 WM
