@@ -1,60 +1,107 @@
-# paths
-PREFIX = /usr/local
-MANPREFIX = ${PREFIX}/share/man
+# ----------------------------------------
+# Paths
+# ----------------------------------------
+PREFIX     ?= /usr/local
+SHAREDIR   ?= $(PREFIX)/share
+MANPREFIX  ?= $(SHAREDIR)/man
+BUILDDIR   ?= build
 
-# libs
-LIBS = -lX11 -lXinerama -lXcursor
+# ----------------------------------------
+# OS and platform detection
+# ----------------------------------------
+UNAME_S := $(shell uname -s)
 
-# flags
-CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
-CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS}
-LDFLAGS = ${LIBS}
+X11_INC :=
+X11_LIB :=
+EXTRA_LDLIBS :=
 
-# uncomment this block for OpenBASED
-# CFLAGS += -I/usr/X11R6/include
-# LDFLAGS += -L/usr/X11R6/lib
+ifeq ($(UNAME_S),Linux)
+    ifneq ($(shell test -d /data/data/com.termux/files/usr && echo yes),)
+        X11_INC := /data/data/com.termux/files/usr/include
+        X11_LIB := /data/data/com.termux/files/usr/lib
 
-# tools
-CC = cc
+        EXTRA_LDLIBS := -landroid-wordexp
+        $(info Detected Termux/Android, using $(X11_INC) $(X11_LIB))
+    else
+        X11_INC := /usr/include
+        X11_LIB := /usr/lib
+        $(info Detected Linux, using $(X11_INC) $(X11_LIB))
+    endif
+endif
 
-# files
-SRC = src/sxwm.c src/parser.c
-OBJ = build/sxwm.o build/parser.o
+ifeq ($(findstring BSD,$(UNAME_S)),BSD)
+    ifneq ("$(wildcard /usr/X11R6)","")
+        X11_INC := /usr/X11R6/include
+        X11_LIB := /usr/X11R6/lib
+    else ifneq ("$(wildcard /usr/local)","")
+        X11_INC := /usr/local/include
+        X11_LIB := /usr/local/lib
+    else
+        $(warning No X11 paths found on BSD, please set X11_INC/X11_LIB manually)
+    endif
+    $(info Detected BSD, using $(X11_INC) $(X11_LIB))
+endif
 
-all: sxwm
+# ----------------------------------------
+# Compiler configuration
+# ----------------------------------------
+CC        ?= cc
+CPPFLAGS  := -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -I$(X11_INC)
+CFLAGS    := -std=c99 -pedantic -Wall -Wextra -Werror -Os
+LDFLAGS   := -L$(X11_LIB)
+LDLIBS    := -lX11 -lXinerama -lXcursor $(EXTRA_LDLIBS)
 
-# rules
-build/sxwm.o: src/sxwm.c
-	mkdir -p build
-	${CC} -c ${CFLAGS} src/sxwm.c -o build/sxwm.o
+override CFLAGS   += $(USER_CFLAGS)
+override LDFLAGS  += $(USER_LDFLAGS)
+override LDLIBS   += $(USER_LDLIBS)
 
-build/parser.o: src/parser.c
-	mkdir -p build
-	${CC} -c ${CFLAGS} src/parser.c -o build/parser.o
+# ----------------------------------------
+# Files
+# ----------------------------------------
+SRC := src/sxwm.c src/parser.c
+OBJ := $(SRC:src/%.c=$(BUILDDIR)/%.o)
+BIN := sxwm
 
-sxwm: ${OBJ}
-	${CC} -o sxwm ${OBJ} ${LDFLAGS}
+# ----------------------------------------
+# Build rules
+# ----------------------------------------
+all: $(BIN)
 
-clean:
-	rm -rf build sxwm
+$(BUILDDIR):
+	mkdir -p $@
 
-install: all
-	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f sxwm ${DESTDIR}${PREFIX}/bin/
-	chmod 755 ${DESTDIR}${PREFIX}/bin/sxwm
-	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-	cp -f docs/sxwm.1 ${DESTDIR}${MANPREFIX}/man1/
-	chmod 644 ${DESTDIR}${MANPREFIX}/man1/sxwm.1
-	mkdir -p ${DESTDIR}${PREFIX}/share
-	cp -f default_sxwmrc ${DESTDIR}${PREFIX}/share/sxwmrc
+$(BUILDDIR)/%.o: src/%.c | $(BUILDDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(BIN): $(OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+# ----------------------------------------
+# Installation
+# ----------------------------------------
+install: $(BIN)
+	install -Dm755 $(BIN)         $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	install -Dm644 docs/sxwm.1    $(DESTDIR)$(MANPREFIX)/man1/sxwm.1
+	install -Dm644 default_sxwmrc $(DESTDIR)$(SHAREDIR)/sxwmrc
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/sxwm \
-	      ${DESTDIR}${MANPREFIX}/man1/sxwm.1 \
-	      ${DESTDIR}${PREFIX}/share/sxwmrc
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) \
+	      $(DESTDIR)$(MANPREFIX)/man1/sxwm.1 \
+	      $(DESTDIR)$(SHAREDIR)/sxwmrc
 
-clangd:
+# ----------------------------------------
+# Cleanup
+# ----------------------------------------
+clean:
+	rm -rf $(BUILDDIR) $(BIN)
+
+distclean: clean
 	rm -f compile_flags.txt
-	for f in ${CFLAGS}; do echo $$f >> compile_flags.txt; done
 
-.PHONY: all clean install uninstall clangd
+# ----------------------------------------
+# Clangd / editor support
+# ----------------------------------------
+clangd:
+	printf "%s\n" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) > compile_flags.txt
+
+.PHONY: all clean distclean install uninstall clangd
