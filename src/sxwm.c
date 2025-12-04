@@ -1943,10 +1943,10 @@ void quit(void)
 	*/
 
 	XSync(dpy, False);
-	XCloseDisplay(dpy);
 	XFreeCursor(dpy, cursor_move);
 	XFreeCursor(dpy, cursor_normal);
 	XFreeCursor(dpy, cursor_resize);
+	XCloseDisplay(dpy);
 	puts("quitting...");
 	running = False;
 }
