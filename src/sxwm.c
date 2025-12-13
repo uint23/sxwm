@@ -2633,17 +2633,13 @@ void tile(void)
 	update_struts();
 	Client *head = workspaces[current_ws];
 	int total = 0;
-	Bool fullscreen_present = False;
 
 	for (Client *c = head; c; c = c->next) {
 		if (c->mapped && !c->floating && !c->fullscreen)
 			total++;
-
-		if (!c->floating && c->fullscreen)
-			fullscreen_present = True;
 	}
 
-	if (total == 1 && fullscreen_present)
+	if (total == 0)
 		return;
 
 	if (monocle) {
