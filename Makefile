@@ -1,3 +1,6 @@
+# tools
+CC = cc
+
 # paths
 PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
@@ -13,9 +16,6 @@ LDFLAGS = ${LIBS}
 # uncomment this block for OpenBSD
 # CFLAGS += -I/usr/X11R6/include
 # LDFLAGS += -L/usr/X11R6/lib
-
-# tools
-CC = cc
 
 # files
 SRC = src/sxwm.c src/parser.c
