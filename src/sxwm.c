@@ -179,7 +179,7 @@ DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
 Client *swap_target = NULL;
 Client *focused = NULL;
-Client *ws_focused[NUM_WORKSPACES] = { NULL };
+Client *ws_focused[NUM_WORKSPACES] = {NULL};
 EventHandler evtable[LASTEvent];
 Display *dpy;
 Window root;
@@ -1226,7 +1226,7 @@ void hdl_map_req(XEvent *xev)
 	Atom *types = NULL;
 	Bool should_float = False;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 8, False, XA_ATOM, &type, &format,
+	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &type, &format,
 				           &n_items, &after, (unsigned char **)&types) == Success && types) {
 
 		for (unsigned long i = 0; i < n_items; i++) {
@@ -1454,7 +1454,6 @@ void hdl_motion(XEvent *xev)
 		unsigned int mask;
 		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
 
-		Client *last_swap_target = NULL;
 		Client *new_target = NULL;
 
 		for (Client *c = workspaces[current_ws]; c; c = c->next) {
@@ -1465,19 +1464,30 @@ void hdl_motion(XEvent *xev)
 				new_target = c;
 				break;
 			}
+			Window root_ret2, parent;
+			Window *children;
+			unsigned int n_children;
+			if (XQueryTree(dpy, child, &root_ret2, &parent, &children, &n_children)) {
+				if (children) {
+					XFree(children);
+				}
+				if (parent == c->win) {
+					new_target = c;
+					break;
+				}
+			}
 		}
 
-		if (new_target != last_swap_target) {
-			if (last_swap_target) {
+		if (new_target != swap_target) {
+			if (swap_target) {
 				XSetWindowBorder(
-						dpy, last_swap_target->win, (last_swap_target == focused ?
+						dpy, swap_target->win, (swap_target == focused ?
 						user_config.border_foc_col : user_config.border_ufoc_col)
 				);
 			}
 			if (new_target) {
 				XSetWindowBorder(dpy, new_target->win, user_config.border_swap_col);
 			}
-			last_swap_target = new_target;
 		}
 
 		swap_target = new_target;
@@ -1926,7 +1936,8 @@ long parse_col(const char *hex)
 		return WhitePixel(dpy, DefaultScreen(dpy));
 	}
 
-	/* possibly unsafe BUT i dont think it can cause any problems */
+	/* possibly unsafe BUT i dont think it can cause any problems.
+	 * used to make sure borders are opaque with compositor like picom */
 	return ((long)col.pixel) | (0xffL << 24);
 }
 
@@ -2531,23 +2542,32 @@ void spawn(const char * const *argv)
 		return;
 	}
 
+	/* initialize all command pointers to NULL for safe cleanup */
+	for (int i = 0; i < cmd_count; i++) {
+		commands[i] = NULL;
+	}
+
 	int cmd_idx = 0;
 	int arg_start = 0;
 	for (int i = 0; i <= argc; i++) {
 		if (!argv[i] || strcmp(argv[i], "|") == 0) {
 			int len = i - arg_start;
 			const char **cmd_args = malloc((len + 1) * sizeof(char *));
+
 			if (!cmd_args) {
 				perror("malloc cmd_args");
+
 				for (int j = 0; j < cmd_idx; j++) {
 					free(commands[j]);
 				}
 				free(commands);
 				return;
 			}
+
 			for (int j = 0; j < len; j++) {
 				cmd_args[j] = argv[arg_start + j];
 			}
+
 			cmd_args[len] = NULL;
 			commands[cmd_idx++] = cmd_args;
 			arg_start = i + 1;
@@ -2557,11 +2577,18 @@ void spawn(const char * const *argv)
 	int (*pipes)[2] = malloc(sizeof(int[2]) * (cmd_count - 1));
 	if (!pipes) {
 		perror("malloc pipes");
+
+		for (int j = 0; j < cmd_count; j++) {
+			free(commands[j]);
+		}
+		free(commands);
 		return;
 	}
+
 	for (int i = 0; i < cmd_count - 1; i++) {
 		if (pipe(pipes[i]) == -1) {
 			perror("pipe");
+
 			for (int j = 0; j < cmd_count; j++) {
 				free(commands[j]);
 			}
@@ -2572,13 +2599,19 @@ void spawn(const char * const *argv)
 	}
 
 	for (int i = 0; i < cmd_count; i++) {
+		if (!commands[i] || !commands[i][0]) {
+			continue;
+		}
+
 		pid_t pid = fork();
 		if (pid < 0) {
 			perror("fork");
+
 			for (int k = 0; k < cmd_count - 1; k++) {
 				close(pipes[k][0]);
 				close(pipes[k][1]);
 			}
+
 			for (int j = 0; j < cmd_count; j++) {
 				free(commands[j]);
 			}
@@ -2592,6 +2625,7 @@ void spawn(const char * const *argv)
 			if (i > 0) {
 				dup2(pipes[i - 1][0], STDIN_FILENO);
 			}
+
 			if (i < cmd_count - 1) {
 				dup2(pipes[i][1], STDOUT_FILENO);
 			}
@@ -3555,3 +3589,4 @@ int main(int ac, char **av)
 	run();
 	return EXIT_SUCCESS;
 }
+
