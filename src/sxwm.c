@@ -320,7 +320,8 @@ void apply_fullscreen(Client *c, Bool on)
 
 	if (on) {
 		XWindowAttributes win_attr;
-		XGetWindowAttributes(dpy, c->win, &win_attr);
+		if (!XGetWindowAttributes(dpy, c->win, &win_attr))
+			return;
 
 		c->orig_x = win_attr.x;
 		c->orig_y = win_attr.y;
@@ -329,7 +330,7 @@ void apply_fullscreen(Client *c, Bool on)
 
 		c->fullscreen = True;
 
-		int mon = c->mon;
+		int mon = CLAMP(c->mon, 0, n_mons - 1);
 		/* make window fill mon */
 		XSetWindowBorderWidth(dpy, c->win, 0);
 		XMoveResizeWindow(dpy, c->win, mons[mon].x, mons[mon].y, mons[mon].w, mons[mon].h);
@@ -367,7 +368,7 @@ void centre_window(void)
 	if (!focused || !focused->mapped || !focused->floating)
 		return;
 
-	focused->mon = get_monitor_for(focused);
+	focused->mon = CLAMP(get_monitor_for(focused), 0, n_mons - 1);
 	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
 	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
 	x -= user_config.border_width;
@@ -587,6 +588,9 @@ Client *find_client(Window w)
 
 Window find_toplevel(Window w)
 {
+	if (!w || w == None)
+		return root;
+
 	Window root_win = None;
 	Window parent;
 	Window *kids;
@@ -597,7 +601,8 @@ Window find_toplevel(Window w)
 			break;
 		if (XQueryTree(dpy, w, &root_win, &parent, &kids, &n_kids) == 0)
 			break;
-		XFree(kids);
+		if (kids)
+			XFree(kids);
 		if (parent == root_win || parent == None)
 			break;
 		w = parent;
@@ -2170,7 +2175,7 @@ void send_wm_take_focus(Window w)
 
 void setup(void)
 {
-	if ((dpy = XOpenDisplay(NULL)) == False) {
+	if ((dpy = XOpenDisplay(NULL)) == NULL) {
 		fprintf(stderr, "can't open display.\nquitting...");
 		exit(EXIT_FAILURE);
 	}
@@ -2328,7 +2333,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 {
 	if (c && c->mapped) {
 		focused = c;
-		current_mon = c->mon;
+		current_mon = CLAMP(c->mon, 0, n_mons - 1);
 
 		/* update remembered focus */
 		if (c->ws >= 0 && c->ws < NUM_WORKSPACES)
@@ -2650,7 +2655,7 @@ void tile(void)
 			int border_width = user_config.border_width;
 			int gaps = user_config.gaps;
 
-			int mon = c->mon;
+			int mon = CLAMP(c->mon, 0, n_mons - 1);
 			int x = mons[mon].x + mons[mon].reserve_left + gaps;
 			int y = mons[mon].y + mons[mon].reserve_top + gaps;
 			int w = mons[mon].w - mons[mon].reserve_left - mons[mon].reserve_right - 2 * gaps;
@@ -2942,7 +2947,7 @@ void toggle_scratchpad(int n)
 		XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 	}
 
-	c->mon = focused ? focused->mon : current_mon;
+	c->mon = CLAMP(focused ? focused->mon : current_mon, 0, n_mons - 1);
 
 	if (scratchpads[n].enabled) {
 		XUnmapWindow(dpy, c->win);
@@ -3051,6 +3056,10 @@ void update_mons(void)
 	if (XineramaIsActive(dpy)) {
 		info = XineramaQueryScreens(dpy, &n_mons);
 		mons = malloc(sizeof *mons * n_mons);
+		if (!mons) {
+			fputs("sxwm: failed to allocate monitors\n", stderr);
+			exit(EXIT_FAILURE);
+		}
 		for (int i = 0; i < n_mons; i++) {
 			mons[i].x = info[i].x_org;
 			mons[i].y = info[i].y_org;
@@ -3062,6 +3071,10 @@ void update_mons(void)
 	else {
 		n_mons = 1;
 		mons = malloc(sizeof *mons);
+		if (!mons) {
+			fputs("sxwm: failed to allocate monitor\n", stderr);
+			exit(EXIT_FAILURE);
+		}
 		mons[0].x = 0;
 		mons[0].y = 0;
 		mons[0].w = scr_width;
