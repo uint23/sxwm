@@ -19,18 +19,24 @@ foo(dpy, root
 
 ### Blocks
 
-* All blocks of C code must be wrapped in curly braces `{}`.
+* All blocks of C code must be wrapped in curly braces `{}` unless it only goes down 1 line.
+If it is also an if-else chain and there is at leas 1 block which has more than 1 line, all
+blocks must use `{}`.
 * Each statement must be on its own line.
 * Always add a space between keywords and the opening parenthesis.
 
 **Example**:
 
 ```c
-if (x) {
+if (x)
     y();
+
+if (y) {
+    z();
+    a();
 }
 else {
-    z();
+    return;
 }
 ```
 
