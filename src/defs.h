@@ -124,3 +124,4 @@ typedef struct {
 	Client *client;
 	Bool enabled;
 } Scratchpad;
+
