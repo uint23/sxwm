@@ -237,9 +237,8 @@ Client *add_client(Window w, int ws)
 		}
 		else {
 			Client *tail = workspaces[ws];
-			while (tail->next) {
+			while (tail->next)
 				tail = tail->next;
-			}
 			tail->next = c;
 		}
 	}
@@ -334,6 +333,12 @@ void apply_fullscreen(Client *c, Bool on)
 		/* make window fill mon */
 		XSetWindowBorderWidth(dpy, c->win, 0);
 		XMoveResizeWindow(dpy, c->win, mons[mon].x, mons[mon].y, mons[mon].w, mons[mon].h);
+
+		c->x = mons[mon].x;
+		c->y = mons[mon].y;
+		c->w = mons[mon].w;
+		c->h = mons[mon].h;
+
 		XRaiseWindow(dpy, c->win);
 		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, True);
 	}
@@ -344,6 +349,11 @@ void apply_fullscreen(Client *c, Bool on)
 		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
 		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
 		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, False);
+
+		c->x = c->orig_x;
+		c->y = c->orig_y;
+		c->w = c->orig_w;
+		c->h = c->orig_h;
 
 		if (!c->floating)
 			c->mon = get_monitor_for(c);
@@ -428,9 +438,9 @@ void change_workspace(int ws)
 
 			/* remove from old workspace */
 			Client **pp = &workspaces[c->ws];
-			while (*pp && *pp != c) {
+			while (*pp && *pp != c)
 				pp = &(*pp)->next;
-			}
+
 			if (*pp)
 				*pp = c->next;
 
@@ -505,9 +515,9 @@ void change_workspace(int ws)
 
 int check_parent(pid_t p, pid_t c)
 {
-	while (p != c && c != 0) { /* walk proc tree until parent found */
+	while (p != c && c != 0) /* walk proc tree until parent found */
 		c = get_parent_process(c);
-	}
+
 	return (int)c;
 }
 
@@ -567,12 +577,11 @@ void dec_gaps(void)
 
 Client *find_client(Window w)
 {
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
+		for (Client *c = workspaces[ws]; c; c = c->next)
 			if (c->win == w)
 				return c;
-		}
-	}
+
 	return NULL;
 }
 
@@ -605,9 +614,9 @@ void focus_next(void)
 	Client *c = start;
 
 	/* loop until we find a mapped client or return to start */
-	do {
+	do
 		c = c->next ? c->next : workspaces[current_ws];
-	} while (( !c->mapped || c->mon != current_mon ) && c != start);
+	while (( !c->mapped || c->mon != current_mon ) && c != start);
 
 	/* if we return to start: */
 	if (!c->mapped || c->mon != current_mon)
@@ -741,9 +750,8 @@ pid_t get_parent_process(pid_t c)
 	char buf[256];
 
 	snprintf(buf, sizeof(buf), "/proc/%u/stat", (unsigned)c);
-	if (!(f = fopen(buf, "r"))) {
+	if (!(f = fopen(buf, "r")))
 		return 0;
-	}
 
 	int no_error = fscanf(f, "%*u %*s %*c %d", &v);
 	(void)no_error;
@@ -800,12 +808,10 @@ int get_workspace_for_window(Window w)
 
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
 {
-	if (w == root) { /* grabbing for wm */
+	if (w == root) /* grabbing for wm */
 		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeAsync, GrabModeAsync, None, None);
-	}
-	else { /* grabbing for windows */
+	else /* grabbing for windows */
 		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeSync, GrabModeAsync, None, None);
-	}
 }
 
 void grab_keys(void)
@@ -966,15 +972,12 @@ void hdl_client_msg(XEvent *xev)
 
 			if (atoms[i] == _NET_WM_STATE_FULLSCREEN) {
 				Bool want = c->fullscreen;
-				if (action == 0) {
+				if (action == 0)
 					want = False;
-				}
-				else if (action == 1) {
+				else if (action == 1)
 					want = True;
-				}
-				else if (action == 2) {
+				else if (action == 2)
 					want = !want;
-				}
 
 				apply_fullscreen(c, want);
 
@@ -1001,12 +1004,10 @@ void hdl_config_req(XEvent *xev)
 	XConfigureRequestEvent *config_ev = &xev->xconfigurerequest;
 	Client *c = NULL;
 
-	for (int i = 0; i < NUM_WORKSPACES && !c; i++) {
-		for (c = workspaces[i]; c; c = c->next) {
+	for (int i = 0; i < NUM_WORKSPACES && !c; i++)
+		for (c = workspaces[i]; c; c = c->next)
 			if (c->win == config_ev->window)
 				break;
-		}
-	}
 
 	if (!c || c->floating || c->fullscreen) {
 		/* allow client to configure itself */
@@ -1066,20 +1067,18 @@ void hdl_destroy_ntf(XEvent *xev)
 			}
 		}
 
-		for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (int ws = 0; ws < NUM_WORKSPACES; ws++)
 			if (ws_focused[ws] == c)
 				ws_focused[ws] = NULL;
-		}
+
 		if (focused == c)
 			focused = NULL;
 
 		/* unlink from workspace list */
-		if (!prev) {
+		if (!prev)
 			workspaces[i] = c->next;
-		}
-		else {
+		else
 			prev->next = c->next;
-		}
 
 		free(c);
 		update_net_client_list();
@@ -1181,7 +1180,7 @@ void hdl_map_req(XEvent *xev)
 	Bool should_float = False;
 
 	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &type, &format,
-				           &n_items, &after, (unsigned char **)&types) == Success && types) {
+	    &n_items, &after, (unsigned char **)&types) == Success && types) {
 
 		for (unsigned long i = 0; i < n_items; i++) {
 			if (types[i] == _NET_WM_WINDOW_TYPE_DOCK) {
@@ -1283,12 +1282,10 @@ void hdl_map_req(XEvent *xev)
 		return;
 
 	/* map & borders */
-	if (!global_floating && !c->floating) {
+	if (!global_floating && !c->floating)
 		tile();
-	}
-	else if (c->floating) {
+	else if (c->floating)
 		XRaiseWindow(dpy, w);
-	}
 
 	/* check for swallowing opportunities */
 	{
@@ -1372,9 +1369,8 @@ void hdl_motion(XEvent *xev)
 	XMotionEvent *motion_ev = &xev->xmotion;
 
 	if ((drag_mode == DRAG_NONE || !drag_client) ||
-			(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle))) {
+		(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle)))
 		return;
-	}
 	last_motion_time = motion_ev->time;
 
 	/* figure out which monitor the pointer is in right now */
@@ -1551,9 +1547,8 @@ void init_defaults(void)
 	user_config.move_window_amt = 10;
 	user_config.resize_window_amt = 10;
 
-	for (int i = 0; i < MAX_MONITORS; i++) {
+	for (int i = 0; i < MAX_MONITORS; i++)
 		user_config.master_width[i] = 50 / 100.0f;
-	}
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
 		user_config.can_be_swallowed[i] = NULL;
@@ -1624,16 +1619,19 @@ void move_master_next(void)
 	first->next = NULL;
 
 	Client *tail = workspaces[current_ws];
-	while (tail->next) {
+	while (tail->next)
 		tail = tail->next;
-	}
+	
 	tail->next = first;
 
 	tile();
+
 	if (user_config.warp_cursor && old_focused)
 		warp_cursor(old_focused);
+
 	if (old_focused)
 		send_wm_take_focus(old_focused->win);
+
 	update_borders();
 }
 
@@ -1662,6 +1660,7 @@ void move_master_prev(void)
 		warp_cursor(old_focused);
 	if (old_focused)
 		send_wm_take_focus(old_focused->win);
+
 	update_borders();
 }
 
@@ -1763,9 +1762,9 @@ void move_to_workspace(int ws)
 
 	/* remove from current list */
 	Client **pp = &workspaces[from_ws];
-	while (*pp && *pp != moved) {
+	while (*pp && *pp != moved)
 		pp = &(*pp)->next;
-	}
+
 	if (*pp)
 		*pp = moved->next;
 
@@ -1783,18 +1782,17 @@ void move_to_workspace(int ws)
 	/* retile current workspace and pick a new focus there */
 	tile();
 	focused = workspaces[from_ws];
-	if (focused) {
+	if (focused)
 		set_input_focus(focused, False, False);
-	}
-	else {
+	else
 		set_input_focus(NULL, False, False);
-	}
 }
 
 void move_win_down(void)
 {
 	if (!focused || !focused->floating)
 		return;
+
 	focused->y += user_config.move_window_amt;
 	XMoveWindow(dpy, focused->win, focused->x, focused->y);
 }
@@ -1803,6 +1801,7 @@ void move_win_left(void)
 {
 	if (!focused || !focused->floating)
 		return;
+
 	focused->x -= user_config.move_window_amt;
 	XMoveWindow(dpy, focused->win, focused->x, focused->y);
 }
@@ -1819,6 +1818,7 @@ void move_win_up(void)
 {
 	if (!focused || !focused->floating)
 		return;
+
 	focused->y -= user_config.move_window_amt;
 	XMoveWindow(dpy, focused->win, focused->x, focused->y);
 }
@@ -1957,11 +1957,9 @@ void reload_config(void)
 	/* regrab all key/button bindings */
 	grab_keys();
 	XUngrabButton(dpy, AnyButton, AnyModifier, root);
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
+		for (Client *c = workspaces[ws]; c; c = c->next)
 			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
-		}
-	}
 
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
@@ -2014,6 +2012,7 @@ void resize_master_add(void)
 
 	if (*mw < MF_MAX - 0.001f)
 		*mw += ((float)user_config.resize_master_amt / 100);
+
 	tile();
 	update_borders();
 }
@@ -2026,6 +2025,7 @@ void resize_master_sub(void)
 
 	if (*mw > MF_MIN + 0.001f)
 		*mw -= ((float)user_config.resize_master_amt / 100);
+
 	tile();
 	update_borders();
 }
@@ -2056,6 +2056,7 @@ void resize_stack_sub(void)
 
 	if (raw_new < min_raw)
 		raw_new = min_raw;
+
 	focused->custom_stack_height = raw_new;
 	tile();
 }
@@ -2147,6 +2148,7 @@ void send_wm_take_focus(Window w)
 	Atom wm_take_focus = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
 	Atom *protos;
 	int n;
+
 	if (XGetWMProtocols(dpy, w, &protos, &n)) {
 		for (int i = 0; i < n; i++) {
 			if (protos[i] == wm_take_focus) {
@@ -2209,9 +2211,8 @@ void setup(void)
 	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
 	XSync(dpy, False);
 
-	for (int i = 0; i < LASTEvent; i++) {
+	for (int i = 0; i < LASTEvent; i++)
 		evtable[i] = hdl_dummy;
-	}
 	evtable[ButtonPress] = hdl_button;
 	evtable[ButtonRelease] = hdl_button_release;
 	evtable[ClientMessage] = hdl_client_msg;
@@ -2351,7 +2352,8 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 
 		if (warp && user_config.warp_cursor)
 			warp_cursor(c);
-	} else {
+	}
+	else {
 		/* no client */
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 		XDeleteProperty(dpy, root, _NET_ACTIVE_WINDOW);
@@ -2419,9 +2421,8 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 void spawn(const char * const *argv)
 {
 	int argc = 0;
-	while (argv[argc]) {
+	while (argv[argc])
 		argc++;
-	}
 
 	int cmd_count = 1;
 	for (int i = 0; i < argc; i++) {
@@ -2436,9 +2437,8 @@ void spawn(const char * const *argv)
 	}
 
 	/* initialize all command pointers to NULL for safe cleanup */
-	for (int i = 0; i < cmd_count; i++) {
+	for (int i = 0; i < cmd_count; i++)
 		commands[i] = NULL;
-	}
 
 	int cmd_idx = 0;
 	int arg_start = 0;
@@ -2450,16 +2450,15 @@ void spawn(const char * const *argv)
 			if (!cmd_args) {
 				perror("malloc cmd_args");
 
-				for (int j = 0; j < cmd_idx; j++) {
+				for (int j = 0; j < cmd_idx; j++)
 					free(commands[j]);
-				}
+
 				free(commands);
 				return;
 			}
 
-			for (int j = 0; j < len; j++) {
+			for (int j = 0; j < len; j++)
 				cmd_args[j] = argv[arg_start + j];
-			}
 
 			cmd_args[len] = NULL;
 			commands[cmd_idx++] = cmd_args;
@@ -2471,9 +2470,9 @@ void spawn(const char * const *argv)
 	if (!pipes) {
 		perror("malloc pipes");
 
-		for (int j = 0; j < cmd_count; j++) {
+		for (int j = 0; j < cmd_count; j++)
 			free(commands[j]);
-		}
+
 		free(commands);
 		return;
 	}
@@ -2482,9 +2481,9 @@ void spawn(const char * const *argv)
 		if (pipe(pipes[i]) == -1) {
 			perror("pipe");
 
-			for (int j = 0; j < cmd_count; j++) {
+			for (int j = 0; j < cmd_count; j++)
 				free(commands[j]);
-			}
+
 			free(commands);
 			free(pipes);
 			return;
@@ -2504,9 +2503,9 @@ void spawn(const char * const *argv)
 				close(pipes[k][1]);
 			}
 
-			for (int j = 0; j < cmd_count; j++) {
+			for (int j = 0; j < cmd_count; j++)
 				free(commands[j]);
-			}
+
 			free(commands);
 			free(pipes);
 			return;
@@ -2536,9 +2535,9 @@ void spawn(const char * const *argv)
 		close(pipes[i][1]);
 	}
 
-	for (int i = 0; i < cmd_count; i++) {
+	for (int i = 0; i < cmd_count; i++)
 		free(commands[i]);
-	}
+
 	free(commands);
 	free(pipes);
 }
@@ -2550,9 +2549,9 @@ void startup_exec(void)
 			const char **argv = build_argv(user_config.to_run[i]);
 			if (argv) {
 				spawn(argv);
-				for (int j = 0; argv[j]; j++) {
+				for (int j = 0; argv[j]; j++)
 					free((void*)(uintptr_t)argv[j]);
-				}
+
 				free(argv);
 			}
 		}
@@ -2593,12 +2592,11 @@ void swap_clients(Client *a, Client *b)
 	Client **head = &workspaces[current_ws];
 	Client **pa = head, **pb = head;
 
-	while (*pa && *pa != a) {
+	while (*pa && *pa != a)
 		pa = &(*pa)->next;
-	}
-	while (*pb && *pb != b) {
+
+	while (*pb && *pb != b)
 		pb = &(*pb)->next;
-	}
 
 	if (!*pa || !*pb)
 		return;
@@ -2640,6 +2638,7 @@ void tile(void)
 	for (Client *c = head; c; c = c->next) {
 		if (c->mapped && !c->floating && !c->fullscreen)
 			total++;
+
 		if (!c->floating && c->fullscreen)
 			fullscreen_present = True;
 	}
@@ -2743,12 +2742,10 @@ void tile(void)
 		int heights_final[MAX_CLIENTS] = {0};
 
 		for (int i = 1 ; i < n_tileable; i++) { /* i=1 - we are excluding master */
-			if (tileable[i]->custom_stack_height > 0) {
+			if (tileable[i]->custom_stack_height > 0)
 				total_fixed_heights += tileable[i]->custom_stack_height;
-			}
-			else {
+			else
 				n_auto++;
-			}
 		}
 
 		int total_vgaps = (n_stack - 1) * gaps;
@@ -2772,18 +2769,17 @@ void tile(void)
 		}
 		else {
 			for (int i = 1; i < n_tileable; i++) {
-				if (tileable[i]->custom_stack_height > 0) {
+				if (tileable[i]->custom_stack_height > 0)
 					heights_final[i] = tileable[i]->custom_stack_height;
-				}
-				else {
+				else
 					heights_final[i] = min_stack_height;
-				}
 			}
 		}
+
 		int total_height = total_vgaps;
-		for (int i = 1; i < n_tileable; i++) {
+		for (int i = 1; i < n_tileable; i++)
 			total_height += heights_final[i];
-		}
+
 		int overfill = total_height - tile_height;
 		if (overfill > 0) {
 			/* shrink from top down, excluding bottom */
@@ -2796,9 +2792,9 @@ void tile(void)
 
 		/* if its not perfectly filled stretch bottom to absorb remainder */
 		int actual_height = total_vgaps;
-		for (int i = 1; i < n_tileable; i++) {
+		for (int i = 1; i < n_tileable; i++)
 			actual_height += heights_final[i];
-		}
+
 		int shortfall = tile_height - actual_height;
 		if (shortfall > 0)
 			heights_final[n_tileable - 1] += shortfall;
@@ -2866,6 +2862,7 @@ void toggle_floating(void)
 
 	if (!focused->floating)
 		focused->mon = get_monitor_for(focused);
+
 	tile();
 	update_borders();
 
@@ -2909,6 +2906,7 @@ void toggle_fullscreen(void)
 {
 	if (!focused)
 		return;
+
 	apply_fullscreen(focused, !focused->fullscreen);
 }
 
@@ -2931,9 +2929,9 @@ void toggle_scratchpad(int n)
 	if (c->ws != current_ws) {
 		/* unlink from old workspace */
 		Client **pp = &workspaces[c->ws];
-		while (*pp && *pp != c) {
+		while (*pp && *pp != c)
 			pp = &(*pp)->next;
-		}
+
 		if (*pp)
 			*pp = c->next;
 
@@ -2943,8 +2941,7 @@ void toggle_scratchpad(int n)
 		c->ws = current_ws;
 
 		long desktop = current_ws;
-		XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
-				        PropModeReplace, (unsigned char *)&desktop, 1);
+		XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 	}
 
 	c->mon = focused ? focused->mon : current_mon;
@@ -2997,9 +2994,9 @@ void unswallow_window(Client *c)
 
 void update_borders(void)
 {
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+	for (Client *c = workspaces[current_ws]; c; c = c->next)
 		XSetWindowBorder(dpy, c->win, (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
-	}
+
 	if (focused) {
 		Window w = focused->win;
 		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
@@ -3080,13 +3077,11 @@ void update_net_client_list(void)
 {
 	Window wins[MAX_CLIENTS];
 	int n = 0;
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
+		for (Client *c = workspaces[ws]; c; c = c->next)
 			wins[n++] = c->win;
-		}
-	}
-	XChangeProperty(dpy, root, _NET_CLIENT_LIST, XA_WINDOW, 32,
-			        PropModeReplace, (unsigned char *)wins, n);
+
+	XChangeProperty(dpy, root, _NET_CLIENT_LIST, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
 }
 
 void update_struts(void)
@@ -3120,9 +3115,8 @@ void update_struts(void)
 
 		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM,
 			&actual_type, &actual_format, &n_items, &bytes_after,
-			(unsigned char **)&types) != Success || !types) {
+			(unsigned char **)&types) != Success || !types)
 			continue;
-		}
 
 		Bool is_dock = False;
 		for (unsigned long j = 0; j < n_items; j++) {
@@ -3254,6 +3248,7 @@ void update_struts(void)
 
 	if (children)
 		XFree(children);
+
 	update_workarea();
 }
 
@@ -3268,8 +3263,7 @@ void update_workarea(void)
 		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
 	}
 
-	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32,
-			        PropModeReplace, (unsigned char *)workarea, n_mons * 4);
+	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, n_mons * 4);
 }
 
 void warp_cursor(Client *c)
@@ -3334,13 +3328,10 @@ void window_set_ewmh_state(Window w, Atom state, Bool add)
 	if (add && list_len < 16)
 		list[list_len++] = state;
 
-	if (list_len == 0) {
+	if (list_len == 0)
 		XDeleteProperty(dpy, w, _NET_WM_STATE);
-	}
-	else {
-		XChangeProperty(dpy, w, _NET_WM_STATE, XA_ATOM, 32,
-				        PropModeReplace, (unsigned char*)list, list_len);
-	}
+	else
+		XChangeProperty(dpy, w, _NET_WM_STATE, XA_ATOM, 32, PropModeReplace, (unsigned char*)list, list_len);
 
 	if (atoms)
 		XFree(atoms);	
@@ -3403,9 +3394,8 @@ int xerr(Display *d, XErrorEvent *ee)
 	};
 
 	for (size_t i = 0; i < sizeof(ignore) / sizeof(ignore[0]); i++) {
-		if ((ignore[i].req == 0 || ignore[i].req == ee->request_code) && (ignore[i].code == ee->error_code)) {
+		if ((ignore[i].req == 0 || ignore[i].req == ee->request_code) && (ignore[i].code == ee->error_code))
 			return 0;
-		}
 	}
 
 	return 0;
@@ -3415,12 +3405,10 @@ int xerr(Display *d, XErrorEvent *ee)
 
 void xev_case(XEvent *xev)
 {
-	if (xev->type >= 0 && xev->type < LASTEvent) {
+	if (xev->type >= 0 && xev->type < LASTEvent)
 		evtable[xev->type](xev);
-	}
-	else {
+	else
 		fprintf(stderr, "sxwm: invalid event type: %d\n", xev->type);
-	}
 }
 
 int main(int ac, char **av)
