@@ -3,9 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 #### v1.8 (git)
-- **FIX**: Proper handling of struts of docks and other windows
-- **CHANGE**: Makefile is new and no longer contains legacy bloat
-- **CHANGE**: Windows focus now get saved per workspace
+- **NEW**: POSIX compliant Makefile
+- **NEW**: Single window gaps patch (@Dragon-Chicken)
+- **NEW**: Per-workspace focus
+- **CHANGE**: Removed legacy Makefile bloat
+- **CHANGE**: Parser refactored
+- **CHANGE**: Removed wordexp dependency for simpler command parsing
+- **CHANGE**: Code style updated
+- **FIX**: Monocle layout not raising focused window
+- **FIX**: Monocle layout tiling floating windows
+- **FIX**: Fullscreen windows breaking tiling for new windows
+- **FIX**: Closing window focuses master instead of previous window
+- **FIX**: Strut handling for docks and panels
+- **FIX**: `centre_window` now accounts for border width
+- **FIX**: Typos in default config causing unknown function errors
+- **FIX**: General hardening
 
 #### v1.7 (current)
 - **NEW**: Monocle layout
