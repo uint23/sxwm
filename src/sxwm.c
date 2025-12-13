@@ -1358,7 +1358,7 @@ void hdl_map_req(XEvent *xev)
 
 	if (user_config.new_win_focus) {
 		focused = c;
-		set_input_focus(focused, False, True);
+		set_input_focus(focused, True, True);
 		return;
 	}
 	update_borders();
@@ -2340,8 +2340,8 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 		send_wm_take_focus(w);
 
 		if (raise_win) {
-			/* if floating_on_top, don't raise a tiled window above floats. */
-			if (c->floating || !user_config.floating_on_top)
+			/* always raise in monocle, otherwise respect floating_on_top */
+			if (monocle || c->floating || !user_config.floating_on_top)
 				XRaiseWindow(dpy, w);
 		}
 		/* EWMH focus hint */
@@ -2644,7 +2644,7 @@ void tile(void)
 
 	if (monocle) {
 		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->fullscreen)
+			if (!c->mapped || c->floating || c->fullscreen)
 				continue;
 
 			int border_width = user_config.border_width;
@@ -2665,13 +2665,15 @@ void tile(void)
 			};
 			XConfigureWindow(dpy, c->win,
 					CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
-			XRaiseWindow(dpy, c->win);
 
 			c->x = wc.x;
 			c->y = wc.y;
 			c->w = wc.width;
 			c->h = wc.height;
 		}
+
+		if (focused && focused->mapped && !focused->floating && !focused->fullscreen)
+			XRaiseWindow(dpy, focused->win);
 
 		update_borders();
 		return;
