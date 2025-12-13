@@ -10,7 +10,7 @@
  *  knowledge of C or programming, although most people who
  *  will use this will probably be programmers :)
  *
- *  (C) Abhinav Prasai 2025
+ *  > uint 2025
 */
 
 #include <signal.h>
