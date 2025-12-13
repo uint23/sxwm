@@ -1089,25 +1089,23 @@ void hdl_destroy_ntf(XEvent *xev)
 			tile();
 			update_borders();
 
-			/* prefer same monitor */
-			Client *newf = NULL;
-			for (Client *p = workspaces[i]; p; p = p->next) {
-				if (!p->mapped)
-					continue;
-				if (p->mon == current_mon) {
-					newf = p;
+			/* prefer previous window else next */
+			Client *foc_new = NULL;
+			if (prev && prev->mapped && prev->mon == current_mon)
+				foc_new = prev;
+			else {
+				for (Client *p = workspaces[i]; p; p = p->next) {
+					if (!p->mapped || p->mon != current_mon)
+						continue;
+					foc_new = p;
 					break;
 				}
-				if (!newf)
-					newf = p;
 			}
 
-			if (newf) {
-				set_input_focus(newf, True, True);
-			}
-			else {
+			if (foc_new)
+				set_input_focus(foc_new, True, True);
+			else
 				set_input_focus(NULL, False, False);
-			}
 		}
 
 		return;
@@ -1869,10 +1867,10 @@ void quit(void)
 	/* Kill all clients on exit...
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-	    for (Client *c = workspaces[ws]; c; c = c->next) {
-	        XUnmapWindow(dpy, c->win);
-	        XKillClient(dpy, c->win);
-	    }
+		for (Client *c = workspaces[ws]; c; c = c->next) {
+			XUnmapWindow(dpy, c->win);
+			XKillClient(dpy, c->win);
+		}
 	}
 	*/
 
