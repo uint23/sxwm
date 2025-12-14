@@ -553,6 +553,8 @@ static char **split_cmd(const char *cmd, int *out_argc)
 		}
 		else if (*p == '"')
 			state = (state == NORMAL) ? IN_QUOTE : NORMAL;
+		else if (*p == '\'')
+			state = (state == NORMAL) ? IN_QUOTE : NORMAL;
 		else
 			token[toklen++] = *p;
 	}
