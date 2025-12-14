@@ -10,12 +10,8 @@ LIBS = -lX11 -lXinerama -lXcursor
 
 # flags
 CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
-CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -fdiagnostics-color=always
-LDFLAGS = ${LIBS}
-
-# uncomment this block for OpenBSD
-# CFLAGS += -I/usr/X11R6/include
-# LDFLAGS += -L/usr/X11R6/lib
+CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -fdiagnostics-color=always -I/usr/X11R6/include
+LDFLAGS = ${LIBS} -L/usr/X11R6/lib
 
 # files
 SRC = src/sxwm.c src/parser.c
