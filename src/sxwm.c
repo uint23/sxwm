@@ -135,39 +135,41 @@ Bool window_should_start_fullscreen(Window w);
 int xerr(Display *d, XErrorEvent *ee);
 void xev_case(XEvent *xev);
 
-Atom _NET_ACTIVE_WINDOW;
-Atom _NET_CURRENT_DESKTOP;
-Atom _NET_SUPPORTED;
-Atom _NET_WM_STATE;
-Atom _NET_WM_STATE_FULLSCREEN;
-Atom WM_STATE;
-Atom _NET_WM_WINDOW_TYPE;
-Atom _NET_WORKAREA;
-Atom WM_DELETE_WINDOW;
-Atom _NET_WM_STRUT;
-Atom _NET_WM_STRUT_PARTIAL;
-Atom _NET_SUPPORTING_WM_CHECK;
-Atom _NET_WM_NAME;
-Atom UTF8_STRING;
-
-Atom _NET_WM_DESKTOP;
-Atom _NET_CLIENT_LIST;
-Atom _NET_FRAME_EXTENTS;
-Atom _NET_NUMBER_OF_DESKTOPS;
-Atom _NET_DESKTOP_NAMES;
-Atom _NET_WM_PID;
-
-Atom _NET_WM_WINDOW_TYPE_DOCK;
-Atom _NET_WM_WINDOW_TYPE_UTILITY;
-Atom _NET_WM_WINDOW_TYPE_DIALOG;
-Atom _NET_WM_WINDOW_TYPE_TOOLBAR;
-Atom _NET_WM_WINDOW_TYPE_SPLASH;
-Atom _NET_WM_WINDOW_TYPE_POPUP_MENU;
-Atom _NET_WM_WINDOW_TYPE_MENU;
-Atom _NET_WM_WINDOW_TYPE_DROPDOWN_MENU;
-Atom _NET_WM_WINDOW_TYPE_TOOLTIP;
-Atom _NET_WM_WINDOW_TYPE_NOTIFICATION;
-Atom _NET_WM_STATE_MODAL;
+static Atom atoms[ATOM_COUNT];
+static const char *atom_names[ATOM_COUNT] = {
+	[ATOM_NET_ACTIVE_WINDOW]             = "_NET_ACTIVE_WINDOW",
+	[ATOM_NET_CURRENT_DESKTOP]           = "_NET_CURRENT_DESKTOP",
+	[ATOM_NET_SUPPORTED]                 = "_NET_SUPPORTED",
+	[ATOM_NET_WM_STATE]                  = "_NET_WM_STATE",
+	[ATOM_NET_WM_STATE_FULLSCREEN]       = "_NET_WM_STATE_FULLSCREEN",
+	[ATOM_WM_STATE]                      = "WM_STATE",
+	[ATOM_NET_WM_WINDOW_TYPE]            = "_NET_WM_WINDOW_TYPE",
+	[ATOM_NET_WORKAREA]                  = "_NET_WORKAREA",
+	[ATOM_WM_DELETE_WINDOW]              = "WM_DELETE_WINDOW",
+	[ATOM_NET_WM_STRUT]                  = "_NET_WM_STRUT",
+	[ATOM_NET_WM_STRUT_PARTIAL]          = "_NET_WM_STRUT_PARTIAL",
+	[ATOM_NET_SUPPORTING_WM_CHECK]       = "_NET_SUPPORTING_WM_CHECK",
+	[ATOM_NET_WM_NAME]                   = "_NET_WM_NAME",
+	[ATOM_UTF8_STRING]                   = "UTF8_STRING",
+	[ATOM_NET_WM_DESKTOP]                = "_NET_WM_DESKTOP",
+	[ATOM_NET_CLIENT_LIST]               = "_NET_CLIENT_LIST",
+	[ATOM_NET_FRAME_EXTENTS]             = "_NET_FRAME_EXTENTS",
+	[ATOM_NET_NUMBER_OF_DESKTOPS]        = "_NET_NUMBER_OF_DESKTOPS",
+	[ATOM_NET_DESKTOP_NAMES]             = "_NET_DESKTOP_NAMES",
+	[ATOM_NET_WM_PID]                    = "_NET_WM_PID",
+	[ATOM_NET_WM_WINDOW_TYPE_DOCK]       = "_NET_WM_WINDOW_TYPE_DOCK",
+	[ATOM_NET_WM_WINDOW_TYPE_UTILITY]    = "_NET_WM_WINDOW_TYPE_UTILITY",
+	[ATOM_NET_WM_WINDOW_TYPE_DIALOG]     = "_NET_WM_WINDOW_TYPE_DIALOG",
+	[ATOM_NET_WM_WINDOW_TYPE_TOOLBAR]    = "_NET_WM_WINDOW_TYPE_TOOLBAR",
+	[ATOM_NET_WM_WINDOW_TYPE_SPLASH]     = "_NET_WM_WINDOW_TYPE_SPLASH",
+	[ATOM_NET_WM_WINDOW_TYPE_POPUP_MENU] = "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+	[ATOM_NET_WM_WINDOW_TYPE_MENU]       = "_NET_WM_WINDOW_TYPE_MENU",
+	[ATOM_NET_WM_WINDOW_TYPE_DROPDOWN_MENU] = "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
+	[ATOM_NET_WM_WINDOW_TYPE_TOOLTIP]    = "_NET_WM_WINDOW_TYPE_TOOLTIP",
+	[ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION] = "_NET_WM_WINDOW_TYPE_NOTIFICATION",
+	[ATOM_NET_WM_STATE_MODAL]            = "_NET_WM_STATE_MODAL",
+	[ATOM_WM_PROTOCOLS]                  = "WM_PROTOCOLS",
+};
 
 Cursor cursor_normal;
 Cursor cursor_move;
@@ -254,7 +256,7 @@ Client *add_client(Window w, int ws)
 	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
 
 	/* allow for more graceful exitting */
-	Atom protos[] = {WM_DELETE_WINDOW};
+	Atom protos[] = {atoms[ATOM_WM_DELETE_WINDOW]};
 	XSetWMProtocols(dpy, w, protos, 1);
 
 	XWindowAttributes wa;
@@ -306,7 +308,7 @@ Client *add_client(Window w, int ws)
 
 	/* associate client with workspace n */
 	long desktop = ws;
-	XChangeProperty(dpy, w, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+	XChangeProperty(dpy, w, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
 			        PropModeReplace, (unsigned char *)&desktop, 1);
 	XRaiseWindow(dpy, w);
 	return c;
@@ -341,7 +343,7 @@ void apply_fullscreen(Client *c, Bool on)
 		c->h = mons[mon].h;
 
 		XRaiseWindow(dpy, c->win);
-		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, True);
+		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], True);
 	}
 	else {
 		c->fullscreen = False;
@@ -349,7 +351,7 @@ void apply_fullscreen(Client *c, Bool on)
 		/* restore win attributes */
 		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
 		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
-		window_set_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN, False);
+		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], False);
 
 		c->x = c->orig_x;
 		c->y = c->orig_y;
@@ -456,7 +458,7 @@ void change_workspace(int ws)
 
 			/* Update desktop property */
 			long desktop = current_ws;
-			XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+			XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
 					        PropModeReplace, (unsigned char *)&desktop, 1);
 		}
 	}
@@ -505,7 +507,7 @@ void change_workspace(int ws)
 	set_input_focus(focused, False, True);
 
 	long current_desktop = current_ws;
-	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
+	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
                     PropModeReplace, (unsigned char *)&current_desktop, 1);
 	update_client_desktop_properties();
 
@@ -545,15 +547,14 @@ void close_focused(void)
 	/* get number of protocols a window possesses and check if any == WM_DELETE_WINDOW (supports it) */
 	if (XGetWMProtocols(dpy, focused->win, &protocols, &n_protocols) && protocols) {
 		for (int i = 0; i < n_protocols; i++) {
-			if (protocols[i] == WM_DELETE_WINDOW) {
-				Atom WM_PROTOCOLS =  XInternAtom(dpy, "WM_PROTOCOLS", False);
+			if (protocols[i] == atoms[ATOM_WM_DELETE_WINDOW]) {
 				XEvent ev = {.xclient = {
 					.type = ClientMessage,
 					.window = focused->win,
-					.message_type = WM_PROTOCOLS,
+					.message_type = atoms[ATOM_WM_PROTOCOLS],
 					.format = 32}};
 
-				ev.xclient.data.l[0] = WM_DELETE_WINDOW;
+				ev.xclient.data.l[0] = atoms[ATOM_WM_DELETE_WINDOW];
 				ev.xclient.data.l[1] = CurrentTime;
 				XSendEvent(dpy, focused->win, False, NoEventMask, &ev);
 				XFree(protocols);
@@ -772,7 +773,7 @@ pid_t get_pid(Window w)
 	unsigned long n_items, bytes_after;
 	unsigned char *prop = NULL;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_PID, 0, 1, False, XA_CARDINAL, &actual_type,
+	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_PID], 0, 1, False, XA_CARDINAL, &actual_type,
 				           &actual_format, &n_items, &bytes_after, &prop) == Success && prop) {
 		if (actual_format == 32 && n_items == 1)
 			pid = *(pid_t *)prop;
@@ -952,13 +953,13 @@ void hdl_button_release(XEvent *xev)
 
 void hdl_client_msg(XEvent *xev)
 {
-	if (xev->xclient.message_type == _NET_CURRENT_DESKTOP) {
+	if (xev->xclient.message_type == atoms[ATOM_NET_CURRENT_DESKTOP]) {
 		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
 		return;
 	}
 
-	if (xev->xclient.message_type == _NET_WM_STATE) {
+	if (xev->xclient.message_type == atoms[ATOM_NET_WM_STATE]) {
 		XClientMessageEvent *client_msg_ev = &xev->xclient;
 		Window w = client_msg_ev->window;
 		Client *c = find_client(find_toplevel(w));
@@ -970,12 +971,12 @@ void hdl_client_msg(XEvent *xev)
 		Atom a1 = (Atom)client_msg_ev->data.l[1];
 		Atom a2 = (Atom)client_msg_ev->data.l[2];
 
-		Atom atoms[2] = { a1, a2 };
+		Atom state_atoms[2] = { a1, a2 };
 		for (int i = 0; i < 2; i++) {
-			if (atoms[i] == None)
+			if (state_atoms[i] == None)
 				continue;
 
-			if (atoms[i] == _NET_WM_STATE_FULLSCREEN) {
+			if (state_atoms[i] == atoms[ATOM_NET_WM_STATE_FULLSCREEN]) {
 				Bool want = c->fullscreen;
 				if (action == 0)
 					want = False;
@@ -1184,25 +1185,25 @@ void hdl_map_req(XEvent *xev)
 	Atom *types = NULL;
 	Bool should_float = False;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM, &type, &format,
+	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 4, False, XA_ATOM, &type, &format,
 	    &n_items, &after, (unsigned char **)&types) == Success && types) {
 
 		for (unsigned long i = 0; i < n_items; i++) {
-			if (types[i] == _NET_WM_WINDOW_TYPE_DOCK) {
+			if (types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
 				XFree(types);
 				XMapWindow(dpy, w);
 				return;
 			}
 
-			if (types[i] == _NET_WM_WINDOW_TYPE_UTILITY ||
-				types[i] == _NET_WM_WINDOW_TYPE_DIALOG  ||
-				types[i] == _NET_WM_WINDOW_TYPE_TOOLBAR ||
-				types[i] == _NET_WM_WINDOW_TYPE_SPLASH  ||
-				types[i] == _NET_WM_WINDOW_TYPE_POPUP_MENU ||
-				types[i] == _NET_WM_WINDOW_TYPE_DROPDOWN_MENU ||
-				types[i] == _NET_WM_WINDOW_TYPE_MENU ||
-				types[i] == _NET_WM_WINDOW_TYPE_TOOLTIP ||
-				types[i] == _NET_WM_WINDOW_TYPE_NOTIFICATION) {
+			if (types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_UTILITY] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DIALOG]  ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLBAR] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_SPLASH]  ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_POPUP_MENU] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DROPDOWN_MENU] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_MENU] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLTIP] ||
+				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION]) {
 				should_float = True;
 				break;
 			}
@@ -1220,10 +1221,10 @@ void hdl_map_req(XEvent *xev)
 		unsigned long bytes_after;
 		n_items = 0;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 8, False, XA_ATOM, &state_type, &state_format, &n_items,
+		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 8, False, XA_ATOM, &state_type, &state_format, &n_items,
 					           &bytes_after, (unsigned char**)&state_atoms) == Success && state_atoms) {
 			for (unsigned long i = 0; i < n_items; i++) {
-				if (state_atoms[i] == _NET_WM_STATE_MODAL) {
+				if (state_atoms[i] == atoms[ATOM_NET_WM_STATE_MODAL]) {
 					should_float = True;
 					break;
 				}
@@ -1350,7 +1351,7 @@ void hdl_map_req(XEvent *xev)
 		}
 	}
 
-	if (window_has_ewmh_state(w, _NET_WM_STATE_FULLSCREEN)) {
+	if (window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN])) {
 		c->fullscreen = True;
 		c->floating = False;
 	}
@@ -1486,19 +1487,19 @@ void hdl_property_ntf(XEvent *xev)
 	XPropertyEvent *property_ev = &xev->xproperty;
 
 	if (property_ev->window == root) {
-		if (property_ev->atom == _NET_CURRENT_DESKTOP) {
+		if (property_ev->atom == atoms[ATOM_NET_CURRENT_DESKTOP]) {
 			long *val = NULL;
 			Atom actual;
 			int fmt;
 			unsigned long n;
 			unsigned long after;
-			if (XGetWindowProperty(dpy, root, _NET_CURRENT_DESKTOP, 0, 1, False, XA_CARDINAL, &actual,
+			if (XGetWindowProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], 0, 1, False, XA_CARDINAL, &actual,
 						           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
 				change_workspace((int)val[0]);
 				XFree(val);
 			}
 		}
-		else if (property_ev->atom == _NET_WM_STRUT_PARTIAL) {
+		else if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL]) {
 			update_struts();
 			tile();
 			update_borders();
@@ -1506,12 +1507,12 @@ void hdl_property_ntf(XEvent *xev)
 	}
 
 	/* client window properties */
-	if (property_ev->atom == _NET_WM_STATE) {
+	if (property_ev->atom == atoms[ATOM_NET_WM_STATE]) {
 		Client *c = find_client(find_toplevel(property_ev->window));
 		if (!c)
 			return;
 
-		Bool want = window_has_ewmh_state(c->win, _NET_WM_STATE_FULLSCREEN);
+		Bool want = window_has_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
 		if (want != c->fullscreen)
 			apply_fullscreen(c, want);
 	}
@@ -1778,7 +1779,7 @@ void move_to_workspace(int ws)
 	workspaces[ws] = moved;
 	moved->ws = ws;
 	long desktop = ws;
-	XChangeProperty(dpy, moved->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+	XChangeProperty(dpy, moved->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
 		        PropModeReplace, (unsigned char *)&desktop, 1);
 
 	/* remember it as last-focused for the target workspace */
@@ -2238,81 +2239,38 @@ void setup(void)
 
 void setup_atoms(void)
 {
-	_NET_NUMBER_OF_DESKTOPS = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
-	_NET_DESKTOP_NAMES = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
-	_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
-	_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
-	_NET_SUPPORTED = XInternAtom(dpy, "_NET_SUPPORTED", False);
-	_NET_WM_STRUT_PARTIAL = XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", False);
-	_NET_WM_STRUT = XInternAtom(dpy, "_NET_WM_STRUT", False); /* legacy struts */
-	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
-	_NET_WORKAREA = XInternAtom(dpy, "_NET_WORKAREA", False);
-	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
-	_NET_WM_STATE_FULLSCREEN = XInternAtom(dpy,"_NET_WM_STATE_FULLSCREEN", False);
-	WM_STATE = XInternAtom(dpy, "WM_STATE", False);
-	WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
-	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_NAME", False);
-	UTF8_STRING = XInternAtom(dpy, "UTF8_STRING", False);
-	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
-	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
-	_NET_FRAME_EXTENTS = XInternAtom(dpy, "_NET_FRAME_EXTENTS", False);
-	_NET_WM_PID = XInternAtom(dpy, "_NET_WM_PID", False);
-
-	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
-	_NET_WM_WINDOW_TYPE_UTILITY = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
-	_NET_WM_WINDOW_TYPE_DIALOG = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
-	_NET_WM_WINDOW_TYPE_TOOLBAR = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
-	_NET_WM_WINDOW_TYPE_SPLASH = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
-	_NET_WM_WINDOW_TYPE_POPUP_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
-	_NET_WM_WINDOW_TYPE_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_MENU", False);
-	_NET_WM_WINDOW_TYPE_DROPDOWN_MENU = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", False);
-	_NET_WM_WINDOW_TYPE_TOOLTIP = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_TOOLTIP", False);
-	_NET_WM_WINDOW_TYPE_NOTIFICATION = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
-	_NET_WM_STATE_MODAL = XInternAtom(dpy, "_NET_WM_STATE_MODAL", False);
-
-	Atom support_list[] = {
-	    _NET_CURRENT_DESKTOP, _NET_ACTIVE_WINDOW, _NET_SUPPORTED, _NET_WM_STATE,
-		_NET_WM_STATE_FULLSCREEN, _NET_WM_WINDOW_TYPE, _NET_WORKAREA, _NET_WM_STRUT,
-		_NET_WM_STRUT_PARTIAL, WM_DELETE_WINDOW, _NET_SUPPORTING_WM_CHECK, _NET_WM_NAME,
-		UTF8_STRING, _NET_WM_DESKTOP, _NET_CLIENT_LIST, _NET_FRAME_EXTENTS, _NET_WM_PID,
-
-		_NET_WM_WINDOW_TYPE_DOCK, _NET_WM_WINDOW_TYPE_UTILITY, _NET_WM_WINDOW_TYPE_DIALOG,
-		_NET_WM_WINDOW_TYPE_TOOLBAR, _NET_WM_WINDOW_TYPE_SPLASH, _NET_WM_WINDOW_TYPE_POPUP_MENU,
-		_NET_WM_WINDOW_TYPE_MENU, _NET_WM_WINDOW_TYPE_DROPDOWN_MENU, _NET_WM_WINDOW_TYPE_TOOLTIP,
-		_NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_STATE_MODAL,
-	};
+	for (int i = 0; i < ATOM_COUNT; i++)
+		atoms[i] = XInternAtom(dpy, atom_names[i], False);
 
 	/* checking window */
 	wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
 	/* root property -> child window */
-	XChangeProperty(dpy, root, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32,
+	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
 	/* child window -> child window */
-	XChangeProperty(dpy, wm_check_win, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32,
+	XChangeProperty(dpy, wm_check_win, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
 	/* name the wm */
 	const char *wmname = "sxwm";
-	XChangeProperty(dpy, wm_check_win, _NET_WM_NAME, UTF8_STRING, 8,
+	XChangeProperty(dpy, wm_check_win, atoms[ATOM_NET_WM_NAME], atoms[ATOM_UTF8_STRING], 8,
 			        PropModeReplace, (const unsigned char *)wmname, strlen(wmname));
 
 	/* workspace setup */
 	long num_workspaces = NUM_WORKSPACES;
-	XChangeProperty(dpy, root, _NET_NUMBER_OF_DESKTOPS, XA_CARDINAL, 32,
+	XChangeProperty(dpy, root, atoms[ATOM_NET_NUMBER_OF_DESKTOPS], XA_CARDINAL, 32,
 			        PropModeReplace, (const unsigned char *)&num_workspaces, 1);
 
 	const char workspace_names[] = WORKSPACE_NAMES;
 	int names_len = sizeof(workspace_names);
-	XChangeProperty(dpy, root, _NET_DESKTOP_NAMES, UTF8_STRING, 8,
+	XChangeProperty(dpy, root, atoms[ATOM_NET_DESKTOP_NAMES], atoms[ATOM_UTF8_STRING], 8,
 			        PropModeReplace, (const unsigned char *)workspace_names, names_len);
 
-	XChangeProperty(dpy, root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
+	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
 			        PropModeReplace, (const unsigned char *)&current_ws, 1);
 
 	/* load supported list */
-	int support_list_len = sizeof(support_list) / sizeof(Atom);
-	XChangeProperty(dpy, root, _NET_SUPPORTED, XA_ATOM, 32,
-			        PropModeReplace, (const unsigned char *)support_list, support_list_len);
+	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTED], XA_ATOM, 32,
+			        PropModeReplace, (const unsigned char *)atoms, ATOM_COUNT);
 
 	update_workarea();
 }
@@ -2325,7 +2283,7 @@ void set_frame_extents(Window w)
 		user_config.border_width,
 		user_config.border_width
 	};
-	XChangeProperty(dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32,
+	XChangeProperty(dpy, w, atoms[ATOM_NET_FRAME_EXTENTS], XA_CARDINAL, 32,
 			        PropModeReplace, (unsigned char *)extents, 4);
 }
 
@@ -2350,7 +2308,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 				XRaiseWindow(dpy, w);
 		}
 		/* EWMH focus hint */
-		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
+		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
 				PropModeReplace, (unsigned char *)&w, 1);
 
 		update_borders();
@@ -2361,7 +2319,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 	else {
 		/* no client */
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
-		XDeleteProperty(dpy, root, _NET_ACTIVE_WINDOW);
+		XDeleteProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW]);
 
 		focused = NULL;
 		ws_focused[current_ws] = NULL;
@@ -2410,7 +2368,7 @@ void set_opacity(Window w, double opacity)
 void set_wm_state(Window w, long state)
 {
 	long data[2] = { state, None }; /* state, icon window */
-	XChangeProperty(dpy, w, WM_STATE, WM_STATE, 32,
+	XChangeProperty(dpy, w, atoms[ATOM_WM_STATE], atoms[ATOM_WM_STATE], 32,
 			        PropModeReplace, (unsigned char *)data, 2);
 }
 
@@ -2944,7 +2902,7 @@ void toggle_scratchpad(int n)
 		c->ws = current_ws;
 
 		long desktop = current_ws;
-		XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
+		XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 	}
 
 	c->mon = CLAMP(focused ? focused->mon : current_mon, 0, n_mons - 1);
@@ -3002,7 +2960,7 @@ void update_borders(void)
 
 	if (focused) {
 		Window w = focused->win;
-		XChangeProperty(dpy, root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32,
+		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
 				        PropModeReplace, (unsigned char *)&w, 1);
 	}
 }
@@ -3012,7 +2970,7 @@ void update_client_desktop_properties(void)
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			long desktop = ws;
-			XChangeProperty(dpy, c->win, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+			XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
 					        PropModeReplace, (unsigned char *)&desktop, 1);
 		}
 	}
@@ -3092,7 +3050,7 @@ void update_net_client_list(void)
 		for (Client *c = workspaces[ws]; c; c = c->next)
 			wins[n++] = c->win;
 
-	XChangeProperty(dpy, root, _NET_CLIENT_LIST, XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
+	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
 }
 
 void update_struts(void)
@@ -3124,14 +3082,14 @@ void update_struts(void)
 		unsigned long n_items, bytes_after;
 		Atom *types = NULL;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_WINDOW_TYPE, 0, 4, False, XA_ATOM,
+		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 4, False, XA_ATOM,
 			&actual_type, &actual_format, &n_items, &bytes_after,
 			(unsigned char **)&types) != Success || !types)
 			continue;
 
 		Bool is_dock = False;
 		for (unsigned long j = 0; j < n_items; j++) {
-			if (types[j] == _NET_WM_WINDOW_TYPE_DOCK) {
+			if (types[j] == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
 				is_dock = True;
 				break;
 			}
@@ -3146,7 +3104,7 @@ void update_struts(void)
 		unsigned long len;
 		unsigned long rem;
 
-		if (XGetWindowProperty(dpy, w, _NET_WM_STRUT_PARTIAL, 0, 12, False, XA_CARDINAL,
+		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STRUT_PARTIAL], 0, 12, False, XA_CARDINAL,
 					&actual, &sfmt, &len, &rem,
 					(unsigned char **)&str) == Success && str && len >= 12) {
 
@@ -3274,7 +3232,7 @@ void update_workarea(void)
 		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
 	}
 
-	XChangeProperty(dpy, root, _NET_WORKAREA, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, n_mons * 4);
+	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, n_mons * 4);
 }
 
 void warp_cursor(Client *c)
@@ -3295,18 +3253,18 @@ Bool window_has_ewmh_state(Window w, Atom state)
 	int format;
 	unsigned long n_atoms = 0;
 	unsigned long unread = 0;
-	Atom *atoms = NULL;
+	Atom *found_atoms = NULL;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 1024, False, XA_ATOM, &type,
-		&format, &n_atoms, &unread, (unsigned char**)&atoms) == Success && atoms) {
+	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 1024, False, XA_ATOM, &type,
+		&format, &n_atoms, &unread, (unsigned char**)&found_atoms) == Success && found_atoms) {
 
 		for (unsigned long i = 0; i < n_atoms; i++) {
-			if (atoms[i] == state) {
-				XFree(atoms);
+			if (found_atoms[i] == state) {
+				XFree(found_atoms);
 				return True;
 			}
 		}
-		XFree(atoms);
+		XFree(found_atoms);
 	}
 	return False;
 }
@@ -3317,11 +3275,11 @@ void window_set_ewmh_state(Window w, Atom state, Bool add)
 	int format;
 	unsigned long n_atoms = 0;
 	unsigned long unread = 0;
-	Atom *atoms = NULL;
+	Atom *found_atoms = NULL;
 
-	if (XGetWindowProperty(dpy, w, _NET_WM_STATE, 0, 1024, False, XA_ATOM, &type,
-		&format, &n_atoms, &unread, (unsigned char**)&atoms) != Success) {
-		atoms = NULL;
+	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 1024, False, XA_ATOM, &type,
+		&format, &n_atoms, &unread, (unsigned char**)&found_atoms) != Success) {
+		found_atoms = NULL;
 		n_atoms = 0;
 	}
 
@@ -3330,22 +3288,22 @@ void window_set_ewmh_state(Window w, Atom state, Bool add)
 	Atom *list = buf;
 	unsigned long list_len = 0;
 
-	if (atoms) {
+	if (found_atoms) {
 		for (unsigned long i = 0; i < n_atoms; i++) {
-			if (atoms[i] != state)
-				list[list_len++] = atoms[i];	
+			if (found_atoms[i] != state)
+				list[list_len++] = found_atoms[i];	
 		}
 	}
 	if (add && list_len < 16)
 		list[list_len++] = state;
 
 	if (list_len == 0)
-		XDeleteProperty(dpy, w, _NET_WM_STATE);
+		XDeleteProperty(dpy, w, atoms[ATOM_NET_WM_STATE]);
 	else
-		XChangeProperty(dpy, w, _NET_WM_STATE, XA_ATOM, 32, PropModeReplace, (unsigned char*)list, list_len);
+		XChangeProperty(dpy, w, atoms[ATOM_NET_WM_STATE], XA_ATOM, 32, PropModeReplace, (unsigned char*)list, list_len);
 
-	if (atoms)
-		XFree(atoms);	
+	if (found_atoms)
+		XFree(found_atoms);	
 }
 
 Bool window_should_float(Window w)
