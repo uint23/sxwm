@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="logo.png" width="50%">
+  <img src="logo.png">
   <br>
-  <b>A very SeXy WM</b>
+  <b>A very SeXy WM</b> <br>
   <br><br>
   <img src="https://img.shields.io/github/v/release/uint23/sxwm?style=flat-square">
   <img src="https://img.shields.io/github/license/uint23/sxwm?style=flat-square">
