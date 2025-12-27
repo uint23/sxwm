@@ -2045,6 +2045,28 @@ void resize_stack_add(void)
 	int raw_cur = (focused->custom_stack_height > 0) ? focused->custom_stack_height : (focused->h + bw2);
 
 	int raw_new = raw_cur + user_config.resize_stack_amt;
+
+	/* Calculate maximum allowed height to prevent extending off-screen */
+	int mon = CLAMP(focused->mon, 0, n_mons - 1);
+	int mon_height = MAX(1, mons[mon].h - mons[mon].reserve_top - mons[mon].reserve_bottom);
+	int gaps = user_config.gaps;
+	int tile_height = MAX(1, mon_height - 2 * gaps);
+
+	/* Count stack windows (excluding master) */
+	int n_stack = 0;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		if (c->mapped && !c->floating && !c->fullscreen && c->mon == mon && c != workspaces[current_ws])
+			n_stack++;
+	}
+
+	/* Maximum height: tile_height minus space for other stack windows (min_height + gap each) */
+	int min_stack_height = bw2 + 1;
+	int other_stack_space = (n_stack > 1) ? (n_stack - 1) * (min_stack_height + gaps) : 0;
+	int max_raw = tile_height - other_stack_space;
+
+	if (raw_new > max_raw)
+		raw_new = max_raw;
+
 	focused->custom_stack_height = raw_new;
 	tile();
 }
