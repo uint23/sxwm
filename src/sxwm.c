@@ -814,10 +814,24 @@ int get_workspace_for_window(Window w)
 
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
 {
-	if (w == root) /* grabbing for wm */
-		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeAsync, GrabModeAsync, None, None);
-	else /* grabbing for windows */
-		XGrabButton(dpy, button, mod, w, owner_events, masks, GrabModeSync, GrabModeAsync, None, None);
+	Mask guards[] = {
+		0,
+		LockMask,
+		numlock_mask,
+		LockMask | numlock_mask,
+		mode_switch_mask,
+		LockMask | mode_switch_mask,
+		numlock_mask | mode_switch_mask,
+		LockMask | numlock_mask | mode_switch_mask
+	};
+
+	for (size_t i = 0; i < sizeof(guards) / sizeof(guards[0]); i++) {
+		XGrabButton(
+			dpy, button, mod | guards[i], w, owner_events, masks,
+			w == root ? GrabModeAsync : GrabModeSync,
+			GrabModeAsync, None, None
+		);
+	}
 }
 
 void grab_keys(void)
@@ -856,6 +870,7 @@ void hdl_button(XEvent *xev)
 
 	Mask left_click = Button1;
 	Mask right_click = Button3;
+	int state = clean_mask(xbutton->state);
 
 	XAllowEvents(dpy, ReplayPointer, xbutton->time);
 	if (!w)
@@ -867,8 +882,8 @@ void hdl_button(XEvent *xev)
 			continue;
 
 		Bool is_swap_mode =
-			(xbutton->state & user_config.modkey) &&
-			(xbutton->state & ShiftMask) &&
+			(state & user_config.modkey) &&
+			(state & ShiftMask) &&
 			xbutton->button == left_click && !c->floating;
 		if (is_swap_mode) {
 			drag_client = c;
@@ -888,7 +903,7 @@ void hdl_button(XEvent *xev)
 		}
 
 		Bool is_move_resize =
-			(xbutton->state & user_config.modkey) &&
+			(state & user_config.modkey) &&
 			(xbutton->button == left_click ||
 			 xbutton->button == right_click) && !c->floating;
 		if (is_move_resize) {
@@ -897,7 +912,7 @@ void hdl_button(XEvent *xev)
 		}
 
 		Bool is_single_click = 
-			!(xbutton->state & user_config.modkey) &&
+			!(state & user_config.modkey) &&
 			xbutton->button == left_click;
 		if (is_single_click) {
 			focused = c;
