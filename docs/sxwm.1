@@ -1,73 +1,72 @@
-.TH SXWM 1 "October 2025" "sxwm" "User Commands"
-.SH NAME
-sxwm \- simple X11 window manager
-.SH SYNOPSIS
-.B sxwm
-[\-v | \-\-version]
-.SH DESCRIPTION
-.B sxwm
+.Dd October 1, 2025
+.Dt SXWM 1
+.Os
+.Sh NAME
+.Nm sxwm
+.Nd simple X11 window manager
+.Sh SYNOPSIS
+.Nm sxwm
+.Op Fl v | Fl -version
+.Sh DESCRIPTION
+.Nm sxwm
 is a minimal, user-friendly tiling window manager for X11.
-It is configured through a plain text file and supports on-the-fly reconfiguration.
-
-.SH LAUNCH ARGUMENTS
-.TP
-.B \-v, \-\-version
+It is configured through a plain text file and supports
+on-the-fly reconfiguration.
+.Sh LAUNCH ARGUMENTS
+.Bl -tag -width Ds
+.It Fl v , Fl -version
 Displays the current version of
-.B sxwm.
-
-.SH CONFIGURATION
-.B sxwm
+.Nm sxwm .
+.El
+.Sh CONFIGURATION
+.Nm sxwm
 is configured via a simple text file located at
-.I ~/.config/sxwmrc.
+.Pa ~/.config/sxwmrc .
 Changes can be applied instantly by reloading the configuration (MOD + r).
-
+.Pp
 The file uses a
-.B key : value
-format. Lines starting with
-.B #
+.Sy key
+:
+.Sy value
+format.
+Lines starting with
+.Sy #
 are ignored.
-
-.SS General Options
-.TS
-allbox;
-c c c c
-l l l l.
-Option	Type	Default	Description
-_
-mod_key	String	super	Sets the primary modifier key (alt, super, ctrl).
-gaps	Integer	10	Pixels between windows and screen edges.
-border_width	Integer	1	Thickness of window borders in pixels.
-focused_border_colour	Hex	#c0cbff	Border color for the currently focused window.
-unfocused_border_colour	Hex	#555555	Border color for unfocused windows.
-swap_border_colour	Hex	#fff4c0	Border color when selecting a window to swap (MOD+Shift+Drag).
-master_width	Integer	60	Percentage of the screen width for the master window.
-motion_throttle	Integer	60	Target FPS for mouse drag actions.
-resize_master_amount	Integer	1	Percent to increase/decrease master width.
-resize_stack_amount	Integer	20	How many pixels to increase/decrease stack windows by.
-snap_distance	Integer	5	Distance (px) before a floating window snaps to edge.
-move_window_amount	Integer	10	Number of pixels to move the window with keyboard.
-resize_window_amount	Integer	10	Number of pixels to resize the window with keyboard.
-start_fullscreen	String	"st"	Starts specified windows that should start fullscreened. Enclosed in quotes and comma-seperated.
-new_win_focus	Bool	true	Whether openening new windows should also set focus to them or keep on current window.
-warp_cursor	Bool	true	Warp the cursor to the middle of newly focused windows.
-floating_on_top	Bool	true	Whether floating windows should always draw over tiled ones
-new_win_master	Bool	false	New windows will open as master window.
-should_float	String	"st"	Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.
-exec	String	Nothing	Command to run on startup (e.g., sxbar, picom, "autostart", etc.).
-can_swallow	String	st	Windows that can swallow.
-can_be_swallowed	String	mpv	Windows that can be swallowed.
-.TE
-
-.SH KEYBINDINGS
-.SS Syntax
+.Ss General Options
+.Bl -column "focused_border_colour" "Integer" "#c0cbff" "Border color for the currently focused window." -offset indent
+.It Sy Option Ta Sy Type Ta Sy Default Ta Sy Description
+.It mod_key Ta String Ta super Ta Sets the primary modifier key (alt, super, ctrl).
+.It gaps Ta Integer Ta 10 Ta Pixels between windows and screen edges.
+.It border_width Ta Integer Ta 1 Ta Thickness of window borders in pixels.
+.It focused_border_colour Ta Hex Ta #c0cbff Ta Border color for the currently focused window.
+.It unfocused_border_colour Ta Hex Ta #555555 Ta Border color for unfocused windows.
+.It swap_border_colour Ta Hex Ta #fff4c0 Ta Border color when selecting a window to swap (MOD+Shift+Drag).
+.It master_width Ta Integer Ta 60 Ta Percentage of the screen width for the master window.
+.It motion_throttle Ta Integer Ta 60 Ta Target FPS for mouse drag actions.
+.It resize_master_amount Ta Integer Ta 1 Ta Percent to increase/decrease master width.
+.It resize_stack_amount Ta Integer Ta 20 Ta How many pixels to increase/decrease stack windows by.
+.It snap_distance Ta Integer Ta 5 Ta Distance (px) before a floating window snaps to edge.
+.It move_window_amount Ta Integer Ta 10 Ta Number of pixels to move the window with keyboard.
+.It resize_window_amount Ta Integer Ta 10 Ta Number of pixels to resize the window with keyboard.
+.It start_fullscreen Ta String Ta \&"st\&" Ta Starts specified windows that should start fullscreened. Enclosed in quotes and comma-seperated.
+.It new_win_focus Ta Bool Ta true Ta Whether openening new windows should also set focus to them or keep on current window.
+.It warp_cursor Ta Bool Ta true Ta Warp the cursor to the middle of newly focused windows.
+.It floating_on_top Ta Bool Ta true Ta Whether floating windows should always draw over tiled ones
+.It new_win_master Ta Bool Ta false Ta New windows will open as master window.
+.It should_float Ta String Ta \&"st\&" Ta Always-float rule. Multiple entries should be comma-seperated. Optionally, entries can be enclosed in quotes.
+.It exec Ta String Ta Nothing Ta Command to run on startup (e.g., sxbar, picom, \&"autostart\&", etc.).
+.It can_swallow Ta String Ta st Ta Windows that can swallow.
+.It can_be_swallowed Ta String Ta mpv Ta Windows that can be swallowed.
+.El
+.Sh KEYBINDINGS
+.Ss Syntax
 Modifiers: mod, shift, ctrl, alt, super ...
 .br
 Key: Case-insensitive keysym (e.g., Return, q, 1)
-.RS
-To find the key do
-.B xev | grep "keysym"
+.Bd -ragged -offset indent
+To find the key do xev | grep "keysym"
 and press the key in the box.
-.RE
+.Ed
 Action: Either an external command (in quotes) or internal function.
 .br
 move: Move to that workspace
@@ -81,67 +80,57 @@ create: Creates a scratchpad on that slot
 toggle: Toggles the visibility of that scratchpad
 .br
 remove: Removes the scratchpad on that slot
-
-.PP
+.Pp
 Example syntax:
-.PP
-.EX
+.Bd -literal
 bind : modifier + ... + key : action
-.EE
-.PP
-.EX
+.Ed
+.Bd -literal
 scratchpad : modifier + ... + key : create n
 scratchpad : modifier + ... + key : toggle n
 scratchpad : modifier + ... + key : remove n
-.EE
-.PP
-.EX
+.Ed
+.Bd -literal
 workspace : modifier + ... + key : move n
 workspace : modifier + ... + key : swap n
-.EE
-
-.SS Available Functions
-.TS
-allbox;
-c c
-l l.
-Function Name	Description
-_
-centre_window	Centre the focused window.
-close_window	Closes the focused window.
-decrease_gaps	Shrinks gaps.
-focus_next	Moves focus forward in the stack.
-focus_prev	Moves focus backward in the stack.
-focus_next_mon	Switches focus to the next monitor.
-focus_prev_mon	Switches focus to the previous monitor.
-fullscreen	Fullscreen the focused window.
-global_floating	Toggles floating state for all windows.
-increase_gaps	Expands gaps.
-master_next	Moves focused window down in master/stack order.
-master_prev	Moves focused window up in master/stack order.
-master_increase	Expands master width.
-master_decrease	Shrinks master width.
-move_next_mon	Moves the focused window to the next monitor.
-move_prev_mon	Moves the focused window to the previous monitor.
-move_win_up	Moves the focused window up (keyboard).
-move_win_down	Moves the focused window down (keyboard).
-move_win_left	Moves the focused window left (keyboard).
-move_win_right	Moves the focused window right (keyboard).
-quit	Exits sxwm.
-reload_config	Reloads config.
-resize_win_up	Resizes the focused window up (keyboard).
-resize_win_down	Resizes the focused window down (keyboard).
-resize_win_left	Resizes the focused window left (keyboard).
-resize_win_right	Resizes the focused window right (keyboard).
-stack_increase	Increase the height of the focused stack window.
-stack_decrease	Decrease the height of the focused stack window.
-switch_previous_workspace	Switch to the previous workspace.
-toggle_floating	Toggles floating state of current window.
-toggle_monocle	Toggles monocle layout.
-.TE
-
-.SS Example Bindings
-.EX
+.Ed
+.Ss Available Functions
+.Bl -column "switch_previous_workspace" "Switch to the previous workspace." -offset indent
+.It Sy Function Name Ta Sy Description
+.It centre_window Ta Centre the focused window.
+.It close_window Ta Closes the focused window.
+.It decrease_gaps Ta Shrinks gaps.
+.It focus_next Ta Moves focus forward in the stack.
+.It focus_prev Ta Moves focus backward in the stack.
+.It focus_next_mon Ta Switches focus to the next monitor.
+.It focus_prev_mon Ta Switches focus to the previous monitor.
+.It fullscreen Ta Fullscreen the focused window.
+.It global_floating Ta Toggles floating state for all windows.
+.It increase_gaps Ta Expands gaps.
+.It master_next Ta Moves focused window down in master/stack order.
+.It master_prev Ta Moves focused window up in master/stack order.
+.It master_increase Ta Expands master width.
+.It master_decrease Ta Shrinks master width.
+.It move_next_mon Ta Moves the focused window to the next monitor.
+.It move_prev_mon Ta Moves the focused window to the previous monitor.
+.It move_win_up Ta Moves the focused window up (keyboard).
+.It move_win_down Ta Moves the focused window down (keyboard).
+.It move_win_left Ta Moves the focused window left (keyboard).
+.It move_win_right Ta Moves the focused window right (keyboard).
+.It quit Ta Exits sxwm.
+.It reload_config Ta Reloads config.
+.It resize_win_up Ta Resizes the focused window up (keyboard).
+.It resize_win_down Ta Resizes the focused window down (keyboard).
+.It resize_win_left Ta Resizes the focused window left (keyboard).
+.It resize_win_right Ta Resizes the focused window right (keyboard).
+.It stack_increase Ta Increase the height of the focused stack window.
+.It stack_decrease Ta Decrease the height of the focused stack window.
+.It switch_previous_workspace Ta Switch to the previous workspace.
+.It toggle_floating Ta Toggles floating state of current window.
+.It toggle_monocle Ta Toggles monocle layout.
+.El
+.Ss Example Bindings
+.Bd -literal
 # Launch terminal
 bind : mod + Return : "st"
 # Close window
@@ -156,9 +145,8 @@ scratchpad : mod + alt + b : remove 2
 workspace : mod + 3 : move 3
 # Move window to workspace
 workspace : mod + shift + 5 : swap 5
-.EE
-
-.SH DEFAULT KEYBINDINGS
+.Ed
+.Sh DEFAULT KEYBINDINGS
 In
-.I default_sxwmrc
+.Pa default_sxwmrc
 file.
