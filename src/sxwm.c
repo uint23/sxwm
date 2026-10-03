@@ -166,9 +166,11 @@ static const char *atom_names[ATOM_COUNT] = {
 	[ATOM_WM_PROTOCOLS]                  = "WM_PROTOCOLS",
 };
 
-Cursor cursor_normal;
-Cursor cursor_move;
-Cursor cursor_resize;
+struct {
+	Cursor normal;
+	Cursor move;
+	Cursor resize;
+} cursors;
 
 Client *workspaces[NUM_WORKSPACES] = {NULL};
 Config user_config;
@@ -810,7 +812,7 @@ void hdl_button(XEvent *xev)
 			drag_orig_h = c->h;
 			drag_mode = DRAG_SWAP;
 			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
-					     GrabModeAsync, GrabModeAsync, None, cursor_move, CurrentTime);
+					     GrabModeAsync, GrabModeAsync, None, cursors.move, CurrentTime);
 			focused = c;
 			set_input_focus(focused, False, False);
 			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
@@ -841,7 +843,7 @@ void hdl_button(XEvent *xev)
 		if (c->fixed && xbutton->button == right_click)
 			return;
 
-		Cursor cursor = (xbutton->button == left_click) ? cursor_move : cursor_resize;
+		Cursor cursor = (xbutton->button == left_click) ? cursors.move : cursors.resize;
 		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
 				     GrabModeAsync, GrabModeAsync, None, cursor, CurrentTime);
 
@@ -1808,9 +1810,9 @@ void quit(void)
 	*/
 
 	XSync(dpy, False);
-	XFreeCursor(dpy, cursor_move);
-	XFreeCursor(dpy, cursor_normal);
-	XFreeCursor(dpy, cursor_resize);
+	XFreeCursor(dpy, cursors.move);
+	XFreeCursor(dpy, cursors.normal);
+	XFreeCursor(dpy, cursors.resize);
 	XCloseDisplay(dpy);
 	puts("quitting...");
 	running = False;
@@ -2123,10 +2125,10 @@ void setup(void)
 	grab_keys();
 	startup_exec();
 
-	cursor_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
-	cursor_move = XcursorLibraryLoadCursor(dpy, "fleur");
-	cursor_resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
-	XDefineCursor(dpy, root, cursor_normal);
+	cursors.normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
+	cursors.move = XcursorLibraryLoadCursor(dpy, "fleur");
+	cursors.resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
+	XDefineCursor(dpy, root, cursors.normal);
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
 	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
@@ -2173,7 +2175,7 @@ void setup_atoms(void)
 		atoms[i] = XInternAtom(dpy, atom_names[i], False);
 
 	/* checking window */
-	wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
+	static Window wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
 	/* root property -> child window */
 	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
@@ -2820,7 +2822,7 @@ void update_mons(void)
 
 	for (int s = 0; s < ScreenCount(dpy); s++) {
 		Window scr_root = RootWindow(dpy, s);
-		XDefineCursor(dpy, scr_root, cursor_normal);
+		XDefineCursor(dpy, scr_root, cursors.normal);
 	}
 
 	if (XineramaIsActive(dpy)) {
