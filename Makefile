@@ -49,7 +49,7 @@ uninstall:
 	      ${DESTDIR}${MANPREFIX}/man1/sxwm.1 \
 	      ${DESTDIR}${PREFIX}/share/sxwmrc
 
-clangd:
+compile_flags:
 	rm -f compile_flags.txt
 	for f in ${CFLAGS}; do echo $$f >> compile_flags.txt; done
 
