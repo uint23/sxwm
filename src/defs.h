@@ -15,7 +15,6 @@
 #define MAX_MONITORS         32
 #define MAX_BINDS            256
 #define MAX_CLIENTS          99
-#define MAX_SCRATCHPADS      32
 #define MAX_ITEMS            256
 #define MIN_WINDOW_SIZE      20
 #define PATH_MAX             4096
@@ -26,10 +25,6 @@
 /* fn/cmd */
 #define TYPE_FUNC            2
 #define TYPE_CMD             3
-/* scratchpads*/
-#define TYPE_SP_REMOVE       4
-#define TYPE_SP_TOGGLE       5
-#define TYPE_SP_CREATE       6
 
 #define NUM_WORKSPACES		 9
 #define WORKSPACE_NAMES	\
@@ -51,7 +46,6 @@ typedef union {
 	const char **cmd;
 	void (*fn)(void);
 	int ws;            /* workspace */
-	int sp;            /* scratchpad */
 } Action;
 
 typedef struct {
@@ -103,7 +97,6 @@ typedef struct {
 	char **start_fullscreen[MAX_ITEMS];
 	char **can_swallow[MAX_ITEMS];
 	char **can_be_swallowed[MAX_ITEMS];
-	char **scratchpads[MAX_SCRATCHPADS];
 	char **open_in_workspace[MAX_ITEMS];
 	char *to_run[MAX_ITEMS];
 } Config;
@@ -119,11 +112,6 @@ typedef struct {
 	int reserve_left, reserve_right;
 	int reserve_top, reserve_bottom;
 } Monitor;
-
-typedef struct {
-	Client *client;
-	Bool enabled;
-} Scratchpad;
 
 typedef enum {
 	ATOM_NET_ACTIVE_WINDOW,

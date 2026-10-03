@@ -85,7 +85,6 @@ int other_wm_err(Display *d, XErrorEvent *ee);
 /* long parse_col(const char *hex); */
 /* void quit(void); */
 /* void reload_config(void); */
-void remove_scratchpad(int n);
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
 /* void resize_stack_add(void); */
@@ -104,7 +103,6 @@ void setup_atoms(void);
 void set_frame_extents(Window w);
 void set_input_focus(Client *c, Bool raise_win, Bool warp);
 void set_opacity(Window w, double opacity);
-void set_win_scratchpad(int n);
 void set_wm_state(Window w, long state);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
@@ -117,7 +115,6 @@ void tile(void);
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
 /* void toggle_monocle(void); */
-void toggle_scratchpad(int n);
 void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
@@ -186,9 +183,6 @@ Display *dpy;
 Window root;
 Window wm_check_win;
 Monitor *mons = NULL;
-Scratchpad scratchpads[MAX_SCRATCHPADS];
-int scratchpad_count = 0;
-int current_scratchpad = 0;
 int n_mons = 0;
 int previous_workspace = 0;
 int current_ws = 0;
@@ -391,76 +385,16 @@ void change_workspace(int ws)
 	in_ws_switch = True;
 	XGrabServer(dpy); /* freeze rendering for tearless switching */
 
-	/* scratchpads stay visible */
-	Bool visible_scratchpads[MAX_SCRATCHPADS] = {False};
-	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-		if (scratchpads[i].client && scratchpads[i].enabled) {
-			visible_scratchpads[i] = True;
-			XUnmapWindow(dpy, scratchpads[i].client->win);
-			scratchpads[i].client->mapped = False;
-		}
-	}
-
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->mapped) {
-			/* TODO: Turn into helper */
-			Bool is_scratchpad = False;
-			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-				if (scratchpads[i].client == c) {
-					is_scratchpad = True;
-					break;
-				}
-			}
-			if (!is_scratchpad)
-				XUnmapWindow(dpy, c->win);
-		}
-	}
+	for (Client *c = workspaces[current_ws]; c; c = c->next)
+		if (c->mapped)
+			XUnmapWindow(dpy, c->win);
 
 	previous_workspace = current_ws;
 	current_ws = ws;
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->mapped) {
-			/* TODO: Turn into helper */
-			Bool is_scratchpad = False;
-			for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-				if (scratchpads[i].client == c) {
-					is_scratchpad = True;
-					break;
-				}
-			}
-			if (!is_scratchpad)
-				XMapWindow(dpy, c->win);
-		}
-	}
 
-	/* move visible scratchpads to new workspace and map them */
-	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-		if (visible_scratchpads[i] && scratchpads[i].client) {
-			Client *c = scratchpads[i].client;
-
-			/* remove from old workspace */
-			Client **pp = &workspaces[c->ws];
-			while (*pp && *pp != c)
-				pp = &(*pp)->next;
-
-			if (*pp)
-				*pp = c->next;
-
-			/* add to new workspace */
-			c->next = workspaces[current_ws];
-			workspaces[current_ws] = c;
-			c->ws = current_ws;
-
+	for (Client *c = workspaces[current_ws]; c; c = c->next)
+		if (c->mapped)
 			XMapWindow(dpy, c->win);
-			c->mapped = True;
-			XRaiseWindow(dpy, c->win);
-
-			/* Update desktop property */
-			long desktop = current_ws;
-			XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
-					        PropModeReplace, (unsigned char *)&desktop, 1);
-		}
-	}
 
 	tile();
 
@@ -495,14 +429,6 @@ void change_workspace(int ws)
 			current_mon = focused->mon;
 	}
 
-	/* try focus focus scratchpad if no other window available */
-	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-		if (!focused && visible_scratchpads[i] && scratchpads[i].client) {
-			focused = scratchpads[i].client;
-			break;
-		}
-	}
-
 	set_input_focus(focused, False, True);
 
 	long current_desktop = current_ws;
@@ -532,14 +458,6 @@ void close_focused(void)
 {
 	if (!focused)
 		return;
-
-	for (int i = 0; i < MAX_SCRATCHPADS; i++) {
-		if (scratchpads[i].client == focused) {
-			scratchpads[i].client = NULL;
-			scratchpads[i].enabled = False;
-			break;
-		}
-	}
 
 	Atom *protocols;
 	int n_protocols;
@@ -1144,9 +1062,6 @@ void hdl_keypress(XEvent *xev)
 				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
 				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
 				case TYPE_WS_MOVE: move_to_workspace(bind->action.ws); update_net_client_list(); break;
-				case TYPE_SP_REMOVE: remove_scratchpad(bind->action.sp); break;
-				case TYPE_SP_TOGGLE: toggle_scratchpad(bind->action.sp); break;
-				case TYPE_SP_CREATE: set_win_scratchpad(bind->action.sp); break;
 			}
 			return;
 		}
@@ -2005,25 +1920,6 @@ void reload_config(void)
 	update_borders();
 }
 
-void remove_scratchpad(int n)
-{
-	if (n < 0 || n >= MAX_SCRATCHPADS || scratchpads[n].client == NULL)
-		return;
-
-	Client *c = scratchpads[n].client;
-
-	if (c->win) {
-		XMapWindow(dpy, c->win);
-		c->mapped = True;
-	}
-
-	scratchpads[n].client = NULL;
-	scratchpads[n].enabled = False;
-
-	update_net_client_list();
-	update_borders();
-}
-
 void resize_master_add(void)
 {
 	/* pick the monitor of the focused window (or 0 if none) */
@@ -2363,22 +2259,6 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 	}
 
 	XFlush(dpy);
-}
-
-void set_win_scratchpad(int n)
-{
-	if (focused == NULL)
-		return;
-
-	Client *pad_client = focused;
-	if (scratchpads[n].client != NULL) {
-		XMapWindow(dpy, scratchpads[n].client->win);
-		scratchpads[n].enabled = False;
-		scratchpads[n].client = NULL;
-	}
-	scratchpads[n].client = pad_client;
-	XUnmapWindow(dpy, scratchpads[n].client->win);
-	scratchpads[n].enabled = False;
 }
 
 void reset_opacity(Window w)
@@ -2914,52 +2794,6 @@ void toggle_monocle(void)
 	update_borders();
 	if (focused)
 		set_input_focus(focused, True, True);
-}
-
-void toggle_scratchpad(int n)
-{
-	if (n < 0 || n >= MAX_SCRATCHPADS || scratchpads[n].client == NULL)
-		return;
-
-	Client *c = scratchpads[n].client;
-
-	if (c->ws != current_ws) {
-		/* unlink from old workspace */
-		Client **pp = &workspaces[c->ws];
-		while (*pp && *pp != c)
-			pp = &(*pp)->next;
-
-		if (*pp)
-			*pp = c->next;
-
-		/* link to current workspace */
-		c->next = workspaces[current_ws];
-		workspaces[current_ws] = c;
-		c->ws = current_ws;
-
-		long desktop = current_ws;
-		XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
-	}
-
-	c->mon = CLAMP(focused ? focused->mon : current_mon, 0, n_mons - 1);
-
-	if (scratchpads[n].enabled) {
-		XUnmapWindow(dpy, c->win);
-		c->mapped = False;
-		scratchpads[n].enabled = False;
-		focus_prev();
-	}
-	else {
-		XMapWindow(dpy, c->win);
-		c->mapped = True;
-		scratchpads[n].enabled = True;
-
-		set_input_focus(c, True, True);
-	}
-
-	tile();
-	update_borders();
-	update_net_client_list();
 }
 
 void unswallow_window(Client *c)

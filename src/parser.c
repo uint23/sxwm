@@ -422,29 +422,6 @@ int parser(Config *cfg)
 			cfg->resize_stack_amt = atoi(rest);
 		else if (!strcmp(key, "resize_window_amount"))
 			cfg->resize_window_amt = atoi(rest);
-		else if (!strcmp(key, "scratchpad")) {
-			char *act;
-			Binding *b = parse_bind_line(cfg, rest, lineno, "scratchpad", &act);
-			if (!b)
-				goto cleanup;
-
-			int n, found = 0;
-			static const struct { const char *fmt; int type; } sp_acts[] = {
-				{"create %d", TYPE_SP_CREATE},
-				{"toggle %d", TYPE_SP_TOGGLE},
-				{"remove %d", TYPE_SP_REMOVE},
-			};
-			for (size_t i = 0; i < sizeof(sp_acts) / sizeof(sp_acts[0]); i++) {
-				if (sscanf(act, sp_acts[i].fmt, &n) == 1 && n >= 1 && n <= MAX_SCRATCHPADS) {
-					b->type = sp_acts[i].type;
-					b->action.sp = n - 1;
-					found = 1;
-					break;
-				}
-			}
-			if (!found)
-				fprintf(stderr, "sxwmrc:%d: invalid scratchpad action '%s'\n", lineno, act);
-		}
 		else if (!strcmp(key, "should_float")) {
 			char *clean = strip_comment(rest);
 			if (parse_csv_to_array(clean, cfg->should_float, &should_floatn, MAX_ITEMS, 0) < 0)
