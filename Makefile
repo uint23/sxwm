@@ -54,3 +54,4 @@ clangd:
 	for f in ${CFLAGS}; do echo $$f >> compile_flags.txt; done
 
 .PHONY: all clean install uninstall clangd
+

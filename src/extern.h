@@ -1,4 +1,5 @@
-#pragma once
+#ifndef EXTERN_H
+#define EXTERN_H
 
 extern void centre_window(void);
 extern void close_focused(void);
@@ -31,4 +32,6 @@ extern void switch_previous_workspace(void);
 extern void toggle_floating(void);
 extern void toggle_floating_global(void);
 extern void toggle_fullscreen(void);
+
+#endif /* EXTERN_H */
 

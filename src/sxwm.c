@@ -31,7 +31,7 @@
 #include <X11/extensions/Xinerama.h>
 #include <X11/Xcursor/Xcursor.h>
 
-#include "defs.h"
+#include "common.h"
 #include "extern.h"
 #include "parser.h"
 
@@ -2175,7 +2175,7 @@ void setup_atoms(void)
 		atoms[i] = XInternAtom(dpy, atom_names[i], False);
 
 	/* checking window */
-	static Window wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
+	wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
 	/* root property -> child window */
 	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);

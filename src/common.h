@@ -1,32 +1,35 @@
 /* See LICENSE for more information on use */
-#pragma once
+#ifndef COMMON_H
+#define COMMON_H
+
 #include <X11/Xlib.h>
+
 #define SXWM_VERSION "sxwm ver. 1.8"
-#define SXWM_AUTHOR "(C) Abhinav Prasai 2025"
+#define SXWM_AUTHOR "(C) uint 2024-2026"
 #define SXWM_LICINFO "See LICENSE for more info"
 
-#define MF_MIN               0.05f
-#define MF_MAX               0.95f
-#define MAX(a, b)            ((a) > (b) ? (a) : (b))
-#define MIN(a, b)            ((a) < (b) ? (a) : (b))
-#define UDIST(a, b)          abs((int)(a) - (int)(b))
-#define CLAMP(x, lo, hi)     (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
+#define MF_MIN           0.05f
+#define MF_MAX           0.95f
+#define MAX(a, b)        ((a) > (b) ? (a) : (b))
+#define MIN(a, b)        ((a) < (b) ? (a) : (b))
+#define UDIST(a, b)      abs((int)(a) - (int)(b))
+#define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
 
-#define MAX_MONITORS         32
-#define MAX_BINDS            256
-#define MAX_CLIENTS          99
-#define MAX_ITEMS            256
-#define MIN_WINDOW_SIZE      20
-#define PATH_MAX             4096
+#define MAX_MONITORS    32
+#define MAX_BINDS       256
+#define MAX_CLIENTS     99
+#define MAX_ITEMS       256
+#define MIN_WINDOW_SIZE 20
+#define PATH_MAX        4096
 
-/* workspaces */
-#define TYPE_WS_CHANGE       0
-#define TYPE_WS_MOVE         1
-/* fn/cmd */
-#define TYPE_FUNC            2
-#define TYPE_CMD             3
+enum {
+	TYPE_WS_CHANGE = 0,
+	TYPE_WS_MOVE = 1,
+	TYPE_FUNC = 2,
+	TYPE_CMD = 3,
+};
 
-#define NUM_WORKSPACES		 9
+#define NUM_WORKSPACES 9
 #define WORKSPACE_NAMES	\
 	"1""\0"\
 	"2""\0"\
@@ -148,4 +151,6 @@ typedef enum {
 	ATOM_WM_PROTOCOLS,
 	ATOM_COUNT
 } AtomType;
+
+#endif /* COMMON_H */
 

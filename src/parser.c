@@ -9,7 +9,7 @@
 #include <X11/XF86keysym.h>
 #include <X11/Xlib.h>
 
-#include "defs.h"
+#include "common.h"
 #include "extern.h"
 #include "parser.h"
 
