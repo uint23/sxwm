@@ -1,17 +1,16 @@
-/*  See LICENSE for more info
- *
- *  simple xorg window manager:
- *  sxwm is a user-friendly, easily configurable yet powerful
- *  tiling window manager inspired by window managers such as
- *  DWM and i3.
- *
- *  The userconfig is designed to be as user-friendly as
- *  possible, and I hope it is easy to configure even without
- *  knowledge of C or programming, although most people who
- *  will use this will probably be programmers :)
- *
- *  > uint 2025
-*/
+/* See LICENSE for more info
+  
+   A very SeXy Window Manager:
+   sxwm is a user-friendly, easily configurable yet powerful
+   tiling window manager inspired by window managers such as
+   DWM and i3.
+  
+   The userconfig is designed to be as user-friendly as
+   possible, and I hope it is easy to configure even without
+   knowledge of C or programming, although most people who
+   will use this will probably be programmers :)
+  
+   (c) uint 2024-2026 */
 
 #include <signal.h>
 #include <stdint.h>
