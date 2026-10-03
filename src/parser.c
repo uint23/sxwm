@@ -57,7 +57,6 @@ static const CommandEntry call_table[] = {
 	{"stack_decrease",            resize_stack_sub},
 	{"switch_previous_workspace", switch_previous_workspace},
 	{"toggle_floating",           toggle_floating},
-	{"toggle_monocle",            toggle_monocle},
 	{NULL, NULL},
 };
 

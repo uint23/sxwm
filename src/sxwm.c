@@ -114,7 +114,6 @@ void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
-/* void toggle_monocle(void); */
 void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
@@ -191,7 +190,6 @@ long last_motion_time = 0;
 Bool global_floating = False;
 Bool in_ws_switch = False;
 Bool running = False;
-Bool monocle = False;
 
 Mask numlock_mask = 0;
 Mask mode_switch_mask = 0;
@@ -2235,8 +2233,7 @@ void set_input_focus(Client *c, Bool raise_win, Bool warp)
 		send_wm_take_focus(w);
 
 		if (raise_win) {
-			/* always raise in monocle, otherwise respect floating_on_top */
-			if (monocle || c->floating || !user_config.floating_on_top)
+			if (c->floating || !user_config.floating_on_top)
 				XRaiseWindow(dpy, w);
 		}
 		/* EWMH focus hint */
@@ -2511,52 +2508,6 @@ void tile(void)
 {
 	update_struts();
 	Client *head = workspaces[current_ws];
-	int total = 0;
-
-	for (Client *c = head; c; c = c->next) {
-		if (c->mapped && !c->floating && !c->fullscreen)
-			total++;
-	}
-
-	if (total == 0)
-		return;
-
-	if (monocle) {
-		for (Client *c = head; c; c = c->next) {
-			if (!c->mapped || c->floating || c->fullscreen)
-				continue;
-
-			int border_width = user_config.border_width;
-			int gaps = user_config.gaps;
-
-			int mon = CLAMP(c->mon, 0, n_mons - 1);
-			int x = mons[mon].x + mons[mon].reserve_left + gaps;
-			int y = mons[mon].y + mons[mon].reserve_top + gaps;
-			int w = mons[mon].w - mons[mon].reserve_left - mons[mon].reserve_right - 2 * gaps;
-			int h = mons[mon].h - mons[mon].reserve_top - mons[mon].reserve_bottom - 2 * gaps;
-
-			XWindowChanges wc = {
-				.x = x,
-				.y = y,
-				.width = MAX(1, w - 2 * border_width),
-				.height = MAX(1, h - 2 * border_width),
-				.border_width = border_width
-			};
-			XConfigureWindow(dpy, c->win,
-					CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
-
-			c->x = wc.x;
-			c->y = wc.y;
-			c->w = wc.width;
-			c->h = wc.height;
-		}
-
-		if (focused && focused->mapped && !focused->floating && !focused->fullscreen)
-			XRaiseWindow(dpy, focused->win);
-
-		update_borders();
-		return;
-	}
 
 	for (int m = 0; m < n_mons; m++) {
 		int mon_x = mons[m].x + mons[m].reserve_left;
@@ -2785,15 +2736,6 @@ void toggle_fullscreen(void)
 		return;
 
 	apply_fullscreen(focused, !focused->fullscreen);
-}
-
-void toggle_monocle(void)
-{
-	monocle = !monocle;
-	tile();
-	update_borders();
-	if (focused)
-		set_input_focus(focused, True, True);
 }
 
 void unswallow_window(Client *c)
