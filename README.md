@@ -3,8 +3,6 @@
   <br>
   <b>A very SeXy WM</b> <br>
   <br><br>
-  <img src="https://img.shields.io/github/v/release/uint23/sxwm?style=flat-square">
-  <img src="https://img.shields.io/github/license/uint23/sxwm?style=flat-square">
 </div>
 
 ---
@@ -172,8 +170,6 @@ Or use the `sxwm.desktop` file
 > make install PREFIX=$HOME/.local
 > ```
 
----
-
 ## Thanks & Inspiration
 
 - [dwm](https://dwm.suckless.org) - Tiling & source code
@@ -181,8 +177,3 @@ Or use the `sxwm.desktop` file
 - [sowm](https://github.com/dylanaraps/sowm) - README inspiration
 - [tinywm](http://incise.org/tinywm.html) - Minimal X11 WM
 
----
-
-<p align="center">
-  <em>uint [2026]</em>
-</p>

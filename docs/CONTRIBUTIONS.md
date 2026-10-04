@@ -84,11 +84,13 @@ void do_something(void);
 
 ### Headers
 
-If you create a header file, use pragma. It is supported on most modern compilers:
+If you create a header file, use header guards.
 
 ```c
-#pragma once
+#ifdef HEADER_NAME_H
+#endif HEADER_NAME_H
 /* content */
+#endif /* HEADER_NAME_H */
 ```
 
 ### Line Length
@@ -121,19 +123,19 @@ Organize includes like this:
 
 ## File Layout
 
-* Don’t create new `.c` or `.h` files unless absolutely necessary.
+* Don't create new `.c` or `.h` files unless absolutely necessary.
 * Keep most changes within `sxwm.c` to maintain cohesion.
 
 ---
 
 ## Submitting Changes
 
-* Open a pull request with a **clear description** of what and why.
-* Keep **one purpose per commit** - don’t mix unrelated changes.
-* If fixing a bug, describe **how to reproduce it**.
+* Open a pull request with a clear description of what and why.
+* Keep one purpose per commit - don't mix unrelated changes.
+* If fixing a bug, describe how to reproduce it.
 * If adding a feature, ensure it fits with `sxwm`’s **minimalist philosophy**.
     * If said feature doesn't fit, you can make a patch instead.
-* **Open separate PRs** for unrelated changes.
+* Open separate PRs for unrelated changes.
 
 ---
 
@@ -202,3 +204,4 @@ Please ensure the following before opening a PR:
 ---
 
 **Happy hacking!**
+
