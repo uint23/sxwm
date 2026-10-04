@@ -1,7 +1,6 @@
 # Colour Themes:
 focused_border_colour    : #000000
 unfocused_border_colour  : #444444
-swap_border_colour       : #eeeeee
 
 # General Options:
 gaps                    : 5

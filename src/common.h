@@ -42,7 +42,7 @@ enum {
 	"9""\0"
 
 
-typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_SWAP } DragMode;
+typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
 typedef void (*EventHandler)(XEvent *);
 
 typedef union {
@@ -82,7 +82,6 @@ typedef struct {
 	int border_width;
 	long border_foc_col;
 	long border_ufoc_col;
-	long border_swap_col;
 	float master_width[MAX_MONITORS];
 	int motion_throttle;
 	int resize_master_amt;

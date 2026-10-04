@@ -108,7 +108,6 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
 void startup_exec(void);
 void swallow_window(Client *swallower, Client *swallowed);
-void swap_clients(Client *a, Client *b);
 /* void switch_previous_workspace(void); */
 void tile(void);
 /* void toggle_floating(void); */
@@ -176,7 +175,6 @@ Client *workspaces[NUM_WORKSPACES] = {NULL};
 Config user_config;
 DragMode drag_mode = DRAG_NONE;
 Client *drag_client = NULL;
-Client *swap_target = NULL;
 Client *focused = NULL;
 Client *ws_focused[NUM_WORKSPACES] = {NULL};
 EventHandler evtable[LASTEvent];
@@ -245,7 +243,6 @@ Client *add_client(Window w, int ws)
 	select_input(w, window_masks);
 	grab_button(Button1, None, w, False, ButtonPressMask);
 	grab_button(Button1, user_config.modkey, w, False, ButtonPressMask);
-	grab_button(Button1, user_config.modkey | ShiftMask, w, False, ButtonPressMask);
 	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
 
 	/* allow for more graceful exitting */
@@ -798,27 +795,6 @@ void hdl_button(XEvent *xev)
 		if (c->win != w)
 			continue;
 
-		Bool is_swap_mode =
-			(state & user_config.modkey) &&
-			(state & ShiftMask) &&
-			xbutton->button == left_click && !c->floating;
-		if (is_swap_mode) {
-			drag_client = c;
-			drag_start_x = xbutton->x_root;
-			drag_start_y = xbutton->y_root;
-			drag_orig_x = c->x;
-			drag_orig_y = c->y;
-			drag_orig_w = c->w;
-			drag_orig_h = c->h;
-			drag_mode = DRAG_SWAP;
-			XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
-					     GrabModeAsync, GrabModeAsync, None, cursors.move, CurrentTime);
-			focused = c;
-			set_input_focus(focused, False, False);
-			XSetWindowBorder(dpy, c->win, user_config.border_swap_col);
-			return;
-		}
-
 		Bool is_move_resize =
 			(state & user_config.modkey) &&
 			(xbutton->button == left_click ||
@@ -866,21 +842,10 @@ void hdl_button_release(XEvent *xev)
 {
 	(void)xev;
 
-	if (drag_mode == DRAG_SWAP) {
-		if (swap_target) {
-			XSetWindowBorder(dpy, swap_target->win, (swap_target == focused ?
-						     user_config.border_foc_col : user_config.border_ufoc_col));
-			swap_clients(drag_client, swap_target);
-		}
-		tile();
-		update_borders();
-	}
-
 	XUngrabPointer(dpy, CurrentTime);
 
 	drag_mode = DRAG_NONE;
 	drag_client = NULL;
-	swap_target = NULL;
 }
 
 void hdl_client_msg(XEvent *xev)
@@ -1324,49 +1289,7 @@ void hdl_motion(XEvent *xev)
 	}
 	Monitor *current_mon_motion = &mons[mon];
 
-	if (drag_mode == DRAG_SWAP) {
-		Window root_ret, child;
-		int rx, ry, wx, wy;
-		unsigned int mask;
-		XQueryPointer(dpy, root, &root_ret, &child, &rx, &ry, &wx, &wy, &mask);
-
-		Client *new_target = NULL;
-
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			if (c == drag_client || c->floating)
-				continue;
-			if (c->win == child) {
-				new_target = c;
-				break;
-			}
-			Window root_ret2, parent;
-			Window *children;
-			unsigned int n_children;
-			if (XQueryTree(dpy, child, &root_ret2, &parent, &children, &n_children)) {
-				if (children)
-					XFree(children);
-				if (parent == c->win) {
-					new_target = c;
-					break;
-				}
-			}
-		}
-
-		if (new_target != swap_target) {
-			if (swap_target) {
-				XSetWindowBorder(
-						dpy, swap_target->win, (swap_target == focused ?
-						user_config.border_foc_col : user_config.border_ufoc_col)
-				);
-			}
-			if (new_target)
-				XSetWindowBorder(dpy, new_target->win, user_config.border_swap_col);
-		}
-
-		swap_target = new_target;
-		return;
-	}
-	else if (drag_mode == DRAG_MOVE) {
+	if (drag_mode == DRAG_MOVE) {
 		int dx = motion_ev->x_root - drag_start_x;
 		int dy = motion_ev->y_root - drag_start_y;
 		int nx = drag_orig_x + dx;
@@ -1478,7 +1401,6 @@ void init_defaults(void)
 	user_config.border_width = 1;
 	user_config.border_foc_col = parse_col("#c0cbff");
 	user_config.border_ufoc_col = parse_col("#555555");
-	user_config.border_swap_col = parse_col("#fff4c0");
 	user_config.move_window_amt = 10;
 	user_config.resize_window_amt = 10;
 
@@ -1897,17 +1819,14 @@ void reload_config(void)
 			XUngrabButton(dpy, AnyButton, AnyModifier, c->win);
 
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
 	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (Client *c = workspaces[ws]; c; c = c->next) {
 			grab_button(Button1, None, c->win, False, ButtonPressMask);
 			grab_button(Button1, user_config.modkey, c->win, False, ButtonPressMask);
-			grab_button(Button1, user_config.modkey | ShiftMask, c->win, False, ButtonPressMask);
 			grab_button(Button2, user_config.modkey, c->win, False, ButtonPressMask);
 		}
 	}
@@ -2142,10 +2061,8 @@ void setup(void)
 
 	/* grab mouse button events on root window */
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	Mask root_swap_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button1, user_config.modkey | ShiftMask, root, True, root_swap_masks);
 	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
 	XSync(dpy, False);
 
@@ -2460,45 +2377,6 @@ void swallow_window(Client *swallower, Client *swallowed)
 
 	tile();
 	update_borders();
-}
-
-void swap_clients(Client *a, Client *b)
-{
-	if (!a || !b || a == b)
-		return;
-
-	Client **head = &workspaces[current_ws];
-	Client **pa = head, **pb = head;
-
-	while (*pa && *pa != a)
-		pa = &(*pa)->next;
-
-	while (*pb && *pb != b)
-		pb = &(*pb)->next;
-
-	if (!*pa || !*pb)
-		return;
-
-	/* if next to it swap */
-	if (*pa == b && *pb == a) {
-		Client *tmp = b->next;
-		b->next = a;
-		a->next = tmp;
-		*pa = b;
-		return;
-	}
-
-	/* full swap */
-	Client *ta = *pa;
-	Client *tb = *pb;
-	Client *ta_next = ta->next;
-	Client *tb_next = tb->next;
-
-	*pa = tb;
-	tb->next = ta_next == tb ? ta : ta_next;
-
-	*pb = ta;
-	ta->next = tb_next == ta ? tb : tb_next;
 }
 
 void switch_previous_workspace(void)

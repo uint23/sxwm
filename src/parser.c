@@ -437,8 +437,6 @@ int parser(Config *cfg)
 			if (parse_csv_to_array(clean, cfg->start_fullscreen, &idx, MAX_ITEMS, 1) < 0)
 				goto cleanup;
 		}
-		else if (!strcmp(key, "swap_border_colour"))
-			cfg->border_swap_col = parse_col(rest);
 		else if (!strcmp(key, "unfocused_border_colour"))
 			cfg->border_ufoc_col = parse_col(rest);
 		else if (!strcmp(key, "warp_cursor"))
