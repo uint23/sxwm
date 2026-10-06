@@ -1,25 +1,22 @@
-# tools
 CC = cc
 
-# paths
 PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
 
-# libs
 LIBS = -lX11 -lXinerama -lXcursor
 
-# flags
-CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
-CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -fdiagnostics-color=always -I/usr/X11R6/include
+CPPFLAGS = -D_DEFAULT_SOURCE
+CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -I/usr/X11R6/include
 LDFLAGS = ${LIBS} -L/usr/X11R6/lib
 
-# files
 SRC = src/sxwm.c src/parser.c
 OBJ = build/sxwm.o build/parser.o
 
+# OpenBSD (uncomment)
+# MANPREFIX = ${PREFIX}/man
+
 all: sxwm
 
-# rules
 build/sxwm.o: src/sxwm.c
 	mkdir -p build
 	${CC} -c ${CFLAGS} src/sxwm.c -o build/sxwm.o

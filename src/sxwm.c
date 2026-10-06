@@ -19,6 +19,9 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/types.h>
+#ifdef __OpenBSD__
+#include <sys/sysctl.h>
+#endif
 #include <unistd.h>
 
 #include <X11/keysym.h>
@@ -668,6 +671,7 @@ int get_monitor_for(Client *c)
 
 pid_t get_parent_process(pid_t c)
 {
+#ifdef __linux__
 	pid_t v = -1;
 	FILE *f;
 	char buf[256];
@@ -680,6 +684,17 @@ pid_t get_parent_process(pid_t c)
 	(void)no_error;
 	fclose(f);
 	return (pid_t)v;
+#endif
+#ifdef __OpenBSD__
+	struct kinfo_proc p;
+	size_t len = sizeof(struct kinfo_proc);
+	int mib[6] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, c, len, 1 };
+	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &p, &len, NULL, 0) < 0)
+		return 0;
+	if (len == 0)
+		return 0;
+	return p.p_ppid;
+#endif
 }
 
 pid_t get_pid(Window w)
