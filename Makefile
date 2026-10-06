@@ -10,7 +10,7 @@ LIBS = -lX11 -lXinerama -lXcursor
 
 # flags
 CPPFLAGS = -D_DEFAULT_SOURCE
-CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -fdiagnostics-color=always -I/usr/X11R6/include
+CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os ${CPPFLAGS} -I/usr/X11R6/include
 LDFLAGS = ${LIBS} -L/usr/X11R6/lib
 
 # files
