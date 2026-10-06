@@ -17,6 +17,9 @@ LDFLAGS = ${LIBS} -L/usr/X11R6/lib
 SRC = src/sxwm.c src/parser.c
 OBJ = build/sxwm.o build/parser.o
 
+# OpenBSD (uncomment)
+# MANPREFIX = ${PREFIX}/man
+
 all: sxwm
 
 # rules
