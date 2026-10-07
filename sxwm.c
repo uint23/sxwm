@@ -350,61 +350,57 @@ void centre_window(void)
 
 void change_workspace(int ws)
 {
-	if (ws >= NUM_WORKSPACES || ws == current_ws)
+	if (ws < 0 || ws >= NUM_WORKSPACES || ws == current_ws)
 		return;
 
-	/* remember last focus for workspace we are leaving */
-	ws_focused[current_ws] = focused;
+	Workspace *oldw = &workspaces[current_ws];
+	Workspace *neww = &workspaces[ws];
 
 	previous_workspace = current_ws;
 	current_ws = ws;
 
-	for (Client *c = workspaces[current_ws]; c; c = c->next)
-		if (c->mapped)
-			XMapWindow(dpy, c->win);
+	Client *oldc[] = { oldw->tiled, oldw->floating };
+	Client *newc[] = { neww->tiled, neww->floating };
 
-	for (Client *c = workspaces[previous_workspace]; c; c = c->next)
-		if (c->mapped)
-			XUnmapWindow(dpy, c->win);
+	/* map current workspace */
+	for (int i = 0; i < 2; i++)
+		for (Client *c = newc[i]; c; c = c->next)
+			if (c->mapped)
+				XMapWindow(dpy, c->win);
 
-	tile();
+	/* unmap previous workspace */
+	for (int i = 0; i < 2; i++)
+		for (Client *c = oldc[i]; c; c = c->next)
+			if (c->mapped)
+				XUnmapWindow(dpy, c->win);
 
-	/* restore last focused client for this workspace */
-	focused = ws_focused[current_ws];
+	/* restore previous focus, else current monitor */
+	Client *focused = NULL;
+	Client *fallback = NULL;
 
-	if (focused) {
-		Client *found = NULL;
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			if (c == focused && c->mapped) {
-				found = c;
-				break;
-			}
-		}
-		if (!found)
-			focused = NULL;
-	}
-
-	/* fallback: choose a mapped client on current_ws, preferring current_mon */
-	if (!focused && workspaces[current_ws]) {
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
+	for (int i = 0; i < 2; i++) {
+		for (Client *c = newc[i]; c; c = c->next) {
 			if (!c->mapped)
 				continue;
-			if (c->mon == current_mon) {
+
+			if (c == neww->focused) {
 				focused = c;
 				break;
 			}
-			if (!focused)
-				focused = c;
+
+			if (!fallback || (fallback->mon != current_mon && c->mon == current_mon))
+				fallback = c;
 		}
 		if (focused)
-			current_mon = focused->mon;
+			break;
 	}
 
-	set_input_focus(focused, False, True);
+	tile();
+	set_input_focus(focused ? focused : fallback, False, True);
 
-	long current_desktop = current_ws;
+	long desktop = current_ws;
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
-	                PropModeReplace, (unsigned char *)&current_desktop, 1);
+	                PropModeReplace, (unsigned char *)&desktop, 1);
 	update_client_desktop_properties();
 }
 
@@ -1897,42 +1893,34 @@ void set_frame_extents(Window w)
 
 void set_input_focus(Client *c, Bool raise_win, Bool warp)
 {
-	if (c && c->mapped) {
-		focused = c;
+	if (c && c->ws != current_ws)
+		return;
+
+	workspaces[current_ws].focused = (c && c->mapped) ? c : NULL;
+
+	if (workspaces[current_ws].focused) {
 		current_mon = CLAMP(c->mon, 0, n_mons - 1);
-
-		/* update remembered focus */
-		if (c->ws >= 0 && c->ws < NUM_WORKSPACES)
-			ws_focused[c->ws] = c;
-
 		Window w = find_toplevel(c->win);
 
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(w);
 
-		if (raise_win) {
-			if (c->floating || !user_config.floating_on_top)
-				XRaiseWindow(dpy, w);
-		}
+		if (raise_win && (client_is_floating(c) || !user_config.floating_on_top))
+			XRaiseWindow(dpy, w);
+
 		/* EWMH focus hint */
 		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
-				PropModeReplace, (unsigned char *)&w, 1);
-
-		update_borders();
+		                PropModeReplace, (unsigned char *)&w, 1);
 
 		if (warp && user_config.warp_cursor)
 			warp_cursor(c);
 	}
 	else {
-		/* no client */
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 		XDeleteProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW]);
-
-		focused = NULL;
-		ws_focused[current_ws] = NULL;
-		update_borders();
 	}
 
+	update_borders();
 	XFlush(dpy);
 }
 
@@ -2355,14 +2343,13 @@ void unlink_client(Client *c)
 
 void update_borders(void)
 {
-	for (Client *c = workspaces[current_ws]; c; c = c->next)
-		XSetWindowBorder(dpy, c->win, (c == focused ? user_config.border_foc_col : user_config.border_ufoc_col));
+	Client *focused = workspaces[current_ws].focused;
 
-	if (focused) {
-		Window w = focused->win;
-		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
-				        PropModeReplace, (unsigned char *)&w, 1);
-	}
+	for (Client *c = workspaces[current_ws].tiled; c; c = c->next)
+		XSetWindowBorder(dpy, c->win, c == focused ? user_config.border_foc_col : user_config.border_ufoc_col);
+
+	for (Client *c = workspaces[current_ws].floating; c; c = c->next)
+		XSetWindowBorder(dpy, c->win, c == focused ? user_config.border_foc_col : user_config.border_ufoc_col);
 }
 
 void update_client_desktop_properties(void)
