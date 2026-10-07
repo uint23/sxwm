@@ -109,10 +109,8 @@ typedef struct {
 } CommandEntry;
 
 typedef struct {
-	int x, y;
-	int w, h;
-	int reserve_left, reserve_right;
-	int reserve_top, reserve_bottom;
+	int x, y, w, h;
+	struct { int left, right, bottom, top; } res;
 } Monitor;
 
 typedef enum {

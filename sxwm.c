@@ -199,11 +199,6 @@ int open_windows = 0;
 int drag_start_x, drag_start_y;
 int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
-int reserve_left = 0;
-int reserve_right = 0;
-int reserve_top = 0;
-int reserve_bottom = 0;
-
 Client *add_client(Window w, int ws)
 {
 	Client *c = malloc(sizeof(Client));
@@ -1867,7 +1862,7 @@ void resize_stack_add(void)
 
 	/* Calculate maximum allowed height to prevent extending off-screen */
 	int mon = CLAMP(focused->mon, 0, n_mons - 1);
-	int mon_height = MAX(1, mons[mon].h - mons[mon].reserve_top - mons[mon].reserve_bottom);
+	int mon_height = MAX(1, mons[mon].h - mons[mon].res.top - mons[mon].res.bottom);
 	int gaps = user_config.gaps;
 	int tile_height = MAX(1, mon_height - 2 * gaps);
 
@@ -2380,10 +2375,10 @@ void tile(void)
 	Client *head = workspaces[current_ws];
 
 	for (int m = 0; m < n_mons; m++) {
-		int mon_x = mons[m].x + mons[m].reserve_left;
-		int mon_y = mons[m].y + mons[m].reserve_top;
-		int mon_width = MAX(1, mons[m].w - mons[m].reserve_left - mons[m].reserve_right);
-		int mon_height = MAX(1, mons[m].h - mons[m].reserve_top  - mons[m].reserve_bottom);
+		int mon_x = mons[m].x + mons[m].res.left;
+		int mon_y = mons[m].y + mons[m].res.top;
+		int mon_width = MAX(1, mons[m].w - mons[m].res.left - mons[m].res.right);
+		int mon_height = MAX(1, mons[m].h - mons[m].res.top  - mons[m].res.bottom);
 
 		Client *tileable[MAX_CLIENTS] = {0};
 		int n_tileable = 0;
@@ -2739,10 +2734,10 @@ void update_struts(void)
 {
 	/* reset all reserves */
 	for (int i = 0; i < n_mons; i++) {
-		mons[i].reserve_left   = 0;
-		mons[i].reserve_right  = 0;
-		mons[i].reserve_top    = 0;
-		mons[i].reserve_bottom = 0;
+		mons[i].res.left   = 0;
+		mons[i].res.right  = 0;
+		mons[i].res.top    = 0;
+		mons[i].res.bottom = 0;
 	}
 
 	Window root_ret;
@@ -2838,7 +2833,7 @@ void update_struts(void)
 						 */
 						int reserve = (int)MAX(0, left - mx);
 						if (reserve > 0)
-							mons[m].reserve_left = MAX(mons[m].reserve_left, reserve);
+							mons[m].res.left = MAX(mons[m].res.left, reserve);
 					}
 				}
 
@@ -2856,7 +2851,7 @@ void update_struts(void)
 						int overlap = (mx + mw) - global_reserved_left;
 						int reserve = MAX(0, overlap);
 						if (reserve > 0)
-							mons[m].reserve_right = MAX(mons[m].reserve_right, reserve);
+							mons[m].res.right = MAX(mons[m].res.right, reserve);
 					}
 				}
 
@@ -2871,7 +2866,7 @@ void update_struts(void)
 						 */
 						int reserve = (int)MAX(0, top - my);
 						if (reserve > 0)
-							mons[m].reserve_top = MAX(mons[m].reserve_top, reserve);
+							mons[m].res.top = MAX(mons[m].res.top, reserve);
 					}
 				}
 
@@ -2890,7 +2885,7 @@ void update_struts(void)
 						int overlap = (my + mh) - global_reserved_top;
 						int reserve = MAX(0, overlap);
 						if (reserve > 0)
-							mons[m].reserve_bottom = MAX(mons[m].reserve_bottom, reserve);
+							mons[m].res.bottom = MAX(mons[m].res.bottom, reserve);
 					}
 				}
 			}
@@ -2908,10 +2903,10 @@ void update_workarea(void)
 	long workarea[4 * MAX_MONITORS];
 
 	for (int i = 0; i < n_mons && i < MAX_MONITORS; i++) {
-		workarea[i * 4 + 0] = mons[i].x + mons[i].reserve_left;
-		workarea[i * 4 + 1] = mons[i].y + mons[i].reserve_top;
-		workarea[i * 4 + 2] = mons[i].w - mons[i].reserve_left - mons[i].reserve_right;
-		workarea[i * 4 + 3] = mons[i].h - mons[i].reserve_top - mons[i].reserve_bottom;
+		workarea[i * 4 + 0] = mons[i].x + mons[i].res.left;
+		workarea[i * 4 + 1] = mons[i].y + mons[i].res.top;
+		workarea[i * 4 + 2] = mons[i].w - mons[i].res.left - mons[i].res.right;
+		workarea[i * 4 + 3] = mons[i].h - mons[i].res.top - mons[i].res.bottom;
 	}
 
 	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, n_mons * 4);
