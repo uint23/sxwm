@@ -1250,23 +1250,25 @@ void init_defaults(void)
 
 void move_master_next(void)
 {
-	if (!workspaces[current_ws] || !workspaces[current_ws]->next)
+	Client **head = &workspaces[current_ws].tiled;
+	if (!*head || !(*head)->next)
 		return;
 
-	Client *first = workspaces[current_ws];
-	Client *old_focused = focused;
+	Client *first = *head;
+	Client *old_focused = workspaces[current_ws].focused;
 
-	workspaces[current_ws] = first->next;
-	first->next = NULL;
+	*head = first->next;
+	(*head)->prev = NULL;
 
-	Client *tail = get_last_client(workspaces[current_ws]);
+	Client *tail = get_last_client(*head);
 	tail->next = first;
+	first->prev = tail;
+	first->next = NULL;
 
 	tile();
 
 	if (user_config.warp_cursor && old_focused)
 		warp_cursor(old_focused);
-
 	if (old_focused)
 		send_wm_take_focus(old_focused->win);
 
@@ -1275,20 +1277,21 @@ void move_master_next(void)
 
 void move_master_prev(void)
 {
-	if (!workspaces[current_ws] || !workspaces[current_ws]->next)
+	Client **head = &workspaces[current_ws].tiled;
+	if (!*head || !(*head)->next)
 		return;
 
-	Client *cur = get_last_client(workspaces[current_ws]);
-	Client *prev = cur->prev;
-	Client *old_focused = focused;
+	Client *last = get_last_client(*head);
+	Client *old_focused = workspaces[current_ws].focused;
 
-	if (prev)
-		prev->next = NULL;
-
-	cur->next = workspaces[current_ws];
-	workspaces[current_ws] = cur;
+	last->prev->next = NULL;
+	last->prev = NULL;
+	last->next = *head;
+	(*head)->prev = last;
+	*head = last;
 
 	tile();
+
 	if (user_config.warp_cursor && old_focused)
 		warp_cursor(old_focused);
 	if (old_focused)
