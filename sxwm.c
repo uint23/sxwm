@@ -48,6 +48,7 @@ Window find_toplevel(Window w);
 /* void focus_prev(void); */
 /* void focus_next_mon(void); */
 /* void focus_prev_mon(void); */
+Bool get_cursor_xy(int *x, int *y);
 int get_monitor_for(Client *c);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
@@ -242,18 +243,13 @@ Client *add_client(Window w, int ws)
 	c->h = wa.height;
 
 	/* set monitor based on cursor location */
-	Window root_ret, child_ret;
-	int root_x, root_y,
-		win_x, win_y;
-	unsigned int masks;
-	int cursor_mon = 0;
-
-	if (XQueryPointer(dpy, root, &root_ret, &child_ret, &root_x, &root_y, &win_x, &win_y, &masks)) {
+	int cx, cy, cursor_mon = 0;
+	if (get_cursor_xy(&cx, &cy)) {
 		for (int i = 0; i < n_mons; i++) {
-			Bool in_mon = root_x >= mons[i].x &&
-				          root_x < mons[i].x + mons[i].w &&
-				          root_y >= mons[i].y &&
-			              root_y < mons[i].y + mons[i].h;
+			Bool in_mon = cx >= mons[i].x &&
+			              cx < mons[i].x + mons[i].w &&
+			              cy >= mons[i].y &&
+			              cy < mons[i].y + mons[i].h;
 			if (in_mon) {
 				cursor_mon = i;
 				break;
@@ -614,6 +610,18 @@ void focus_prev_mon(void)
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
 		XSync(dpy, False);
 	}
+}
+
+Bool get_cursor_xy(int *x, int *y);
+{
+	Window root_ret, child_ret;
+	int win_x, win_y;
+	unsigned int masks;
+
+	return XQueryPointer(
+		dpy, root, &root_ret, &child_ret,
+		x, y, &win_x, &win_y, &masks
+	);
 }
 
 int get_monitor_for(Client *c)
