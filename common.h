@@ -61,19 +61,17 @@ typedef struct {
 
 typedef struct Client {
 	Window win;
-	int x, y, h, w;
+	int x, y, w, h;
 	int orig_x, orig_y, orig_w, orig_h;
 	int custom_stack_height;
 	int mon;
 	int ws;
 	Bool fixed;
-	Bool floating;
 	Bool fullscreen;
 	Bool mapped;
 	pid_t pid;
 	struct Client *next;
-	struct Client *swallowed;
-	struct Client *swallower;
+	struct Client *prev;
 } Client;
 
 typedef struct {
@@ -112,6 +110,14 @@ typedef struct {
 	int x, y, w, h;
 	struct { int left, right, bottom, top; } res;
 } Monitor;
+
+typedef struct {
+	int x, y;
+} Point;
+
+typedef struct {
+	Client *focused, *floating, *tiled;
+} Workspace;
 
 typedef enum {
 	ATOM_NET_ACTIVE_WINDOW,
