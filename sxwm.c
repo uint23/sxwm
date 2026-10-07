@@ -43,6 +43,7 @@ void change_workspace(int ws);
 int clean_mask(int mask);
 Bool client_is_floating(Client *c);
 /* void close_focused(void); */
+void configure_tile(Client *c, int x, int y, int w, int h);
 /* void dec_gaps(void); */
 Client *find_client(Window w);
 Window find_toplevel(Window w);
@@ -454,6 +455,26 @@ void close_focused(void)
 	}
 	XUnmapWindow(dpy, focused->win);
 	XKillClient(dpy, focused->win);
+}
+
+void configure_tile(Client *c, int x, int y, int w, int h)
+{
+	int bw = 2 * user_config.border_width;
+	w = MAX(1, w - bw);
+	h = MAX(1, h - bw);
+
+	if (c->x != x || c->y != y || c->w != w || c->h != h) {
+		XWindowChanges wc = {
+			.x = x, .y = y, .width = w, .height = h,
+			.border_width = user_config.border_width
+		};
+		XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
+	}
+
+	c->x = x;
+	c->y = y;
+	c->w = w;
+	c->h = h;
 }
 
 void dec_gaps(void)
@@ -2120,152 +2141,88 @@ void switch_client_list(Client *c, Bool floating)
 void tile(void)
 {
 	update_struts();
-	Client *head = workspaces[current_ws];
 
 	for (int m = 0; m < n_mons; m++) {
-		int mon_x = mons[m].x + mons[m].res.left;
-		int mon_y = mons[m].y + mons[m].res.top;
-		int mon_width = MAX(1, mons[m].w - mons[m].res.left - mons[m].res.right);
-		int mon_height = MAX(1, mons[m].h - mons[m].res.top  - mons[m].res.bottom);
+		Client *clients[MAX_CLIENTS];
+		int n = 0;
 
-		Client *tileable[MAX_CLIENTS] = {0};
-		int n_tileable = 0;
-		for (Client *c = head; c && n_tileable < MAX_CLIENTS; c = c->next) {
-			if (c->mapped && !c->floating && !c->fullscreen && c->mon == m)
-				tileable[n_tileable++] = c;
-		}
+		for (Client *c = workspaces[current_ws].tiled; c && n < MAX_CLIENTS; c = c->next)
+			if (c->mapped && !c->fullscreen && c->mon == m)
+				clients[n++] = c;
 
-		if (n_tileable == 0)
+		if (!n)
 			continue;
 
+		Monitor *mon = &mons[m];
 		int gaps = user_config.gaps;
-		int tile_x = mon_x + gaps;
-		int tile_y = mon_y + gaps;
-		int tile_width = MAX(1, mon_width - 2 * gaps);
-		int tile_height = MAX(1, mon_height - 2 * gaps);
-		float master_frac = CLAMP(user_config.master_width[m], MF_MIN, MF_MAX);
-		int master_width = (n_tileable > 1) ? (int)(tile_width * master_frac) : tile_width;
-		int stack_width = (n_tileable > 1) ? (tile_width - master_width - gaps) : 0;
+		int x = mon->x + mon->res.left + gaps;
+		int y = mon->y + mon->res.top + gaps;
+		int w = MAX(1, mon->w - mon->res.left - mon->res.right - 2 * gaps);
+		int h = MAX(1, mon->h - mon->res.top - mon->res.bottom - 2 * gaps);
+		int master_w = n > 1 ? (int)(w * CLAMP(user_config.master_width[m], MF_MIN, MF_MAX)) : w;
 
-		{
-			Client *c = tileable[0];
-			int border_width = 2 * user_config.border_width;
-			XWindowChanges wc = {
-				.x = tile_x,
-				.y = tile_y,
-				.width = MAX(1, master_width - border_width),
-				.height = MAX(1, tile_height - border_width),
-				.border_width = user_config.border_width
-			};
+		/* master */
+		configure_tile(clients[0], x, y, master_w, h);
 
-			Bool geom_differ =
-				c->x != wc.x || c->y != wc.y ||
-				c->w != wc.width || c->h != wc.height;
-			if (geom_differ)
-				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
-
-			c->x = wc.x;
-			c->y = wc.y;
-			c->w = wc.width;
-			c->h = wc.height;
-		}
-
-		if (n_tileable == 1) {
-			update_borders();
+		if (n == 1)
 			continue;
-		}
 
-		int border_width = 2 * user_config.border_width;
-		int n_stack = n_tileable - 1;
-		int min_stack_height = border_width + 1;
-		int total_fixed_heights = 0;
-		int n_auto = 0; /* automatically take up leftover space */
-		int heights_final[MAX_CLIENTS] = {0};
+		/* stack */
+		int stack_x = x + master_w + gaps;
+		int stack_w = w - master_w - gaps;
+		int n_stack = n - 1;
+		int min_h = 2 * user_config.border_width + 1;
+		int heights[MAX_CLIENTS] = {0};
+		int available = h - (n_stack - 1) * gaps;
+		int n_auto = 0;
 
-		for (int i = 1 ; i < n_tileable; i++) { /* i=1 - we are excluding master */
-			if (tileable[i]->custom_stack_height > 0)
-				total_fixed_heights += tileable[i]->custom_stack_height;
+		for (int i = 1; i < n; i++) {
+			if (clients[i]->custom_stack_height > 0)
+				available -= clients[i]->custom_stack_height;
 			else
 				n_auto++;
 		}
 
-		int total_vgaps = (n_stack - 1) * gaps;
-		int remaining = tile_height - total_fixed_heights - total_vgaps;
+		Bool enough = n_auto && available >= n_auto * min_h;
+		int auto_h = enough ? available / n_auto : min_h;
+		int auto_left = available;
+		int auto_count = n_auto;
 
-		if (n_auto > 0 && remaining >= n_auto * min_stack_height) {
-			int used = 0;
-			int count = 0;
-			int auto_height = remaining / n_auto;
-
-			for (int i = 1; i < n_tileable; i++) {
-				if (tileable[i]->custom_stack_height > 0) {
-					heights_final[i] = tileable[i]->custom_stack_height;
-				}
-				else {
-					count++;
-					heights_final[i] = (count < n_auto) ? auto_height : remaining - used;
-					used += auto_height;
-				}
+		for (int i = 1; i < n; i++) {
+			if (clients[i]->custom_stack_height > 0) {
+				heights[i] = clients[i]->custom_stack_height;
+				continue;
 			}
-		}
-		else {
-			for (int i = 1; i < n_tileable; i++) {
-				if (tileable[i]->custom_stack_height > 0)
-					heights_final[i] = tileable[i]->custom_stack_height;
-				else
-					heights_final[i] = min_stack_height;
-			}
+
+			heights[i] = enough && auto_count == 1 ? auto_left : auto_h;
+			auto_left -= heights[i];
+			auto_count--;
 		}
 
-		int total_height = total_vgaps;
-		for (int i = 1; i < n_tileable; i++)
-			total_height += heights_final[i];
+		/* calculate occupied height */
+		int occupied = (n_stack - 1) * gaps;
+		for (int i = 1; i < n; i++)
+			occupied += heights[i];
 
-		int overfill = total_height - tile_height;
-		if (overfill > 0) {
-			/* shrink from top down, excluding bottom */
-			for (int i = 1; i < n_tileable - 1 && overfill > 0; i++) {
-				int shrink = MIN(overfill, heights_final[i] - min_stack_height);
-				heights_final[i] -= shrink;
-				overfill -= shrink;
-			}
+		/* shrink overflowing windows */
+		for (int i = 1; i < n - 1 && occupied > h; i++) {
+			int shrink = MIN(occupied - h, MAX(0, heights[i] - min_h));
+			heights[i] -= shrink;
+			occupied -= shrink;
 		}
 
-		/* if its not perfectly filled stretch bottom to absorb remainder */
-		int actual_height = total_vgaps;
-		for (int i = 1; i < n_tileable; i++)
-			actual_height += heights_final[i];
+		/* bottom window takes unused space */
+		if (occupied < h)
+			heights[n - 1] += h - occupied;
 
-		int shortfall = tile_height - actual_height;
-		if (shortfall > 0)
-			heights_final[n_tileable - 1] += shortfall;
-
-		int stack_y = tile_y;
-		for (int i = 1; i < n_tileable; i++) {
-			Client *c = tileable[i];
-			XWindowChanges wc = {
-				.x = tile_x + master_width + gaps,
-				.y = stack_y,
-				.width = MAX(1, stack_width - (2 * user_config.border_width)),
-				.height = MAX(1, heights_final[i] - (2 * user_config.border_width)),
-				.border_width = user_config.border_width
-			};
-
-			Bool geom_differ =
-				c->x != wc.x || c->y != wc.y ||
-				c->w != wc.width || c->h != wc.height;
-			if (geom_differ)
-				XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
-
-			c->x = wc.x;
-			c->y = wc.y;
-			c->w = wc.width;
-			c->h = wc.height;
-
-			stack_y += heights_final[i] + gaps;
+		int stack_y = y;
+		for (int i = 1; i < n; i++) {
+			configure_tile(clients[i], stack_x, stack_y, stack_w, heights[i]);
+			stack_y += heights[i] + gaps;
 		}
-		update_borders();
 	}
+
+	update_borders();
 }
 
 void toggle_floating(void)
