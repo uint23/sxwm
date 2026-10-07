@@ -188,7 +188,6 @@ int current_ws = 0;
 int current_mon = 0;
 long last_motion_time = 0;
 Bool global_floating = False;
-Bool in_ws_switch = False;
 Bool running = False;
 
 Mask numlock_mask = 0;
@@ -379,19 +378,16 @@ void change_workspace(int ws)
 	/* remember last focus for workspace we are leaving */
 	ws_focused[current_ws] = focused;
 
-	in_ws_switch = True;
-	XGrabServer(dpy); /* freeze rendering for tearless switching */
-
-	for (Client *c = workspaces[current_ws]; c; c = c->next)
-		if (c->mapped)
-			XUnmapWindow(dpy, c->win);
-
 	previous_workspace = current_ws;
 	current_ws = ws;
 
 	for (Client *c = workspaces[current_ws]; c; c = c->next)
 		if (c->mapped)
 			XMapWindow(dpy, c->win);
+
+	for (Client *c = workspaces[previous_workspace]; c; c = c->next)
+		if (c->mapped)
+			XUnmapWindow(dpy, c->win);
 
 	tile();
 
@@ -430,12 +426,8 @@ void change_workspace(int ws)
 
 	long current_desktop = current_ws;
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
-                    PropModeReplace, (unsigned char *)&current_desktop, 1);
+	                PropModeReplace, (unsigned char *)&current_desktop, 1);
 	update_client_desktop_properties();
-
-	XUngrabServer(dpy);
-	XSync(dpy, False);
-	in_ws_switch = False;
 }
 
 int check_parent(pid_t p, pid_t c)
@@ -1372,13 +1364,11 @@ void hdl_property_ntf(XEvent *xev)
 
 void hdl_unmap_ntf(XEvent *xev)
 {
-	if (!in_ws_switch) {
-		Window w = xev->xunmap.window;
-		for (Client *c = workspaces[current_ws]; c; c = c->next) {
-			if (c->win == w) {
-				c->mapped = False;
-				break;
-			}
+	Window w = xev->xunmap.window;
+	for (Client *c = workspaces[current_ws]; c; c = c->next) {
+		if (c->win == w) {
+			c->mapped = False;
+			break;
 		}
 	}
 
