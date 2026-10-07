@@ -174,6 +174,13 @@ struct {
 	Cursor resize;
 } cursors;
 
+struct {
+	int type;
+	int sx, sy; /* start (x, y) */
+	int ox, oy, ow, oh; /* original (x, y), (w, h) */
+	Client* c;
+} drag;
+
 Workspace workspaces[NUM_WORKSPACES] = {NULL};
 Config user_config;
 DragMode drag_mode = DRAG_NONE;
@@ -197,8 +204,6 @@ Mask mode_switch_mask = 0;
 int scr_width;
 int scr_height;
 int open_windows = 0;
-int drag_start_x, drag_start_y;
-int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
 
 Client *add_client(Window w, Bool floating, int ws)
 {
@@ -756,64 +761,47 @@ void grab_keys(void)
 
 void hdl_button(XEvent *xev)
 {
-	XButtonEvent *xbutton = &xev->xbutton;
-	Window w = (xbutton->subwindow != None) ? xbutton->subwindow : xbutton->window;
-	w = find_toplevel(w);
+	XButtonEvent *ev = &xev->xbutton;
+	Window w = ev->subwindow != None ? ev->subwindow : ev->window;
+	Client *c = find_client(find_toplevel(w));
+	Bool mod = (clean_mask(ev->state) & user_config.modkey) == user_config.modkey;
 
-	Mask left_click = Button1;
-	Mask right_click = Button3;
-	int state = clean_mask(xbutton->state);
-
-	XAllowEvents(dpy, ReplayPointer, xbutton->time);
-	if (!w)
-		return;
-
-	Client *head = workspaces[current_ws];
-	for (Client *c = head; c; c = c->next) {
-		if (c->win != w)
-			continue;
-
-		Bool is_move_resize =
-			(state & user_config.modkey) &&
-			(xbutton->button == left_click ||
-			 xbutton->button == right_click) && !c->floating;
-		if (is_move_resize) {
-			focused = c;
-			toggle_floating();
-		}
-
-		Bool is_single_click = 
-			!(state & user_config.modkey) &&
-			xbutton->button == left_click;
-		if (is_single_click) {
-			focused = c;
-			set_input_focus(focused, True, False);
-			return;
-		}
-
-		if (!c->floating)
-			return;
-
-		if (c->fixed && xbutton->button == right_click)
-			return;
-
-		Cursor cursor = (xbutton->button == left_click) ? cursors.move : cursors.resize;
-		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
-				     GrabModeAsync, GrabModeAsync, None, cursor, CurrentTime);
-
-		drag_client = c;
-		drag_start_x = xbutton->x_root;
-		drag_start_y = xbutton->y_root;
-		drag_orig_x = c->x;
-		drag_orig_y = c->y;
-		drag_orig_w = c->w;
-		drag_orig_h = c->h;
-		drag_mode = (xbutton->button == left_click) ? DRAG_MOVE : DRAG_RESIZE;
-		focused = c;
-
-		set_input_focus(focused, True, False);
+	if (!c || c->ws != current_ws) {
+		XAllowEvents(dpy, ReplayPointer, ev->time);
 		return;
 	}
+
+	if (!mod) {
+		if (ev->button == Button1)
+			set_input_focus(c, True, False);
+		XAllowEvents(dpy, ReplayPointer, ev->time);
+		return;
+	}
+
+	XAllowEvents(dpy, AsyncPointer, ev->time);
+
+	if (ev->button != Button1 && ev->button != Button3)
+		return;
+	if (c->fixed && ev->button == Button3)
+		return;
+
+	set_input_focus(c, True, False);
+	if (!client_is_floating(c))
+		toggle_floating();
+
+	Cursor cursor = ev->button == Button1 ? cursors.move : cursors.resize;
+	if (XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
+	                 GrabModeAsync, GrabModeAsync, None, cursor, ev->time) != GrabSuccess)
+		return;
+
+	drag.c = c;
+	drag.mode = ev->button == Button1 ? DRAG_MOVE : DRAG_RESIZE;
+	drag.sx = ev->x_root;
+	drag.sy = ev->y_root;
+	drag.ox = c->x;
+	drag.oy = c->y;
+	drag.ow = c->w;
+	drag.oh = c->h;
 }
 
 void hdl_button_release(XEvent *xev)
@@ -879,28 +867,23 @@ void hdl_config_ntf(XEvent *xev)
 
 void hdl_config_req(XEvent *xev)
 {
-	XConfigureRequestEvent *config_ev = &xev->xconfigurerequest;
-	Client *c = NULL;
+	XConfigureRequestEvent *ev = &xev->xconfigurerequest;
+	Client *c = find_client(ev->window);
 
-	for (int i = 0; i < NUM_WORKSPACES && !c; i++)
-		for (c = workspaces[i]; c; c = c->next)
-			if (c->win == config_ev->window)
-				break;
-
-	if (!c || c->floating || c->fullscreen) {
-		/* allow client to configure itself */
-		XWindowChanges wc = {
-			.x = config_ev->x,
-			.y = config_ev->y,
-			.width = config_ev->width,
-			.height = config_ev->height,
-			.border_width = config_ev->border_width,
-			.sibling = config_ev->above,
-			.stack_mode = config_ev->detail
-		};
-		XConfigureWindow(dpy, config_ev->window, config_ev->value_mask, &wc);
+	if (c && (!client_is_floating(c) || c->fullscreen))
 		return;
-	}
+
+	/* allow client to configure itself */
+	XWindowChanges wc = {
+		.x = ev->x,
+		.y = ev->y,
+		.width = ev->width,
+		.height = ev->height,
+		.border_width = ev->border_width,
+		.sibling = ev->above,
+		.stack_mode = ev->detail
+	};
+	XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
 }
 
 void hdl_dummy(XEvent *xev)
@@ -1195,17 +1178,17 @@ void hdl_property_ntf(XEvent *xev)
 
 void hdl_unmap_ntf(XEvent *xev)
 {
-	Window w = xev->xunmap.window;
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (c->win == w) {
-			c->mapped = False;
-			break;
-		}
-	}
+	Client *c = find_client(xev->xunmap.window);
+	if (!c || c->ws != current_ws || !c->mapped)
+		return;
 
-	update_net_client_list();
+	c->mapped = False;
 	tile();
-	update_borders();
+
+	if (workspaces[current_ws].focused == c)
+		set_input_focus(NULL, False, False);
+	else
+		update_borders();
 }
 
 void inc_gaps(void)
