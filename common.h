@@ -43,6 +43,7 @@ enum {
 
 
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
+typedef enum { WINDOW_NORMAL, WINDOW_FLOAT, WINDOW_DOCK } WindowType;
 typedef void (*EventHandler)(XEvent *);
 
 typedef union {

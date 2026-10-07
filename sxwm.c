@@ -37,9 +37,11 @@
 
 Client *add_client(Window w, Bool floating, int ws);
 void apply_fullscreen(Client *c, Bool on);
+void centre_client(Client *c);
 /* void centre_window(void); */
 void change_workspace(int ws);
 int clean_mask(int mask);
+Bool client_is_floating(Client *c);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
 Client *find_client(Window w);
@@ -52,6 +54,7 @@ Bool get_cursor_point(Point* p);
 Client* get_last_client(Client *root);
 int get_monitor_for_point(Point p);
 Point get_window_center(Client* c);
+WindowType get_window_type(Window w);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
 void grab_keys(void);
@@ -107,10 +110,12 @@ int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
 void startup_exec(void);
 /* void switch_previous_workspace(void); */
+void switch_client_list(Client *c, Bool floating);
 void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
+void unlink_client(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
 void update_modifier_masks(void);
@@ -120,6 +125,7 @@ void update_struts(void);
 void update_workarea(void);
 void warp_cursor(Client *c);
 Bool window_has_ewmh_state(Window w, Atom state);
+Bool window_matches_class(Window w, char ***rules);
 void window_set_ewmh_state(Window w, Atom state, Bool add);
 Bool window_should_float(Window w);
 Bool window_should_start_fullscreen(Window w);
@@ -234,18 +240,18 @@ Client *add_client(Window w, Bool floating, int ws)
 	c->mapped = True;
 	c->custom_stack_height = 0;
 
-	Client *head = floating ? workspaces[ws].floating : workspaces[ws].tiled;
+	Client **head = floating ? &workspaces[ws].floating : &workspaces[ws].tiled;
 
-	if (!head) {
-		head = c;
+	if (!*head) {
+		*head = c;
 	}
 	else if (!floating && user_config.new_win_master) {
-		c->next = head;
-		head->prev = c;
-		head = c;
+		c->next = *head;
+		(*head)->prev = c;
+		*head = c;
 	}
 	else {
-		Client* tail = get_last_client(head);
+		Client* tail = get_last_client(*head);
 		c->prev = tail;
 		tail->next = c;
 	}
@@ -322,20 +328,24 @@ void apply_fullscreen(Client *c, Bool on)
 	}
 }
 
-void centre_window(void)
+void centre_client(Client *c)
 {
-	if (!focused || !focused->mapped || !focused->floating)
+	if (!c || n_mons < 1)
 		return;
 
-	focused->mon = CLAMP(get_monitor_for_point(get_window_center(focused)), 0, n_mons - 1);
-	int x = mons[focused->mon].x + (mons[focused->mon].w - focused->w) / 2;
-	int y = mons[focused->mon].y + (mons[focused->mon].h - focused->h) / 2;
-	x -= user_config.border_width;
-	y -= user_config.border_width;
+	c->x = mons[c->mon].x + (mons[c->mon].w - c->w) / 2 - user_config.border_width;
+	c->y = mons[c->mon].y + (mons[c->mon].h - c->h) / 2 - user_config.border_width;
+	XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
+}
 
-	focused->x = x;
-	focused->y = y;
-	XMoveWindow(dpy, focused->win, x, y);
+void centre_window(void)
+{
+	Client *c = workspaces[current_ws].focused;
+	if (!c || !c->mapped || !client_is_floating(c))
+		return;
+
+	c->mon = get_monitor_for_point(get_window_center(c));
+	centre_client(c);
 }
 
 void change_workspace(int ws)
@@ -403,6 +413,17 @@ int clean_mask(int mask)
 	return mask & ~(LockMask | numlock_mask | mode_switch_mask);
 }
 
+Bool client_is_floating(Client *c)
+{
+	if (!c || c->ws < 0 || c->ws >= NUM_WORKSPACES)
+		return False;
+
+	for (Client *p = workspaces[c->ws].floating; p; p = p->next)
+		if (p == c)
+			return True;
+	return False;
+}
+
 void close_focused(void)
 {
 	if (!focused)
@@ -410,7 +431,6 @@ void close_focused(void)
 
 	Atom *protocols;
 	int n_protocols;
-	/* get number of protocols a window possesses and check if any == WM_DELETE_WINDOW (supports it) */
 	if (XGetWMProtocols(dpy, focused->win, &protocols, &n_protocols) && protocols) {
 		for (int i = 0; i < n_protocols; i++) {
 			if (protocols[i] == atoms[ATOM_WM_DELETE_WINDOW]) {
@@ -418,7 +438,8 @@ void close_focused(void)
 					.type = ClientMessage,
 					.window = focused->win,
 					.message_type = atoms[ATOM_WM_PROTOCOLS],
-					.format = 32}};
+					.format = 32}
+				};
 
 				ev.xclient.data.l[0] = atoms[ATOM_WM_DELETE_WINDOW];
 				ev.xclient.data.l[1] = CurrentTime;
@@ -445,11 +466,14 @@ void dec_gaps(void)
 
 Client *find_client(Window w)
 {
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
-		for (Client *c = workspaces[ws]; c; c = c->next)
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+		for (Client *c = workspaces[ws].tiled; c; c = c->next)
 			if (c->win == w)
 				return c;
-
+		for (Client *c = workspaces[ws].floating; c; c = c->next)
+			if (c->win == w)
+				return c;
+	}
 	return NULL;
 }
 
@@ -580,7 +604,7 @@ void focus_prev_mon(void)
 	}
 }
 
-Bool get_cursor_point(Point* p);
+Bool get_cursor_point(Point* p)
 {
 	Window root_ret, child_ret;
 	int win_x, win_y;
@@ -608,9 +632,50 @@ int get_monitor_for_point(Point p)
 	return 0;
 }
 
-Point get_window_center(Client* c)
+Point get_window_center(Client *c)
 {
-	return { c->x + (c->w / 2), c->y + (c->h / 2) };
+	return (Point){ c->x + c->w / 2, c->y + c->h / 2 };
+}
+
+WindowType get_window_type(Window w)
+{
+	Atom actual_type;
+	int format;
+	unsigned long count, remaining;
+	Atom *types = NULL;
+	WindowType type = WINDOW_NORMAL;
+
+	Bool prop = XGetWindowProperty(
+		dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 32, False, XA_ATOM,
+		&actual_type, &format, &count, &remaining, (unsigned char **)&types
+	) == Success && actual_type == XA_ATOM && format == 32 && types;
+
+	if (prop) {
+		for (unsigned long i = 0; i < count; i++) {
+			Atom t = types[i];
+
+			if (t == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
+				type = WINDOW_DOCK;
+				break;
+			}
+
+			if (t == atoms[ATOM_NET_WM_WINDOW_TYPE_UTILITY] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_DIALOG] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLBAR] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_SPLASH] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_POPUP_MENU] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_DROPDOWN_MENU] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_MENU] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLTIP] ||
+			    t == atoms[ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION])
+				type = WINDOW_FLOAT;
+		}
+	}
+
+	if (types)
+		XFree(types);
+
+	return type;
 }
 
 int get_workspace_for_window(Window w)
@@ -800,9 +865,6 @@ void hdl_client_msg(XEvent *xev)
 					want = !want;
 
 				apply_fullscreen(c, want);
-
-				if (want)
-					XRaiseWindow(dpy, c->win);
 			}
 			/* TODO: other states */
 		}
@@ -852,62 +914,52 @@ void hdl_dummy(XEvent *xev)
 
 void hdl_destroy_ntf(XEvent *xev)
 {
-	Window w = xev->xdestroywindow.window;
+	Client *c = find_client(xev->xdestroywindow.window);
+	if (!c)
+		return;
 
-	for (int i = 0; i < NUM_WORKSPACES; i++) {
-		Client *prev = NULL;
-		Client *c = workspaces[i];
+	int ws = c->ws;
+	Bool was_focused = workspaces[ws].focused == c;
+	Client *prev = c->prev;
+	Client *next = c->next;
 
-		while (c && c->win != w) {
-			prev = c;
-			c = c->next;
-		}
+	/* unlink from workspace list */
+	unlink_client(c);
+	if (was_focused)
+		workspaces[ws].focused = NULL;
+	if (drag_client == c) {
+		drag_client = NULL;
+		drag_mode = DRAG_NONE;
+	}
+	free(c);
+	open_windows--;
+	update_net_client_list();
 
-		if (!c)
-			continue;
+	if (ws != current_ws)
+		return;
 
-		for (int ws = 0; ws < NUM_WORKSPACES; ws++)
-			if (ws_focused[ws] == c)
-				ws_focused[ws] = NULL;
+	tile();
+	update_borders();
 
-		if (focused == c)
-			focused = NULL;
+	if (!was_focused)
+		return;
 
-		/* unlink from workspace list */
-		if (!prev)
-			workspaces[i] = c->next;
-		else
-			prev->next = c->next;
-
-		free(c);
-		update_net_client_list();
-		open_windows--;
-
-		if (i == current_ws) {
-			tile();
-			update_borders();
-
-			/* prefer previous window else next */
-			Client *foc_new = NULL;
-			if (prev && prev->mapped && prev->mon == current_mon)
-				foc_new = prev;
-			else {
-				for (Client *p = workspaces[i]; p; p = p->next) {
-					if (!p->mapped || p->mon != current_mon)
-						continue;
+	/* prefer previous window else next */
+	Client *foc_new = NULL;
+	if (prev && prev->mapped && prev->mon == current_mon)
+		foc_new = prev;
+	else if (next && next->mapped && next->mon == current_mon)
+		foc_new = next;
+	else {
+		Client *lists[] = { workspaces[ws].tiled, workspaces[ws].floating };
+		for (int i = 0; i < 2 && !foc_new; i++)
+			for (Client *p = lists[i]; p; p = p->next)
+				if (p->mapped && p->mon == current_mon) {
 					foc_new = p;
 					break;
 				}
-			}
-
-			if (foc_new)
-				set_input_focus(foc_new, True, True);
-			else
-				set_input_focus(NULL, False, False);
-		}
-
-		return;
 	}
+	set_input_focus(foc_new, True, True);
 }
 
 void hdl_keypress(XEvent *xev)
@@ -939,167 +991,104 @@ void hdl_mapping_ntf(XEvent *xev)
 void hdl_map_req(XEvent *xev)
 {
 	Window w = xev->xmaprequest.window;
-	XWindowAttributes win_attr;
+	XWindowAttributes wa;
 
-	if (!XGetWindowAttributes(dpy, w, &win_attr))
+	if (!XGetWindowAttributes(dpy, w, &wa))
 		return;
 
-	/* skips invisible windows */
-	if (win_attr.override_redirect || win_attr.width <= 0 || win_attr.height <= 0) {
+	if (wa.override_redirect || wa.width <= 0 || wa.height <= 0) {
 		XMapWindow(dpy, w);
 		return;
 	}
 
-	/* check if this window is already managed on any workspace */
+	/* already managed */
 	Client *c = find_client(w);
 	if (c) {
-		if (c->ws == current_ws) {
-			if (!c->mapped) {
-				XMapWindow(dpy, w);
-				c->mapped = True;
-			}
-			if (user_config.new_win_focus) {
-				focused = c;
-				set_input_focus(c, True, True);
-				return; /* set_input_focus already calls update_borders */
-			}
-			update_borders();
+		if (c->ws != current_ws)
+			return;
+
+		if (!c->mapped) {
+			XMapWindow(dpy, w);
+			c->mapped = True;
 		}
+
+		if (user_config.new_win_focus)
+			set_input_focus(c, True, True);
+		else
+			update_borders();
 		return;
 	}
 
-
-	Atom type;
-	int format;
-	unsigned long n_items, after;
-	Atom *types = NULL;
-	Bool should_float = False;
-
-	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 4, False, XA_ATOM, &type, &format,
-	    &n_items, &after, (unsigned char **)&types) == Success && types) {
-
-		for (unsigned long i = 0; i < n_items; i++) {
-			if (types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
-				XFree(types);
-				XMapWindow(dpy, w);
-				return;
-			}
-
-			if (types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_UTILITY] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DIALOG]  ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLBAR] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_SPLASH]  ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_POPUP_MENU] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_DROPDOWN_MENU] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_MENU] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_TOOLTIP] ||
-				types[i] == atoms[ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION]) {
-				should_float = True;
-				break;
-			}
-		}
-		XFree(types);
+	WindowType type = get_window_type(w);
+	if (type == WINDOW_DOCK) {
+		XMapWindow(dpy, w);
+		return;
 	}
 
-	if (!should_float)
-		should_float = window_should_float(w);
-
-	if (!should_float) {
-		Atom state_type;
-		Atom *state_atoms = NULL;
-		int state_format;
-		unsigned long bytes_after;
-		n_items = 0;
-
-		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 8, False, XA_ATOM, &state_type, &state_format, &n_items,
-					           &bytes_after, (unsigned char**)&state_atoms) == Success && state_atoms) {
-			for (unsigned long i = 0; i < n_items; i++) {
-				if (state_atoms[i] == atoms[ATOM_NET_WM_STATE_MODAL]) {
-					should_float = True;
-					break;
-				}
-			}
-			XFree(state_atoms);
-		}
-	}
-
-	if (open_windows == MAX_CLIENTS) {
+	if (open_windows >= MAX_CLIENTS) {
 		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
-	int target_ws = get_workspace_for_window(w);
-	c = add_client(w, target_ws);
-	if (!c)
-		return;
-	set_wm_state(w, NormalState);
+	/* classify window before adding */
+	Bool fullscreen = window_should_start_fullscreen(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
+
+	XSizeHints hints;
+	long supplied;
+	Bool fixed = XGetWMNormalHints(dpy, w, &hints, &supplied) &&
+	             (hints.flags & PMinSize) && (hints.flags & PMaxSize) &&
+	             hints.min_width == hints.max_width && hints.min_height == hints.max_height;
+
+	Bool floating = type == WINDOW_FLOAT || global_floating || fixed ||
+	                window_should_float(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_MODAL]);
 
 	Window transient;
-	if (!should_float && XGetTransientForHint(dpy, w, &transient))
-		should_float = True;
+	if (!floating && XGetTransientForHint(dpy, w, &transient))
+		floating = True;
 
-	XSizeHints size_hints;
-	long supplied_ret;
+	if (fullscreen)
+		floating = False;
 
-	if (!should_float &&
-		XGetWMNormalHints(dpy, w, &size_hints, &supplied_ret) &&
-		(size_hints.flags & PMinSize) && (size_hints.flags & PMaxSize) &&
-		size_hints.min_width  == size_hints.max_width &&
-		size_hints.min_height == size_hints.max_height) {
+	int ws = get_workspace_for_window(w);
+	c = add_client(w, floating, ws);
+	if (!c)
+		return;
 
-		should_float = True;
-		c->fixed = True;
-	}
+	c->ws = ws;
+	c->fixed = fixed;
+	set_wm_state(w, NormalState);
 
-	if (should_float || global_floating)
-		c->floating = True;
-
-	if (window_should_start_fullscreen(w)) {
-		c->fullscreen = True;
-		c->floating = False;
-	}
-
-	/* center floating windows & set border */
-	if (c->floating && !c->fullscreen) {
-		int w_ = MAX(c->w, 64), h_ = MAX(c->h, 64);
-		int mx = mons[c->mon].x, my = mons[c->mon].y;
-		int mw = mons[c->mon].w, mh = mons[c->mon].h;
-		int x = mx + (mw - w_) / 2, y = my + (mh - h_) / 2;
-		c->x = x;
-		c->y = y;
-		c->w = w_;
-		c->h = h_;
-		XMoveResizeWindow(dpy, w, x, y, w_, h_);
+	/* position floating windows */
+	if (floating) {
+		c->w = MAX(c->w, 64);
+		c->h = MAX(c->h, 64);
+		centre_client(c);
 		XSetWindowBorderWidth(dpy, w, user_config.border_width);
 	}
 
+	/* initialise fullscreen through the existing helper */
+	if (fullscreen)
+		apply_fullscreen(c, True);
+
 	update_net_client_list();
-	if (target_ws != current_ws)
+
+	if (ws != current_ws)
 		return;
-
-	/* map & borders */
-	if (!global_floating && !c->floating)
-		tile();
-	else if (c->floating)
-		XRaiseWindow(dpy, w);
-
-	if (window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN])) {
-		c->fullscreen = True;
-		c->floating = False;
-	}
 
 	XMapWindow(dpy, w);
 	c->mapped = True;
-	if (c->fullscreen)
-		apply_fullscreen(c, True);
+
+	if (!floating && !fullscreen)
+		tile();
+	else if (floating)
+		XRaiseWindow(dpy, w);
+
 	set_frame_extents(w);
 
-	if (user_config.new_win_focus) {
-		focused = c;
-		set_input_focus(focused, True, True);
-		return;
-	}
-	update_borders();
+	if (user_config.new_win_focus)
+		set_input_focus(c, True, True);
+	else
+		update_borders();
 }
 
 void hdl_motion(XEvent *xev)
@@ -1396,40 +1385,36 @@ void move_prev_mon(void)
 
 void move_to_workspace(int ws)
 {
-	if (!focused || ws >= NUM_WORKSPACES || ws == current_ws)
+	if (!workspaces[current_ws].focused || ws < 0 || ws >= NUM_WORKSPACES || ws == current_ws)
 		return;
 
-	Client *moved = focused;
+	Client *moved = workspaces[current_ws].focused;
 	int from_ws = current_ws;
 
 	XUnmapWindow(dpy, moved->win);
 
 	/* remove from current list */
-	Client **pp = &workspaces[from_ws];
-	while (*pp && *pp != moved)
-		pp = &(*pp)->next;
-
-	if (*pp)
-		*pp = moved->next;
+	Bool floating = client_is_floating(moved);
+	unlink_client(moved);
 
 	/* push to target list */
-	moved->next = workspaces[ws];
-	workspaces[ws] = moved;
+	Client **head = floating ? &workspaces[ws].floating : &workspaces[ws].tiled;
+	moved->next = *head;
+	if (*head)
+		(*head)->prev = moved;
+	*head = moved;
 	moved->ws = ws;
 	long desktop = ws;
 	XChangeProperty(dpy, moved->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
 		        PropModeReplace, (unsigned char *)&desktop, 1);
 
 	/* remember it as last-focused for the target workspace */
-	ws_focused[ws] = moved;
+	workspaces[ws].focused = moved;
 
 	/* retile current workspace and pick a new focus there */
+	workspaces[from_ws].focused = workspaces[from_ws].tiled ? workspaces[from_ws].tiled : workspaces[from_ws].floating;
 	tile();
-	focused = workspaces[from_ws];
-	if (focused)
-		set_input_focus(focused, False, False);
-	else
-		set_input_focus(NULL, False, False);
+	set_input_focus(workspaces[from_ws].focused, False, False);
 }
 
 void move_win_down(void)
@@ -2132,6 +2117,35 @@ void switch_previous_workspace(void)
 	change_workspace(previous_workspace);
 }
 
+void switch_client_list(Client *c, Bool floating)
+{
+	if (!c || client_is_floating(c) == floating)
+		return;
+
+	if (c->fullscreen)
+		apply_fullscreen(c, False);
+
+	unlink_client(c);
+	Client **head = floating ? &workspaces[c->ws].floating : &workspaces[c->ws].tiled;
+	c->next = *head;
+	if (*head)
+		(*head)->prev = c;
+	*head = c;
+
+	if (floating) {
+		XWindowAttributes wa;
+		if (XGetWindowAttributes(dpy, c->win, &wa)) {
+			c->x = wa.x;
+			c->y = wa.y;
+			c->w = wa.width;
+			c->h = wa.height;
+		}
+		XRaiseWindow(dpy, c->win);
+	}
+	else
+		c->mon = get_monitor_for_point(get_window_center(c));
+}
+
 void tile(void)
 {
 	update_struts();
@@ -2285,74 +2299,27 @@ void tile(void)
 
 void toggle_floating(void)
 {
-	if (!focused)
+	Client *c = workspaces[current_ws].focused;
+	if (!c)
 		return;
 
-	if (focused->fullscreen) {
-		focused->fullscreen = False;
-		tile();
-		XSetWindowBorderWidth(dpy, focused->win, user_config.border_width);
-	}
-
-	focused->floating = !focused->floating;
-
-	if (focused->floating) {
-		XWindowAttributes wa;
-		if (XGetWindowAttributes(dpy, focused->win, &wa)) {
-			focused->x = wa.x;
-			focused->y = wa.y;
-			focused->w = wa.width;
-			focused->h = wa.height;
-
-			XConfigureWindow(dpy, focused->win, CWX | CWY | CWWidth | CWHeight, &(XWindowChanges){
-					.x = focused->x,
-					.y = focused->y,
-					.width = focused->w,
-					.height = focused->h
-			});
-		}
-	}
-	else {
-		focused->mon = get_monitor_for_point(get_window_center(workspaces[current_ws].focused));
-	}
-
-	if (!focused->floating)
-		focused->mon = get_monitor_for(focused);
+	Bool floating = !client_is_floating(c);
+	switch_client_list(c, floating);
 
 	tile();
 	update_borders();
-
-	/* raise and refocus floating window */
-	if (focused->floating)
-		set_input_focus(focused, True, False);
+	if (floating)
+		set_input_focus(c, True, False);
 }
 
 void toggle_floating_global(void)
 {
 	global_floating = !global_floating;
-	Bool any_tiled = False;
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		if (!c->floating) {
-			any_tiled = True;
-			break;
-		}
-	}
+	Bool floating = workspaces[current_ws].tiled != NULL;
+	Client **source = floating ? &workspaces[current_ws].tiled : &workspaces[current_ws].floating;
 
-	for (Client *c = workspaces[current_ws]; c; c = c->next) {
-		c->floating = any_tiled;
-		if (c->floating) {
-			XWindowAttributes wa;
-			XGetWindowAttributes(dpy, c->win, &wa);
-			c->x = wa.x;
-			c->y = wa.y;
-			c->w = wa.width;
-			c->h = wa.height;
-
-			XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight,
-			                 &(XWindowChanges){.x = c->x, .y = c->y, .width = c->w, .height = c->h});
-			XRaiseWindow(dpy, c->win);
-		}
-	}
+	while (*source)
+		switch_client_list(*source, floating);
 
 	tile();
 	update_borders();
@@ -2364,6 +2331,26 @@ void toggle_fullscreen(void)
 		return;
 
 	apply_fullscreen(focused, !focused->fullscreen);
+}
+
+void unlink_client(Client *c)
+{
+	if (!c || c->ws < 0 || c->ws >= NUM_WORKSPACES)
+		return;
+
+	Workspace *ws = &workspaces[c->ws];
+	Client **head = client_is_floating(c) ? &ws->floating : &ws->tiled;
+
+	if (c->prev)
+		c->prev->next = c->next;
+	else if (*head == c)
+		*head = c->next;
+
+	if (c->next)
+		c->next->prev = c->prev;
+
+	c->next = NULL;
+	c->prev = NULL;
 }
 
 void update_borders(void)
@@ -2490,25 +2477,7 @@ void update_struts(void)
 	for (unsigned int i = 0; i < n_children; i++) {
 		Window w = children[i];
 
-		Atom actual_type;
-		int actual_format;
-		unsigned long n_items, bytes_after;
-		Atom *types = NULL;
-
-		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 4, False, XA_ATOM,
-			&actual_type, &actual_format, &n_items, &bytes_after,
-			(unsigned char **)&types) != Success || !types)
-			continue;
-
-		Bool is_dock = False;
-		for (unsigned long j = 0; j < n_items; j++) {
-			if (types[j] == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
-				is_dock = True;
-				break;
-			}
-		}
-		XFree(types);
-		if (!is_dock)
+		if (get_window_type(w) != WINDOW_DOCK)
 			continue;
 
 		long *str = NULL;
@@ -2682,6 +2651,29 @@ Bool window_has_ewmh_state(Window w, Atom state)
 	return False;
 }
 
+Bool window_matches_class(Window w, char ***rules)
+{
+	XClassHint ch = { 0 };
+	if (!XGetClassHint(dpy, w, &ch))
+		return False;
+
+	Bool matched = False;
+	for (int i = 0; i < MAX_ITEMS && rules[i] && rules[i][0]; i++) {
+		const char *name = rules[i][0];
+		if ((ch.res_class && !strcmp(ch.res_class, name)) || (ch.res_name && !strcmp(ch.res_name, name))) {
+			matched = True;
+			break;
+		}
+	}
+
+	if (ch.res_class)
+		XFree(ch.res_class);
+	if (ch.res_name)
+		XFree(ch.res_name);
+
+	return matched;
+}
+
 void window_set_ewmh_state(Window w, Atom state, Bool add)
 {
 	Atom type;
@@ -2721,46 +2713,12 @@ void window_set_ewmh_state(Window w, Atom state, Bool add)
 
 Bool window_should_float(Window w)
 {
-	XClassHint ch = {0};
-	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < MAX_ITEMS; i++) {
-			if (!user_config.should_float[i] || !user_config.should_float[i][0])
-				break;
-
-			if ((ch.res_class && !strcmp(ch.res_class, user_config.should_float[i][0])) ||
-			    (ch.res_name && !strcmp(ch.res_name, user_config.should_float[i][0]))) {
-				XFree(ch.res_class);
-				XFree(ch.res_name);
-				return True;
-			}
-		}
-		XFree(ch.res_class);
-		XFree(ch.res_name);
-	}
-
-	return False;
+	return window_matches_class(w, user_config.should_float);
 }
 
 Bool window_should_start_fullscreen(Window w)
 {
-	XClassHint ch = {0};
-	if (XGetClassHint(dpy, w, &ch)) {
-		for (int i = 0; i < MAX_ITEMS; i++) {
-			if (!user_config.start_fullscreen[i] || !user_config.start_fullscreen[i][0])
-				break;
-
-			if ((ch.res_class && !strcmp(ch.res_class, user_config.start_fullscreen[i][0])) ||
-			    (ch.res_name && !strcmp(ch.res_name, user_config.start_fullscreen[i][0]))) {
-				XFree(ch.res_class);
-				XFree(ch.res_name);
-				return True;
-			}
-		}
-		XFree(ch.res_class);
-		XFree(ch.res_name);
-	}
-
-	return False;
+	return window_matches_class(w, user_config.start_fullscreen);
 }
 
 int xerr(Display *d, XErrorEvent *ee)
