@@ -39,7 +39,6 @@ Client *add_client(Window w, int ws);
 void apply_fullscreen(Client *c, Bool on);
 /* void centre_window(void); */
 void change_workspace(int ws);
-int check_parent(pid_t p, pid_t c);
 int clean_mask(int mask);
 /* void close_focused(void); */
 /* void dec_gaps(void); */
@@ -50,8 +49,6 @@ Window find_toplevel(Window w);
 /* void focus_next_mon(void); */
 /* void focus_prev_mon(void); */
 int get_monitor_for(Client *c);
-pid_t get_parent_process(pid_t c);
-pid_t get_pid(Window w);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
 void grab_keys(void);
@@ -70,7 +67,6 @@ void hdl_property_ntf(XEvent *xev);
 void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
-Bool is_child_proc(pid_t pid1, pid_t pid2);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
 /* void move_next_mon(void); */
@@ -107,13 +103,11 @@ void set_wm_state(Window w, long state);
 int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 void spawn(const char * const *argv);
 void startup_exec(void);
-void swallow_window(Client *swallower, Client *swallowed);
 /* void switch_previous_workspace(void); */
 void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
-void unswallow_window(Client *c);
 void update_borders(void);
 void update_client_desktop_properties(void);
 void update_modifier_masks(void);
@@ -210,9 +204,6 @@ Client *add_client(Window w, int ws)
 	c->win = w;
 	c->next = NULL;
 	c->ws = ws;
-	c->pid = get_pid(w);
-	c->swallowed = NULL;
-	c->swallower = NULL;
 
 	if (!workspaces[ws]) {
 		workspaces[ws] = c;
@@ -423,14 +414,6 @@ void change_workspace(int ws)
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
 	                PropModeReplace, (unsigned char *)&current_desktop, 1);
 	update_client_desktop_properties();
-}
-
-int check_parent(pid_t p, pid_t c)
-{
-	while (p != c && c != 0) /* walk proc tree until parent found */
-		c = get_parent_process(c);
-
-	return (int)c;
 }
 
 int clean_mask(int mask)
@@ -648,39 +631,6 @@ int get_monitor_for(Client *c)
 			return i;
 	}
 	return 0;
-}
-
-pid_t get_parent_process(pid_t c)
-{
-	pid_t v = -1;
-	FILE *f;
-	char buf[256];
-
-	snprintf(buf, sizeof(buf), "/proc/%u/stat", (unsigned)c);
-	if (!(f = fopen(buf, "r")))
-		return 0;
-
-	int no_error = fscanf(f, "%*u %*s %*c %d", &v);
-	(void)no_error;
-	fclose(f);
-	return (pid_t)v;
-}
-
-pid_t get_pid(Window w)
-{
-	pid_t pid = 0;
-	Atom actual_type;
-	int actual_format;
-	unsigned long n_items, bytes_after;
-	unsigned char *prop = NULL;
-
-	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_PID], 0, 1, False, XA_CARDINAL, &actual_type,
-				           &actual_format, &n_items, &bytes_after, &prop) == Success && prop) {
-		if (actual_format == 32 && n_items == 1)
-			pid = *(pid_t *)prop;
-		XFree(prop);
-	}
-	return pid;
 }
 
 int get_workspace_for_window(Window w)
@@ -936,27 +886,6 @@ void hdl_destroy_ntf(XEvent *xev)
 		if (!c)
 			continue;
 
-		/* if client is swallowed, restore swallower */
-		if (c->swallower)
-			unswallow_window(c);
-
-		/* if this client had swallowed another, restore that child */
-		if (c->swallowed) {
-			Client *swallowed = c->swallowed;
-			c->swallowed = NULL;
-			swallowed->swallower = NULL;
-
-			swallowed->mapped = True;
-
-			if (i == current_ws) {
-				XMapWindow(dpy, swallowed->win);
-				set_input_focus(swallowed, False, True);
-			}
-			else {
-				ws_focused[i] = swallowed;
-			}
-		}
-
 		for (int ws = 0; ws < NUM_WORKSPACES; ws++)
 			if (ws_focused[ws] == c)
 				ws_focused[ws] = NULL;
@@ -1174,64 +1103,6 @@ void hdl_map_req(XEvent *xev)
 	else if (c->floating)
 		XRaiseWindow(dpy, w);
 
-	/* check for swallowing opportunities */
-	{
-		XClassHint ch = {0};
-		Bool can_be_swallowed = False;
-
-		if (XGetClassHint(dpy, w, &ch)) {
-			/* check if new window can be swallowed */
-			for (int i = 0; i < MAX_ITEMS; i++) {
-				if (!user_config.can_be_swallowed[i] || !user_config.can_be_swallowed[i][0])
-					break;
-
-				if ((ch.res_class && strcasecmp(ch.res_class, user_config.can_be_swallowed[i][0]) == 0) ||
-				    (ch.res_name && strcasecmp(ch.res_name, user_config.can_be_swallowed[i][0]) == 0)) {
-					can_be_swallowed = True;
-					break;
-				}
-			}
-
-			/* if window can be swallowed look for a potential swallower */
-			if (can_be_swallowed) {
-				for (Client *p = workspaces[current_ws]; p; p = p->next) {
-					if (p == c || p->swallowed || !p->mapped)
-						continue;
-
-					XClassHint pch = {0};
-					Bool can_swallow = False;
-
-					if (XGetClassHint(dpy, p->win, &pch)) {
-						/* check if this existing window can swallow others */
-						for (int i = 0; i < MAX_ITEMS; i++) {
-							if (!user_config.can_swallow[i] || !user_config.can_swallow[i][0])
-								break;
-
-							if ((pch.res_class && strcasecmp(pch.res_class, user_config.can_swallow[i][0]) == 0) ||
-							    (pch.res_name && strcasecmp(pch.res_name, user_config.can_swallow[i][0]) == 0)) {
-								can_swallow = True;
-								break;
-							}
-						}
-
-						/* check process relationship */
-						if (can_swallow && check_parent(p->pid, c->pid)) {
-							/* we know class matches and the swallower is the parent -> swallow now */
-							swallow_window(p, c);
-							XFree(pch.res_class);
-							XFree(pch.res_name);
-							break;
-						}
-						XFree(pch.res_class);
-						XFree(pch.res_name);
-					}
-				}
-			}
-			XFree(ch.res_class);
-			XFree(ch.res_name);
-		}
-	}
-
 	if (window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN])) {
 		c->fullscreen = True;
 		c->floating = False;
@@ -1393,8 +1264,6 @@ void init_defaults(void)
 		user_config.master_width[i] = 50 / 100.0f;
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		user_config.can_be_swallowed[i] = NULL;
-		user_config.can_swallow[i] = NULL;
 		user_config.open_in_workspace[i] = NULL;
 		user_config.start_fullscreen[i] = NULL;
 	}
@@ -1408,45 +1277,6 @@ void init_defaults(void)
 	user_config.warp_cursor = True;
 	user_config.new_win_master = False;
 	user_config.floating_on_top = True;
-}
-
-Bool is_child_proc(pid_t parent_pid, pid_t child_pid)
-{
-	if (parent_pid <= 0 || child_pid <= 0)
-		return False;
-
-	char path[PATH_MAX];
-	FILE *f;
-	pid_t current_pid = child_pid;
-	int max_iterations = 20;
-
-	while (current_pid > 1 && max_iterations-- > 0) {
-		snprintf(path, sizeof(path), "/proc/%d/stat", current_pid);
-		f = fopen(path, "r");
-		if (!f) {
-			fprintf(stderr, "sxwm: could not open %s\n", path);
-			return False;
-		}
-
-		int ppid = 0;
-		if (fscanf(f, "%*d %*s %*c %d", &ppid) != 1) {
-			fprintf(stderr, "sxwm: failed to read ppid from %s\n", path);
-			fclose(f);
-			return False;
-		}
-		fclose(f);
-
-		if (ppid == parent_pid)
-			return True;
-
-		if (ppid <= 1) {
-			/* Reached init or kernel */
-			fprintf(stderr, "sxwm: reached init/kernel, no relationship found\n");
-			break;
-		}
-		current_pid = ppid;
-	}
-	return False;
 }
 
 void move_master_next(void)
@@ -1740,20 +1570,7 @@ void reload_config(void)
 		user_config.binds[i].mods = 0;
 	}
 
-	/* free swallow-related arrays */
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.can_swallow[i]) {
-			if (user_config.can_swallow[i][0])
-				free(user_config.can_swallow[i][0]);
-			free(user_config.can_swallow[i]);
-			user_config.can_swallow[i] = NULL;
-		}
-		if (user_config.can_be_swallowed[i]) {
-			if (user_config.can_be_swallowed[i][0])
-				free(user_config.can_be_swallowed[i][0]);
-			free(user_config.can_be_swallowed[i]);
-			user_config.can_be_swallowed[i] = NULL;
-		}
 		if (user_config.open_in_workspace[i]) {
 			if (user_config.open_in_workspace[i][0])
 				free(user_config.open_in_workspace[i][0]);
@@ -2338,32 +2155,6 @@ void startup_exec(void)
 	}
 }
 
-void swallow_window(Client *swallower, Client *swallowed)
-{
-	if (!swallower || !swallowed || swallower->swallowed || swallowed->swallower)
-		return;
-
-	XUnmapWindow(dpy, swallower->win);
-	swallower->mapped = False;
-
-	swallower->swallowed = swallowed;
-	swallowed->swallower = swallower;
-
-	swallowed->floating = swallower->floating;
-	if (swallowed->floating) {
-		swallowed->x = swallower->x;
-		swallowed->y = swallower->y;
-		swallowed->w = swallower->w;
-		swallowed->h = swallower->h;
-
-		if (swallowed->win)
-			XMoveResizeWindow(dpy, swallowed->win, swallowed->x, swallowed->y, swallowed->w, swallowed->h);
-	}
-
-	tile();
-	update_borders();
-}
-
 void switch_previous_workspace(void)
 {
 	change_workspace(previous_workspace);
@@ -2601,33 +2392,6 @@ void toggle_fullscreen(void)
 		return;
 
 	apply_fullscreen(focused, !focused->fullscreen);
-}
-
-void unswallow_window(Client *c)
-{
-	if (!c || !c->swallower)
-		return;
-
-	Client *swallower = c->swallower;
-	int ws = swallower->ws;
-
-	/* unlink windows */
-	swallower->swallowed = NULL;
-	c->swallower = NULL;
-
-	/* mark swallower as visible */
-	swallower->mapped = True;
-
-	/* remember it as focused for that workspace */
-	if (ws >= 0 && ws < NUM_WORKSPACES)
-		ws_focused[ws] = swallower;
-
-	if (ws == current_ws) {
-		XMapWindow(dpy, swallower->win);
-		set_input_focus(swallower, False, True);
-		tile();
-		update_borders();
-	}
 }
 
 void update_borders(void)
