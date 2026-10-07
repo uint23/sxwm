@@ -38,8 +38,8 @@ call : mod + shift + e : quit
 call : mod + m : toggle_monocle
 
 # Focus Movement:
-call : mod + j : focus_next
-call : mod + k : focus_prev
+call : mod + k : focus_next
+call : mod + j : focus_prev
 
 # Monitor Focus:
 call : mod + comma : focus_prev_mon
