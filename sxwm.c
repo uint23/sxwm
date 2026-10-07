@@ -49,6 +49,7 @@ Window find_toplevel(Window w);
 /* void focus_next_mon(void); */
 /* void focus_prev_mon(void); */
 Bool get_cursor_xy(int *x, int *y);
+Client* get_last_client(Client *root);
 int get_monitor_for(Client *c);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
@@ -622,6 +623,13 @@ Bool get_cursor_xy(int *x, int *y);
 		dpy, root, &root_ret, &child_ret,
 		x, y, &win_x, &win_y, &masks
 	);
+}
+
+Client* get_last_client(Client *root)
+{
+	while (root->next)
+		root = root->next;
+	return root;
 }
 
 int get_monitor_for(Client *c)
