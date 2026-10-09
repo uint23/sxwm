@@ -22,13 +22,6 @@
 #define MIN_WINDOW_SIZE 20
 #define PATH_MAX        4096
 
-enum {
-	TYPE_WS_CHANGE = 0,
-	TYPE_WS_MOVE = 1,
-	TYPE_FUNC = 2,
-	TYPE_CMD = 3,
-};
-
 #define NUM_WORKSPACES 9
 #define WORKSPACE_NAMES	\
 	"1""\0"\
@@ -41,41 +34,65 @@ enum {
 	"8""\0"\
 	"9""\0"
 
+enum {
+	TYPE_WS_CHANGE = 0,
+	TYPE_WS_MOVE = 1,
+	TYPE_FUNC = 2,
+	TYPE_CMD = 3,
+};
 
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
+typedef enum { LIST_TILED, LIST_FLOATING, LIST_COUNT } ListType;
 typedef enum { WINDOW_NORMAL, WINDOW_FLOAT, WINDOW_DOCK } WindowType;
 typedef void (*EventHandler)(XEvent *);
 
-typedef union {
+typedef union Action Action;
+typedef struct Binding Binding;
+typedef struct Client Client;
+typedef struct ClientList ClientList;
+typedef struct Config Config;
+typedef struct CommandEntry CommandEntry;
+typedef struct Monitor Monitor;
+typedef struct Point Point;
+typedef struct Workspace Workspace;
+
+union Action {
 	const char **cmd;
 	void (*fn)(void);
-	int ws;            /* workspace */
-} Action;
+	int ws; /* workspace */
+};
 
-typedef struct {
+struct Binding {
 	int mods;
 	KeySym keysym;
 	KeyCode keycode;
 	Action action;
 	int type;
-} Binding;
+};
 
-typedef struct Client {
+struct Client {
 	Window win;
 	int x, y, w, h;
 	int orig_x, orig_y, orig_w, orig_h;
 	int custom_stack_height;
 	int mon;
-	int ws;
 	Bool fixed;
 	Bool fullscreen;
 	Bool mapped;
 	pid_t pid;
-	struct Client *next;
-	struct Client *prev;
-} Client;
+	ClientList *list;
+	Client *next;
+	Client *prev;
+};
 
-typedef struct {
+struct ClientList {
+	Client *head, *tail;
+	Workspace *workspace;
+	ListType type;
+	unsigned int count;
+};
+
+struct Config {
 	int modkey;
 	int gaps;
 	int border_width;
@@ -100,25 +117,27 @@ typedef struct {
 	char **can_be_swallowed[MAX_ITEMS];
 	char **open_in_workspace[MAX_ITEMS];
 	char *to_run[MAX_ITEMS];
-} Config;
+};
 
-typedef struct {
+struct CommandEntry {
 	const char *name;
 	void (*fn)(void);
-} CommandEntry;
+};
 
-typedef struct {
+struct Monitor {
 	int x, y, w, h;
 	struct { int left, right, bottom, top; } res;
-} Monitor;
+};
 
-typedef struct {
+struct Point {
 	int x, y;
-} Point;
+};
 
-typedef struct {
-	Client *focused, *floating, *tiled;
-} Workspace;
+struct Workspace {
+	int number;
+	Client *focused;
+	ClientList lists[LIST_COUNT];
+};
 
 typedef enum {
 	ATOM_NET_ACTIVE_WINDOW,
