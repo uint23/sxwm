@@ -13,18 +13,18 @@
 #include "extern.h"
 #include "parser.h"
 
-static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks);
-static char **alloc_str_pair(const char *a, const char *b);
-static void dedupe_binds(Config *cfg);
-static int find_free_slot(char **arr[], int max);
-static FILE *open_config(char *path, size_t pathsz);
-static Binding *parse_bind_line(Config *cfg, char *rest, int lineno, const char *ctx, char **out_act);
-static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks);
-static int parse_csv_to_array(char *rest, char **arr[], int *idx, int max, int alloc_pair);
-static char **split_cmd(const char *cmd, int *out_argc);
-static char *strip(char *s);
-static char *strip_comment(char *s);
-static char *strip_quotes(char *s);
+static Binding* alloc_bind(Config* cfg, unsigned mods, KeySym ks);
+static char** alloc_str_pair(const char* a, const char* b);
+static void dedupe_binds(Config* cfg);
+static int find_free_slot(char** arr[], int max);
+static FILE* open_config(char* path, size_t pathsz);
+static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char* ctx, char** out_act);
+static unsigned parse_combo(const char* combo, Config* cfg, KeySym* out_ks);
+static int parse_csv_to_array(char* rest, char** arr[], int* idx, int max, int alloc_pair);
+static char** split_cmd(const char* cmd, int* out_argc);
+static char* strip(char* s);
+static char* strip_comment(char* s);
+static char* strip_quotes(char* s);
 
 static const CommandEntry call_table[] = {
 	{"centre_window",             centre_window},
@@ -58,7 +58,7 @@ static const CommandEntry call_table[] = {
 	{NULL, NULL},
 };
 
-static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks)
+static Binding* alloc_bind(Config* cfg, unsigned mods, KeySym ks)
 {
 	for (int i = 0; i < cfg->n_binds; i++) {
 		if (cfg->binds[i].mods == (int)mods && cfg->binds[i].keysym == ks)
@@ -68,15 +68,15 @@ static Binding *alloc_bind(Config *cfg, unsigned mods, KeySym ks)
 	if (cfg->n_binds >= MAX_BINDS)
 		return NULL;
 
-	Binding *b = &cfg->binds[cfg->n_binds++];
+	Binding* b = &cfg->binds[cfg->n_binds++];
 	b->mods = mods;
 	b->keysym = ks;
 	return b;
 }
 
-static char **alloc_str_pair(const char *a, const char *b)
+static char** alloc_str_pair(const char* a, const char* b)
 {
-	char **p = malloc(2 * sizeof(char *));
+	char** p = malloc(2 * sizeof(char *));
 	if (!p)
 		return NULL;
 
@@ -85,17 +85,17 @@ static char **alloc_str_pair(const char *a, const char *b)
 	return p;
 }
 
-const char **build_argv(const char *cmd)
+const char** build_argv(const char* cmd)
 {
 	int argc = 0;
-	char **tmp = split_cmd(cmd, &argc);
+	char** tmp = split_cmd(cmd, &argc);
 	if (!tmp)
 		return NULL;
 
 	return (const char **)tmp;
 }
 
-static void dedupe_binds(Config *cfg)
+static void dedupe_binds(Config* cfg)
 {
 	for (int i = 0; i < cfg->n_binds; i++) {
 		for (int j = i + 1; j < cfg->n_binds; j++) {
@@ -113,7 +113,7 @@ static void dedupe_binds(Config *cfg)
 	}
 }
 
-static int find_free_slot(char **arr[], int max)
+static int find_free_slot(char** arr[], int max)
 {
 	for (int i = 0; i < max; i++) {
 		if (!arr[i])
@@ -123,16 +123,16 @@ static int find_free_slot(char **arr[], int max)
 	return -1;
 }
 
-static FILE *open_config(char *path, size_t pathsz)
+static FILE* open_config(char* path, size_t pathsz)
 {
-	const char *home = getenv("HOME");
+	const char* home = getenv("HOME");
 	if (!home) {
 		fputs("sxwmrc: HOME not set\n", stderr);
 		return NULL;
 	}
 
-	const char *xdg = getenv("XDG_CONFIG_HOME");
-	const char *paths[] = {
+	const char* xdg = getenv("XDG_CONFIG_HOME");
+	const char* paths[] = {
 		"%s/sxwmrc",
 		"%s/sxwm/sxwmrc",
 	};
@@ -158,16 +158,16 @@ static FILE *open_config(char *path, size_t pathsz)
 
 found:
 	printf("sxwmrc: using configuration file %s\n", path);
-	FILE *f = fopen(path, "r");
+	FILE* f = fopen(path, "r");
 	if (!f)
 		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
 
 	return f;
 }
 
-static Binding *parse_bind_line(Config *cfg, char *rest, int lineno, const char *ctx, char **out_act)
+static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char* ctx, char** out_act)
 {
-	char *mid = strchr(rest, ':');
+	char* mid = strchr(rest, ':');
 	if (!mid) {
 		fprintf(stderr, "sxwmrc:%d: %s missing action\n", lineno, ctx);
 		return NULL;
@@ -182,14 +182,14 @@ static Binding *parse_bind_line(Config *cfg, char *rest, int lineno, const char 
 		return NULL;
 	}
 
-	Binding *b = alloc_bind(cfg, mods, ks);
+	Binding* b = alloc_bind(cfg, mods, ks);
 	if (!b)
 		fputs("sxwm: too many binds\n", stderr);
 
 	return b;
 }
 
-static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
+static unsigned parse_combo(const char* combo, Config* cfg, KeySym* out_ks)
 {
 	unsigned m = 0;
 	KeySym ks = NoSymbol;
@@ -198,12 +198,12 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 	strncpy(buf, combo, sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
 
-	for (char *p = buf; *p; p++) {
+	for (char* p = buf; *p; p++) {
 		if (*p == '+' || isspace((unsigned char)*p))
 			*p = '+';
 	}
 
-	for (char *tok = strtok(buf, "+"); tok; tok = strtok(NULL, "+")) {
+	for (char* tok = strtok(buf, "+"); tok; tok = strtok(NULL, "+")) {
 		if (!strcmp(tok, "mod")) m |= cfg->modkey;
 		else if (!strcmp(tok, "shift")) m |= ShiftMask;
 		else if (!strcmp(tok, "ctrl")) m |= ControlMask;
@@ -219,11 +219,12 @@ static unsigned parse_combo(const char *combo, Config *cfg, KeySym *out_ks)
 	return m;
 }
 
-static int parse_csv_to_array(char *rest, char **arr[], int *idx, int max, int alloc_pair)
+static int parse_csv_to_array(char* rest, char** arr[], int* idx, int max, int alloc_pair)
 {
-	char *save, *tok;
+	char* save;
+	char* tok;
 	for (tok = strtok_r(rest, ",", &save); tok && *idx < max; tok = strtok_r(NULL, ",", &save)) {
-		char *item = strip_quotes(strip(tok));
+		char* item = strip_quotes(strip(tok));
 		if (!*item)
 			continue;
 
@@ -244,7 +245,7 @@ static int parse_csv_to_array(char *rest, char **arr[], int *idx, int max, int a
 	return 0;
 }
 
-KeySym parse_keysym(const char *key)
+KeySym parse_keysym(const char* key)
 {
 	KeySym ks = XStringToKeysym(key);
 	if (ks != NoSymbol)
@@ -274,16 +275,16 @@ KeySym parse_keysym(const char *key)
 	return NoSymbol;
 }
 
-int parse_mods(const char *mods, Config *cfg)
+int parse_mods(const char* mods, Config* cfg)
 {
 	KeySym dummy;
 	return parse_combo(mods, cfg, &dummy);
 }
 
-int parser(Config *cfg)
+int parser(Config* cfg)
 {
 	char path[PATH_MAX];
-	FILE *f = open_config(path, sizeof(path));
+	FILE* f = open_config(path, sizeof(path));
 	if (!f)
 		return -1;
 
@@ -298,24 +299,24 @@ int parser(Config *cfg)
 
 	while (fgets(line, sizeof line, f)) {
 		lineno++;
-		char *s = strip(line);
+		char* s = strip(line);
 		if (!*s || *s == '#')
 			continue;
 
-		char *sep = strchr(s, ':');
+		char* sep = strchr(s, ':');
 		if (!sep) {
 			fprintf(stderr, "sxwmrc:%d: missing ':'\n", lineno);
 			continue;
 		}
 		*sep = '\0';
-		char *key = strip(s);
-		char *rest = strip(sep + 1);
+		char* key = strip(s);
+		char* rest = strip(sep + 1);
 
 		if (!strcmp(key, "border_width"))
 			cfg->border_width = atoi(rest);
 		else if (!strcmp(key, "call") || !strcmp(key, "bind")) {
-			char *act;
-			Binding *b = parse_bind_line(cfg, rest, lineno, key, &act);
+			char* act;
+			Binding* b = parse_bind_line(cfg, rest, lineno, key, &act);
 			if (!b)
 				continue;
 
@@ -357,7 +358,7 @@ int parser(Config *cfg)
 				fprintf(stderr, "sxwmrc:%d: too many exec commands\n", lineno);
 				continue;
 			}
-			char *cmd = strip_quotes(strip_comment(rest));
+			char* cmd = strip_quotes(strip_comment(rest));
 			if (!*cmd) {
 				fprintf(stderr, "sxwmrc:%d: empty exec command\n", lineno);
 				continue;
@@ -394,13 +395,13 @@ int parser(Config *cfg)
 		else if (!strcmp(key, "new_win_master"))
 			cfg->new_win_master = !strcmp(rest, "true");
 		else if (!strcmp(key, "open_in_workspace")) {
-			char *mid = strchr(rest, ':');
+			char* mid = strchr(rest, ':');
 			if (!mid) {
 				fprintf(stderr, "sxwmrc:%d: open_in_workspace missing workspace\n", lineno);
 				continue;
 			}
 			*mid = '\0';
-			char *cls = strip_quotes(strip(rest));
+			char* cls = strip_quotes(strip(rest));
 			int ws = atoi(strip(mid + 1));
 			if (ws < 1 || ws > NUM_WORKSPACES) {
 				fprintf(stderr, "sxwmrc:%d: invalid workspace number %d\n", lineno, ws);
@@ -418,7 +419,7 @@ int parser(Config *cfg)
 		else if (!strcmp(key, "resize_window_amount"))
 			cfg->resize_window_amt = atoi(rest);
 		else if (!strcmp(key, "should_float")) {
-			char *clean = strip_comment(rest);
+			char* clean = strip_comment(rest);
 			if (parse_csv_to_array(clean, cfg->should_float, &should_floatn, MAX_ITEMS, 0) < 0)
 				goto cleanup;
 		}
@@ -429,7 +430,7 @@ int parser(Config *cfg)
 			if (idx < 0)
 				idx = 0;
 
-			char *clean = strip_comment(rest);
+			char* clean = strip_comment(rest);
 			if (parse_csv_to_array(clean, cfg->start_fullscreen, &idx, MAX_ITEMS, 1) < 0)
 				goto cleanup;
 		}
@@ -438,8 +439,8 @@ int parser(Config *cfg)
 		else if (!strcmp(key, "warp_cursor"))
 			cfg->warp_cursor = !strcmp(rest, "true");
 		else if (!strcmp(key, "workspace")) {
-			char *act;
-			Binding *b = parse_bind_line(cfg, rest, lineno, "workspace", &act);
+			char* act;
+			Binding* b = parse_bind_line(cfg, rest, lineno, "workspace", &act);
 			if (!b)
 				continue;
 
@@ -495,23 +496,23 @@ cleanup:
 	return -1;
 }
 
-static char **split_cmd(const char *cmd, int *out_argc)
+static char** split_cmd(const char* cmd, int* out_argc)
 {
 	enum { NORMAL, IN_QUOTE } state = NORMAL;
 	size_t cap = 8, argc = 0, toklen = 0;
-	char *token = malloc(strlen(cmd) + 1);
-	char **argv = malloc(cap * sizeof *argv);
+	char* token = malloc(strlen(cmd) + 1);
+	char** argv = malloc(cap * sizeof *argv);
 
 	if (!token || !argv)
 		goto err;
 
-	for (const char *p = cmd; *p; p++) {
+	for (const char* p = cmd; *p; p++) {
 		if (state == NORMAL && isspace((unsigned char)*p)) {
 			if (toklen) {
 				token[toklen] = '\0';
 				if (argc + 1 >= cap) {
 					cap *= 2;
-					char **tmp = realloc(argv, cap * sizeof *argv);
+					char** tmp = realloc(argv, cap * sizeof *argv);
 					if (!tmp)
 						goto err;
 
@@ -548,27 +549,27 @@ err:
 	return NULL;
 }
 
-static char *strip(char *s)
+static char* strip(char* s)
 {
 	while (*s && isspace((unsigned char)*s))
 		s++;
 	if (!*s)
 		return s;
-	char *e = s + strlen(s) - 1;
+	char* e = s + strlen(s) - 1;
 	while (e > s && isspace((unsigned char)*e))
 		*e-- = '\0';
 	return s;
 }
 
-static char *strip_comment(char *s)
+static char* strip_comment(char* s)
 {
-	char *c = strchr(s, '#');
+	char* c = strchr(s, '#');
 	if (c)
 		*c = '\0';
 	return strip(s);
 }
 
-static char *strip_quotes(char *s)
+static char* strip_quotes(char* s)
 {
 	size_t len = strlen(s);
 	if (len > 0 && s[0] == '"') {

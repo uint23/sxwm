@@ -45,7 +45,7 @@ typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
 typedef enum { LIST_TILED, LIST_FLOATING, LIST_COUNT } ListType;
 typedef enum { WINDOW_NORMAL, WINDOW_FLOAT, WINDOW_DOCK } WindowType;
 typedef enum { UP, DOWN, LEFT, RIGHT } Direction;
-typedef void (*EventHandler)(XEvent *);
+typedef void (*EventHandler)(XEvent*);
 
 typedef union Action Action;
 typedef struct Binding Binding;
@@ -58,7 +58,7 @@ typedef struct Point Point;
 typedef struct Workspace Workspace;
 
 union Action {
-	const char **cmd;
+	const char** cmd;
 	void (*fn)(void);
 	int ws; /* workspace */
 };
@@ -81,14 +81,15 @@ struct Client {
 	Bool fullscreen;
 	Bool mapped;
 	pid_t pid;
-	ClientList *list;
-	Client *next;
-	Client *prev;
+	ClientList* list;
+	Client* next;
+	Client* prev;
 };
 
 struct ClientList {
-	Client *head, *tail;
-	Workspace *workspace;
+	Client* head;
+	Client* tail;
+	Workspace* workspace;
 	ListType type;
 	unsigned int count;
 };
@@ -111,16 +112,16 @@ struct Config {
 	Bool floating_on_top;
 	Bool new_win_master;
 	Binding binds[MAX_ITEMS];
-	char **should_float[MAX_ITEMS];
-	char **start_fullscreen[MAX_ITEMS];
-	char **can_swallow[MAX_ITEMS];
-	char **can_be_swallowed[MAX_ITEMS];
-	char **open_in_workspace[MAX_ITEMS];
-	char *to_run[MAX_ITEMS];
+	char** should_float[MAX_ITEMS];
+	char** start_fullscreen[MAX_ITEMS];
+	char** can_swallow[MAX_ITEMS];
+	char** can_be_swallowed[MAX_ITEMS];
+	char** open_in_workspace[MAX_ITEMS];
+	char* to_run[MAX_ITEMS];
 };
 
 struct CommandEntry {
-	const char *name;
+	const char* name;
 	void (*fn)(void);
 };
 
@@ -135,7 +136,7 @@ struct Point {
 
 struct Workspace {
 	int number;
-	Client *focused;
+	Client* focused;
 	ClientList lists[LIST_COUNT];
 };
 

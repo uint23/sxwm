@@ -17,7 +17,7 @@ extern void move_win_down(void);
 extern void move_win_left(void);
 extern void move_win_right(void);
 extern void move_win_up(void);
-extern long parse_col(const char *hex);
+extern long parse_col(const char* hex);
 extern void quit(void);
 extern void reload_config(void);
 extern void resize_master_add(void);
