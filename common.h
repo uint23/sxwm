@@ -102,7 +102,6 @@ struct Config {
 	float master_width[MAX_MONITORS];
 	int motion_throttle;
 	int resize_master_amt;
-	int resize_stack_amt;
 	int snap_distance;
 	int n_binds;
 	int move_window_amt;

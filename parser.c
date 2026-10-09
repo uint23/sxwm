@@ -53,8 +53,6 @@ static const CommandEntry call_table[] = {
 	{"resize_win_down",           resize_win_down},
 	{"resize_win_left",           resize_win_left},
 	{"resize_win_right",          resize_win_right},
-	{"stack_increase",            resize_stack_add},
-	{"stack_decrease",            resize_stack_sub},
 	{"switch_previous_workspace", switch_previous_workspace},
 	{"toggle_floating",           toggle_floating},
 	{NULL, NULL},
@@ -417,8 +415,6 @@ int parser(Config *cfg)
 		}
 		else if (!strcmp(key, "resize_master_amount"))
 			cfg->resize_master_amt = atoi(rest);
-		else if (!strcmp(key, "resize_stack_amount"))
-			cfg->resize_stack_amt = atoi(rest);
 		else if (!strcmp(key, "resize_window_amount"))
 			cfg->resize_window_amt = atoi(rest);
 		else if (!strcmp(key, "should_float")) {

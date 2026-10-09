@@ -22,8 +22,6 @@ extern void quit(void);
 extern void reload_config(void);
 extern void resize_master_add(void);
 extern void resize_master_sub(void);
-extern void resize_stack_add(void);
-extern void resize_stack_sub(void);
 extern void resize_win_down(void);
 extern void resize_win_left(void);
 extern void resize_win_right(void);
