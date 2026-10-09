@@ -12,6 +12,7 @@
   
    (c) uint 2024-2026 */
 
+#include <limits.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -98,8 +99,6 @@ void reset_opacity(Window w);
 void resize_master(int amount);
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
-/* void resize_stack_add(void); */
-/* void resize_stack_sub(void); */
 void resize_win(Direction dir);
 /* void resize_win_down(void); */
 /* void resize_win_left(void); */
@@ -212,7 +211,6 @@ Mask mode_switch_mask = 0;
 
 int scr_width;
 int scr_height;
-int open_windows = 0;
 
 Client *add_client(Window w, Bool floating, int ws)
 {
@@ -253,7 +251,6 @@ Client *add_client(Window w, Bool floating, int ws)
 	c->fixed = False;
 	c->fullscreen = False;
 	c->mapped = True;
-	c->custom_stack_height = 0;
 
 	ClientList *list = &workspaces[ws].lists[floating ? LIST_FLOATING : LIST_TILED];
 
@@ -261,8 +258,6 @@ Client *add_client(Window w, Bool floating, int ws)
 		prepend_client(list, c);
 	else
 		append_client(list, c);
-
-	open_windows++;
 
 	/* remember first created client per workspace as a fallback */
 	if (!workspaces[ws].focused)
@@ -842,7 +837,6 @@ void init_defaults(void)
 
 	user_config.motion_throttle = 60;
 	user_config.resize_master_amt = 5;
-	user_config.resize_stack_amt = 20;
 	user_config.snap_distance = 5;
 	user_config.n_binds = 0;
 	user_config.new_win_focus = True;
@@ -1216,7 +1210,6 @@ void on_destroy_ntf(XEvent *xev)
 		drag_mode = DRAG_NONE;
 	}
 	free(c);
-	open_windows--;
 	update_net_client_list();
 
 	if (ws != current_ws)
@@ -1289,11 +1282,6 @@ void on_map_req(XEvent *xev)
 	WindowType type = get_window_type(w);
 	if (type == WINDOW_DOCK) {
 		XMapWindow(dpy, w);
-		return;
-	}
-
-	if (open_windows >= MAX_CLIENTS) {
-		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
 		return;
 	}
 
@@ -1665,61 +1653,6 @@ void resize_master_add(void)
 void resize_master_sub(void)
 {
 	resize_master(-user_config.resize_master_amt);
-}
-
-void resize_stack_add(void)
-{
-	Client *focused = get_focused();
-	if (!focused || is_floating(focused) || focused == workspaces[current_ws].lists[LIST_TILED].head)
-		return;
-
-	int bw2 = 2 * user_config.border_width;
-	int raw_cur = (focused->custom_stack_height > 0) ? focused->custom_stack_height : (focused->h + bw2);
-
-	int raw_new = raw_cur + user_config.resize_stack_amt;
-
-	/* Calculate maximum allowed height to prevent extending off-screen */
-	int mon = CLAMP(focused->mon, 0, n_mons - 1);
-	int mon_height = MAX(1, mons[mon].h - mons[mon].res.top - mons[mon].res.bottom);
-	int gaps = user_config.gaps;
-	int tile_height = MAX(1, mon_height - 2 * gaps);
-
-	/* Count stack windows (excluding master) */
-	int n_stack = 0;
-	for (Client *c = workspaces[current_ws].lists[LIST_TILED].head; c; c = c->next) {
-		if (c->mapped && !c->fullscreen && c->mon == mon && c != workspaces[current_ws].lists[LIST_TILED].head)
-			n_stack++;
-	}
-
-	/* Maximum height: tile_height minus space for other stack windows (min_height + gap each) */
-	int min_stack_height = bw2 + 1;
-	int other_stack_space = (n_stack > 1) ? (n_stack - 1) * (min_stack_height + gaps) : 0;
-	int max_raw = tile_height - other_stack_space;
-
-	if (raw_new > max_raw)
-		raw_new = max_raw;
-
-	focused->custom_stack_height = raw_new;
-	tile();
-}
-
-void resize_stack_sub(void)
-{
-	Client *focused = get_focused();
-	if (!focused || is_floating(focused) || focused == workspaces[current_ws].lists[LIST_TILED].head)
-		return;
-
-	int bw2 = 2 * user_config.border_width;
-	int raw_cur = (focused->custom_stack_height > 0) ? focused->custom_stack_height : (focused->h + bw2);
-
-	int raw_new = raw_cur - user_config.resize_stack_amt;
-	int min_raw = bw2 + 1;
-
-	if (raw_new < min_raw)
-		raw_new = min_raw;
-
-	focused->custom_stack_height = raw_new;
-	tile();
 }
 
 void resize_win(Direction dir)
@@ -2199,17 +2132,23 @@ void switch_previous_workspace(void)
 
 void tile(void)
 {
+	ClientList *list = &workspaces[current_ws].lists[LIST_TILED];
+
 	update_struts();
 
 	for (int m = 0; m < n_mons; m++) {
-		Client *clients[MAX_CLIENTS];
+		Client *master = NULL;
 		int n = 0;
 
-		for (Client *c = workspaces[current_ws].lists[LIST_TILED].head; c && n < MAX_CLIENTS; c = c->next)
-			if (c->mapped && !c->fullscreen && c->mon == m)
-				clients[n++] = c;
+		for (Client *c = list->head; c; c = c->next) {
+			if (!c->mapped || c->fullscreen || c->mon != m)
+				continue;
+			if (!master)
+				master = c;
+			n++;
+		}
 
-		if (!n)
+		if (!master)
 			continue;
 
 		Monitor *mon = &mons[m];
@@ -2221,63 +2160,30 @@ void tile(void)
 		int master_w = n > 1 ? (int)(w * CLAMP(user_config.master_width[m], MF_MIN, MF_MAX)) : w;
 
 		/* master */
-		configure_tile(clients[0], x, y, master_w, h);
+		configure_tile(master, x, y, master_w, h);
 
 		if (n == 1)
 			continue;
 
 		/* stack */
+		int n_stack = n - 1;
 		int stack_x = x + master_w + gaps;
 		int stack_w = w - master_w - gaps;
-		int n_stack = n - 1;
-		int min_h = 2 * user_config.border_width + 1;
-		int heights[MAX_CLIENTS] = {0};
 		int available = h - (n_stack - 1) * gaps;
-		int n_auto = 0;
-
-		for (int i = 1; i < n; i++) {
-			if (clients[i]->custom_stack_height > 0)
-				available -= clients[i]->custom_stack_height;
-			else
-				n_auto++;
-		}
-
-		Bool enough = n_auto && available >= n_auto * min_h;
-		int auto_h = enough ? available / n_auto : min_h;
-		int auto_left = available;
-		int auto_count = n_auto;
-
-		for (int i = 1; i < n; i++) {
-			if (clients[i]->custom_stack_height > 0) {
-				heights[i] = clients[i]->custom_stack_height;
-				continue;
-			}
-
-			heights[i] = enough && auto_count == 1 ? auto_left : auto_h;
-			auto_left -= heights[i];
-			auto_count--;
-		}
-
-		/* calculate occupied height */
-		int occupied = (n_stack - 1) * gaps;
-		for (int i = 1; i < n; i++)
-			occupied += heights[i];
-
-		/* shrink overflowing windows */
-		for (int i = 1; i < n - 1 && occupied > h; i++) {
-			int shrink = MIN(occupied - h, MAX(0, heights[i] - min_h));
-			heights[i] -= shrink;
-			occupied -= shrink;
-		}
-
-		/* bottom window takes unused space */
-		if (occupied < h)
-			heights[n - 1] += h - occupied;
-
+		int stack_h = MAX(2 * user_config.border_width + 1, available / n_stack);
+		int extra = MAX(0, available - n_stack * stack_h);
 		int stack_y = y;
-		for (int i = 1; i < n; i++) {
-			configure_tile(clients[i], stack_x, stack_y, stack_w, heights[i]);
-			stack_y += heights[i] + gaps;
+
+		for (Client *c = master->next; c; c = c->next) {
+			if (!c->mapped || c->fullscreen || c->mon != m)
+				continue;
+
+			int height = stack_h;
+			if (--n_stack == 0)
+				height += extra;
+
+			configure_tile(c, stack_x, stack_y, stack_w, height);
+			stack_y += height + gaps;
 		}
 	}
 
@@ -2433,15 +2339,34 @@ void update_mons(void)
 
 void update_net_client_list(void)
 {
-	Window wins[MAX_CLIENTS];
+	size_t count = 0;
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
+		for (int i = 0; i < LIST_COUNT; i++) {
+			unsigned int n = workspaces[ws].lists[i].count;
+			if (n > (size_t)INT_MAX - count) {
+				fputs("sxwm: client list exceeds X property size\n", stderr);
+				return;
+			}
+			count += n;
+		}
+
+	if (count > SIZE_MAX / sizeof(Window))
+		return;
+
+	Window *wins = count ? malloc(count * sizeof(*wins)) : NULL;
+	if (count && !wins) {
+		fputs("sxwm: could not allocate client list\n", stderr);
+		return;
+	}
+
 	int n = 0;
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
+	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
 		for (int i = 0; i < LIST_COUNT; i++)
 			for (Client *c = workspaces[ws].lists[i].head; c; c = c->next)
 				wins[n++] = c->win;
-	}
 
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
+	free(wins);
 }
 
 void update_struts(void)
