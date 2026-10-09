@@ -1,7 +1,7 @@
 <div align="center">
   <img src="logo.png">
   <br>
-  <b>A very SeXy WM</b> <br>
+  <b>A Simple X Window Manager</b> <br>
   <br><br>
 </div>
 
