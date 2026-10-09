@@ -31,6 +31,10 @@ build/parser.o: src/parser.c
 sxwm: ${OBJ}
 	${CC} -o sxwm ${OBJ} ${LDFLAGS}
 
+release: CFLAGS := -std=c99 -pedantic -Wall -Wextra -O3 ${CPPFLAGS} -flto -ffunction-sections -fdata-sections -I/usr/X11R6/include
+release: LDFLAGS := -O3 -flto -Wl,--gc-sections -s ${LIBS} -L/usr/X11R6/lib
+release: clean sxwm
+
 clean:
 	rm -rf build sxwm
 
@@ -53,4 +57,4 @@ clangd:
 	rm -f compile_flags.txt
 	for f in ${CFLAGS}; do echo $$f >> compile_flags.txt; done
 
-.PHONY: all clean install uninstall clangd
+.PHONY: all release clean install uninstall clangd

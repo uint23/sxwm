@@ -120,3 +120,8 @@ workspace : mod + 8          : move 8
 workspace : mod + shift + 8  : swap 8
 workspace : mod + 9          : move 9
 workspace : mod + shift + 9  : swap 9
+
+# startup
+
+exec : picom
+exec : dunst
