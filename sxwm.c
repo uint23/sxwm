@@ -70,6 +70,7 @@ void move_client(ClientList *list, Client *c);
 /* void move_next_mon(void); */
 /* void move_prev_mon(void); */
 void move_to_workspace(int ws);
+void move_win(Direction dir);
 /* void move_win_down(void); */
 /* void move_win_left(void); */
 /* void move_win_right(void); */
@@ -94,10 +95,12 @@ void prepend_client(ClientList *list, Client *c);
 /* void quit(void); */
 /* void reload_config(void); */
 void reset_opacity(Window w);
+void resize_master(int amount);
 /* void resize_master_add(void); */
 /* void resize_master_sub(void); */
 /* void resize_stack_add(void); */
 /* void resize_stack_sub(void); */
+void resize_win(Direction dir);
 /* void resize_win_down(void); */
 /* void resize_win_left(void); */
 /* void resize_win_right(void); */
@@ -1020,43 +1023,51 @@ void move_to_workspace(int ws)
 	set_input_focus(workspaces[from_ws].focused, False, False);
 }
 
-void move_win_down(void)
+void move_win(Direction dir)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
+	Client *c = get_focused();
+	int amount = user_config.move_window_amt;
+	if (!c || !is_floating(c))
 		return;
 
-	focused->y += user_config.move_window_amt;
-	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+	switch (dir) {
+	case UP:
+		c->y -= amount;
+		break;
+	case DOWN:
+		c->y += amount;
+		break;
+	case LEFT:
+		c->x -= amount;
+		break;
+	case RIGHT:
+		c->x += amount;
+		break;
+	default:
+		return;
+	}
+
+	XMoveWindow(dpy, c->win, c->x, c->y);
+}
+
+void move_win_down(void)
+{
+	move_win(DOWN);
 }
 
 void move_win_left(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-
-	focused->x -= user_config.move_window_amt;
-	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+	move_win(LEFT);
 }
 
 void move_win_right(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-	focused->x += user_config.move_window_amt;
-	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+	move_win(RIGHT);
 }
 
 void move_win_up(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-
-	focused->y -= user_config.move_window_amt;
-	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+	move_win(UP);
 }
 
 void on_button(XEvent *xev)
@@ -1509,7 +1520,7 @@ long parse_col(const char *hex)
 	}
 
 	/* possibly unsafe BUT i dont think it can cause any problems.
-	 * used to make sure borders are opaque with compositor like picom */
+	   used to make sure borders are opaque with compositor like picom */
 	return ((long)col.pixel) | (0xffL << 24);
 }
 
@@ -1529,16 +1540,6 @@ void prepend_client(ClientList *list, Client *c)
 
 void quit(void)
 {
-	/* Kill all clients on exit...
-
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (Client *c = workspaces[ws]; c; c = c->next) {
-			XUnmapWindow(dpy, c->win);
-			XKillClient(dpy, c->win);
-		}
-	}
-	*/
-
 	XSync(dpy, False);
 	XFreeCursor(dpy, cursors.move);
 	XFreeCursor(dpy, cursors.normal);
@@ -1644,33 +1645,26 @@ void reset_opacity(Window w)
 	XDeleteProperty(dpy, w, atom);
 }
 
-
-void resize_master_add(void)
+void resize_master(int amount)
 {
-	/* pick the monitor of the focused window (or 0 if none) */
 	Client *focused = get_focused();
 	int m = focused ? focused->mon : 0;
 	float *mw = &user_config.master_width[m];
 
-	if (*mw < MF_MAX - 0.001f)
-		*mw += ((float)user_config.resize_master_amt / 100);
+	*mw = CLAMP(*mw + (float)amount / 100.0f, MF_MIN, MF_MAX);
 
 	tile();
 	update_borders();
 }
 
+void resize_master_add(void)
+{
+	resize_master(user_config.resize_master_amt);
+}
+
 void resize_master_sub(void)
 {
-	/* pick the monitor of the focused window (or 0 if none) */
-	Client *focused = get_focused();
-	int m = focused ? focused->mon : 0;
-	float *mw = &user_config.master_width[m];
-
-	if (*mw > MF_MIN + 0.001f)
-		*mw -= ((float)user_config.resize_master_amt / 100);
-
-	tile();
-	update_borders();
+	resize_master(-user_config.resize_master_amt);
 }
 
 void resize_stack_add(void)
@@ -1728,50 +1722,61 @@ void resize_stack_sub(void)
 	tile();
 }
 
-void resize_win_down(void)
+void resize_win(Direction dir)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
+	Client *c = get_focused();
+	int *size, max;
+	int amount = user_config.resize_window_amt;
+	Monitor *m = &mons[c->mon];
+	if (!c || !is_floating(c))
 		return;
 
-	int new_h = focused->h + user_config.resize_window_amt;
-	int max_h = mons[focused->mon].h - (focused->y - mons[focused->mon].y);
-	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, max_h);
-	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+
+	switch (dir) {
+	case LEFT:
+		size = &c->w;
+		max = c->w;
+		amount = -amount;
+		break;
+	case RIGHT:
+		size = &c->w;
+		max = m->x + m->w - c->x;
+		break;
+	case UP:
+		size = &c->h;
+		max = c->h;
+		amount = -amount;
+		break;
+	case DOWN:
+		size = &c->h;
+		max = m->y + m->h - c->y;
+		break;
+	default:
+		return;
+	}
+
+	*size = CLAMP(*size + amount, MIN_WINDOW_SIZE, MAX(MIN_WINDOW_SIZE, max));
+	XResizeWindow(dpy, c->win, c->w, c->h);
+}
+
+void resize_win_down(void)
+{
+	resize_win(DOWN);
 }
 
 void resize_win_left(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-
-	int new_w = focused->w - user_config.resize_window_amt;
-	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, focused->w);
-	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+	resize_win(LEFT);
 }
 
 void resize_win_right(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-
-	int new_w = focused->w + user_config.resize_window_amt;
-	int max_w = mons[focused->mon].w - (focused->x - mons[focused->mon].x);
-	focused->w = CLAMP(new_w, MIN_WINDOW_SIZE, max_w);
-	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+	resize_win(RIGHT);
 }
 
 void resize_win_up(void)
 {
-	Client *focused = get_focused();
-	if (!focused || !is_floating(focused))
-		return;
-
-	int new_h = focused->h - user_config.resize_window_amt;
-	focused->h = CLAMP(new_h, MIN_WINDOW_SIZE, focused->h);
-	XResizeWindow(dpy, focused->win, focused->w, focused->h);
+	resize_win(UP);
 }
 
 void run(void)

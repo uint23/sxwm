@@ -44,6 +44,7 @@ enum {
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
 typedef enum { LIST_TILED, LIST_FLOATING, LIST_COUNT } ListType;
 typedef enum { WINDOW_NORMAL, WINDOW_FLOAT, WINDOW_DOCK } WindowType;
+typedef enum { UP, DOWN, LEFT, RIGHT } Direction;
 typedef void (*EventHandler)(XEvent *);
 
 typedef union Action Action;
