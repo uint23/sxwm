@@ -59,19 +59,6 @@ WindowType get_window_type(Window w);
 int get_workspace_for_window(Window w);
 void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
 void grab_keys(void);
-void hdl_button(XEvent *xev);
-void hdl_button_release(XEvent *xev);
-void hdl_client_msg(XEvent *xev);
-void hdl_config_ntf(XEvent *xev);
-void hdl_config_req(XEvent *xev);
-void hdl_dummy(XEvent *xev);
-void hdl_destroy_ntf(XEvent *xev);
-void hdl_keypress(XEvent *xev);
-void hdl_mapping_ntf(XEvent *xev);
-void hdl_map_req(XEvent *xev);
-void hdl_motion(XEvent *xev);
-void hdl_property_ntf(XEvent *xev);
-void hdl_unmap_ntf(XEvent *xev);
 /* void inc_gaps(void); */
 void init_defaults(void);
 Bool is_floating(Client *c);
@@ -84,6 +71,19 @@ void move_to_workspace(int ws);
 /* void move_win_left(void); */
 /* void move_win_right(void); */
 /* void move_win_up(void); */
+void on_button(XEvent *xev);
+void on_button_release(XEvent *xev);
+void on_client_msg(XEvent *xev);
+void on_config_ntf(XEvent *xev);
+void on_config_req(XEvent *xev);
+void on_dummy(XEvent *xev);
+void on_destroy_ntf(XEvent *xev);
+void on_keypress(XEvent *xev);
+void on_mapping_ntf(XEvent *xev);
+void on_map_req(XEvent *xev);
+void on_motion(XEvent *xev);
+void on_property_ntf(XEvent *xev);
+void on_unmap_ntf(XEvent *xev);
 void other_wm(void);
 int other_wm_err(Display *d, XErrorEvent *ee);
 /* long parse_col(const char *hex); */
@@ -795,438 +795,6 @@ void grab_keys(void)
 	}
 }
 
-void hdl_button(XEvent *xev)
-{
-	XButtonEvent *ev = &xev->xbutton;
-	Window w = ev->subwindow != None ? ev->subwindow : ev->window;
-	Client *c = find_client(find_toplevel(w));
-	Bool mod = (clean_mask(ev->state) & user_config.modkey) == user_config.modkey;
-
-	if (!c || c->ws != current_ws) {
-		XAllowEvents(dpy, ReplayPointer, ev->time);
-		return;
-	}
-
-	if (!mod) {
-		if (ev->button == Button1)
-			set_input_focus(c, True, False);
-		XAllowEvents(dpy, ReplayPointer, ev->time);
-		return;
-	}
-
-	XAllowEvents(dpy, AsyncPointer, ev->time);
-
-	if (ev->button != Button1 && ev->button != Button3)
-		return;
-	if (c->fixed && ev->button == Button3)
-		return;
-
-	set_input_focus(c, True, False);
-	if (!is_floating(c))
-		toggle_floating();
-
-	Cursor cursor = ev->button == Button1 ? cursors.move : cursors.resize;
-	if (XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
-	                 GrabModeAsync, GrabModeAsync, None, cursor, ev->time) != GrabSuccess)
-		return;
-
-	drag_client = c;
-	drag_mode = ev->button == Button1 ? DRAG_MOVE : DRAG_RESIZE;
-	drag.sx = ev->x_root;
-	drag.sy = ev->y_root;
-	drag.ox = c->x;
-	drag.oy = c->y;
-	drag.ow = c->w;
-	drag.oh = c->h;
-}
-
-void hdl_button_release(XEvent *xev)
-{
-	(void)xev;
-
-	XUngrabPointer(dpy, CurrentTime);
-
-	drag_mode = DRAG_NONE;
-	drag_client = NULL;
-}
-
-void hdl_client_msg(XEvent *xev)
-{
-	if (xev->xclient.message_type == atoms[ATOM_NET_CURRENT_DESKTOP]) {
-		int ws = (int)xev->xclient.data.l[0];
-		change_workspace(ws);
-		return;
-	}
-
-	if (xev->xclient.message_type == atoms[ATOM_NET_WM_STATE]) {
-		XClientMessageEvent *client_msg_ev = &xev->xclient;
-		Window w = client_msg_ev->window;
-		Client *c = find_client(find_toplevel(w));
-		if (!c)
-			return;
-
-		/* 0=remove, 1=add, 2=toggle */
-		long action = client_msg_ev->data.l[0];
-		Atom a1 = (Atom)client_msg_ev->data.l[1];
-		Atom a2 = (Atom)client_msg_ev->data.l[2];
-
-		Atom state_atoms[2] = { a1, a2 };
-		for (int i = 0; i < 2; i++) {
-			if (state_atoms[i] == None)
-				continue;
-
-			if (state_atoms[i] == atoms[ATOM_NET_WM_STATE_FULLSCREEN]) {
-				Bool want = c->fullscreen;
-				if (action == 0)
-					want = False;
-				else if (action == 1)
-					want = True;
-				else if (action == 2)
-					want = !want;
-
-				apply_fullscreen(c, want);
-			}
-			/* TODO: other states */
-		}
-		return;
-	}
-}
-
-void hdl_config_ntf(XEvent *xev)
-{
-	if (xev->xconfigure.window == root) {
-		update_mons();
-		tile();
-		update_borders();
-	}
-}
-
-void hdl_config_req(XEvent *xev)
-{
-	XConfigureRequestEvent *ev = &xev->xconfigurerequest;
-	Client *c = find_client(ev->window);
-
-	if (c && (!is_floating(c) || c->fullscreen))
-		return;
-
-	/* allow client to configure itself */
-	XWindowChanges wc = {
-		.x = ev->x,
-		.y = ev->y,
-		.width = ev->width,
-		.height = ev->height,
-		.border_width = ev->border_width,
-		.sibling = ev->above,
-		.stack_mode = ev->detail
-	};
-	XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
-}
-
-void hdl_dummy(XEvent *xev)
-{
-	(void)xev;
-}
-
-void hdl_destroy_ntf(XEvent *xev)
-{
-	Client *c = find_client(xev->xdestroywindow.window);
-	if (!c)
-		return;
-
-	int ws = c->ws;
-	Bool was_focused = workspaces[ws].focused == c;
-	Client *prev = c->prev;
-	Client *next = c->next;
-
-	/* unlink from workspace list */
-	unlink_client(c);
-	if (was_focused)
-		workspaces[ws].focused = NULL;
-	if (drag_client == c) {
-		drag_client = NULL;
-		drag_mode = DRAG_NONE;
-	}
-	free(c);
-	open_windows--;
-	update_net_client_list();
-
-	if (ws != current_ws)
-		return;
-
-	tile();
-	update_borders();
-
-	if (!was_focused)
-		return;
-
-	/* prefer previous window else next */
-	Client *foc_new = NULL;
-	if (prev && prev->mapped && prev->mon == current_mon)
-		foc_new = prev;
-	else if (next && next->mapped && next->mon == current_mon)
-		foc_new = next;
-	else {
-		Client *lists[] = { workspaces[ws].tiled, workspaces[ws].floating };
-		for (int i = 0; i < 2 && !foc_new; i++)
-			for (Client *p = lists[i]; p; p = p->next)
-				if (p->mapped && p->mon == current_mon) {
-					foc_new = p;
-					break;
-				}
-	}
-	set_input_focus(foc_new, True, True);
-}
-
-void hdl_keypress(XEvent *xev)
-{
-	KeyCode code = xev->xkey.keycode;
-	int mods = clean_mask(xev->xkey.state);
-
-	for (int i = 0; i < user_config.n_binds; i++) {
-		Binding *bind = &user_config.binds[i];
-		if (bind->keycode == code && clean_mask(bind->mods) == mods) {
-			switch (bind->type) {
-				case TYPE_CMD: spawn(bind->action.cmd); break;
-				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
-				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
-				case TYPE_WS_MOVE: move_to_workspace(bind->action.ws); update_net_client_list(); break;
-			}
-			return;
-		}
-	}
-}
-
-void hdl_mapping_ntf(XEvent *xev)
-{
-	XRefreshKeyboardMapping(&xev->xmapping);
-	update_modifier_masks();
-	grab_keys();
-}
-
-void hdl_map_req(XEvent *xev)
-{
-	Window w = xev->xmaprequest.window;
-	XWindowAttributes wa;
-
-	if (!XGetWindowAttributes(dpy, w, &wa))
-		return;
-
-	if (wa.override_redirect || wa.width <= 0 || wa.height <= 0) {
-		XMapWindow(dpy, w);
-		return;
-	}
-
-	/* already managed */
-	Client *c = find_client(w);
-	if (c) {
-		if (c->ws != current_ws)
-			return;
-
-		if (!c->mapped) {
-			XMapWindow(dpy, w);
-			c->mapped = True;
-		}
-
-		if (user_config.new_win_focus)
-			set_input_focus(c, True, True);
-		else
-			update_borders();
-		return;
-	}
-
-	WindowType type = get_window_type(w);
-	if (type == WINDOW_DOCK) {
-		XMapWindow(dpy, w);
-		return;
-	}
-
-	if (open_windows >= MAX_CLIENTS) {
-		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
-		return;
-	}
-
-	/* classify window before adding */
-	Bool fullscreen = window_should_start_fullscreen(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
-
-	XSizeHints hints;
-	long supplied;
-	Bool fixed = XGetWMNormalHints(dpy, w, &hints, &supplied) &&
-	             (hints.flags & PMinSize) && (hints.flags & PMaxSize) &&
-	             hints.min_width == hints.max_width && hints.min_height == hints.max_height;
-
-	Bool floating = type == WINDOW_FLOAT || global_floating || fixed ||
-	                window_should_float(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_MODAL]);
-
-	Window transient;
-	if (!floating && XGetTransientForHint(dpy, w, &transient))
-		floating = True;
-
-	if (fullscreen)
-		floating = False;
-
-	int ws = get_workspace_for_window(w);
-	c = add_client(w, floating, ws);
-	if (!c)
-		return;
-
-	c->ws = ws;
-	c->fixed = fixed;
-	set_wm_state(w, NormalState);
-
-	/* position floating windows */
-	if (floating) {
-		c->w = MAX(c->w, 64);
-		c->h = MAX(c->h, 64);
-		centre_client(c);
-		XSetWindowBorderWidth(dpy, w, user_config.border_width);
-	}
-
-	/* initialise fullscreen through the existing helper */
-	if (fullscreen)
-		apply_fullscreen(c, True);
-
-	update_net_client_list();
-
-	if (ws != current_ws)
-		return;
-
-	XMapWindow(dpy, w);
-	c->mapped = True;
-
-	if (!floating && !fullscreen)
-		tile();
-	else if (floating)
-		XRaiseWindow(dpy, w);
-
-	set_frame_extents(w);
-
-	if (user_config.new_win_focus)
-		set_input_focus(c, True, True);
-	else
-		update_borders();
-}
-
-void hdl_motion(XEvent *xev)
-{
-	XMotionEvent *motion_ev = &xev->xmotion;
-
-	if ((drag_mode == DRAG_NONE || !drag_client) ||
-		(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle)))
-		return;
-	last_motion_time = motion_ev->time;
-
-	/* figure out which monitor the pointer is in right now */
-	int mon = 0;
-	for (int i = 0; i < n_mons; i++) {
-		Bool is_current_mon =
-			motion_ev->x_root >= mons[i].x &&
-			motion_ev->x_root < mons[i].x + mons[i].w &&
-			motion_ev->y_root >= mons[i].y &&
-			motion_ev->y_root < mons[i].y + mons[i].h;
-
-		if (is_current_mon) {
-			mon = i;
-			break;
-		}
-	}
-	Monitor *current_mon_motion = &mons[mon];
-
-	if (drag_mode == DRAG_MOVE) {
-		int dx = motion_ev->x_root - drag.sx;
-		int dy = motion_ev->y_root - drag.sy;
-		int nx = drag.ox + dx;
-		int ny = drag.oy + dy;
-
-		int outer_w = drag_client->w + 2 * user_config.border_width;
-		int outer_h = drag_client->h + 2 * user_config.border_width;
-
-		/* snap relative to this mons bounds: */
-		int rel_x = nx - current_mon_motion->x;
-		int rel_y = ny - current_mon_motion->y;
-
-		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, user_config.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, user_config.snap_distance);
-
-		nx = current_mon_motion->x + rel_x;
-		ny = current_mon_motion->y + rel_y;
-
-		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
-			UDIST(ny, drag_client->y) > user_config.snap_distance)) {
-			toggle_floating();
-		}
-
-		XMoveWindow(dpy, drag_client->win, nx, ny);
-		drag_client->x = nx;
-		drag_client->y = ny;
-	}
-	else if (drag_mode == DRAG_RESIZE) {
-		int dx = motion_ev->x_root - drag.sx;
-		int dy = motion_ev->y_root - drag.sy;
-		int nw = drag.ow + dx;
-		int nh = drag.oh + dy;
-
-		/* clamp relative to this mon */
-		int max_w = (current_mon_motion->w - (drag_client->x - current_mon_motion->x));
-		int max_h = (current_mon_motion->h - (drag_client->y - current_mon_motion->y));
-
-		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
-		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
-
-		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
-	}
-}
-
-void hdl_property_ntf(XEvent *xev)
-{
-	XPropertyEvent *property_ev = &xev->xproperty;
-
-	if (property_ev->window == root) {
-		if (property_ev->atom == atoms[ATOM_NET_CURRENT_DESKTOP]) {
-			long *val = NULL;
-			Atom actual;
-			int fmt;
-			unsigned long n;
-			unsigned long after;
-			if (XGetWindowProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], 0, 1, False, XA_CARDINAL, &actual,
-						           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
-				change_workspace((int)val[0]);
-				XFree(val);
-			}
-		}
-		else if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL]) {
-			update_struts();
-			tile();
-			update_borders();
-		}
-	}
-
-	/* client window properties */
-	if (property_ev->atom == atoms[ATOM_NET_WM_STATE]) {
-		Client *c = find_client(find_toplevel(property_ev->window));
-		if (!c)
-			return;
-
-		Bool want = window_has_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
-		if (want != c->fullscreen)
-			apply_fullscreen(c, want);
-	}
-}
-
-void hdl_unmap_ntf(XEvent *xev)
-{
-	Client *c = find_client(xev->xunmap.window);
-	if (!c || c->ws != current_ws || !c->mapped)
-		return;
-
-	c->mapped = False;
-	tile();
-
-	if (workspaces[current_ws].focused == c)
-		set_input_focus(NULL, False, False);
-	else
-		update_borders();
-}
-
 void inc_gaps(void)
 {
 	user_config.gaps++;
@@ -1485,6 +1053,438 @@ void move_win_up(void)
 
 	focused->y -= user_config.move_window_amt;
 	XMoveWindow(dpy, focused->win, focused->x, focused->y);
+}
+
+void on_button(XEvent *xev)
+{
+	XButtonEvent *ev = &xev->xbutton;
+	Window w = ev->subwindow != None ? ev->subwindow : ev->window;
+	Client *c = find_client(find_toplevel(w));
+	Bool mod = (clean_mask(ev->state) & user_config.modkey) == user_config.modkey;
+
+	if (!c || c->ws != current_ws) {
+		XAllowEvents(dpy, ReplayPointer, ev->time);
+		return;
+	}
+
+	if (!mod) {
+		if (ev->button == Button1)
+			set_input_focus(c, True, False);
+		XAllowEvents(dpy, ReplayPointer, ev->time);
+		return;
+	}
+
+	XAllowEvents(dpy, AsyncPointer, ev->time);
+
+	if (ev->button != Button1 && ev->button != Button3)
+		return;
+	if (c->fixed && ev->button == Button3)
+		return;
+
+	set_input_focus(c, True, False);
+	if (!is_floating(c))
+		toggle_floating();
+
+	Cursor cursor = ev->button == Button1 ? cursors.move : cursors.resize;
+	if (XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
+	                 GrabModeAsync, GrabModeAsync, None, cursor, ev->time) != GrabSuccess)
+		return;
+
+	drag_client = c;
+	drag_mode = ev->button == Button1 ? DRAG_MOVE : DRAG_RESIZE;
+	drag.sx = ev->x_root;
+	drag.sy = ev->y_root;
+	drag.ox = c->x;
+	drag.oy = c->y;
+	drag.ow = c->w;
+	drag.oh = c->h;
+}
+
+void on_button_release(XEvent *xev)
+{
+	(void)xev;
+
+	XUngrabPointer(dpy, CurrentTime);
+
+	drag_mode = DRAG_NONE;
+	drag_client = NULL;
+}
+
+void on_client_msg(XEvent *xev)
+{
+	if (xev->xclient.message_type == atoms[ATOM_NET_CURRENT_DESKTOP]) {
+		int ws = (int)xev->xclient.data.l[0];
+		change_workspace(ws);
+		return;
+	}
+
+	if (xev->xclient.message_type == atoms[ATOM_NET_WM_STATE]) {
+		XClientMessageEvent *client_msg_ev = &xev->xclient;
+		Window w = client_msg_ev->window;
+		Client *c = find_client(find_toplevel(w));
+		if (!c)
+			return;
+
+		/* 0=remove, 1=add, 2=toggle */
+		long action = client_msg_ev->data.l[0];
+		Atom a1 = (Atom)client_msg_ev->data.l[1];
+		Atom a2 = (Atom)client_msg_ev->data.l[2];
+
+		Atom state_atoms[2] = { a1, a2 };
+		for (int i = 0; i < 2; i++) {
+			if (state_atoms[i] == None)
+				continue;
+
+			if (state_atoms[i] == atoms[ATOM_NET_WM_STATE_FULLSCREEN]) {
+				Bool want = c->fullscreen;
+				if (action == 0)
+					want = False;
+				else if (action == 1)
+					want = True;
+				else if (action == 2)
+					want = !want;
+
+				apply_fullscreen(c, want);
+			}
+			/* TODO: other states */
+		}
+		return;
+	}
+}
+
+void on_config_ntf(XEvent *xev)
+{
+	if (xev->xconfigure.window == root) {
+		update_mons();
+		tile();
+		update_borders();
+	}
+}
+
+void on_config_req(XEvent *xev)
+{
+	XConfigureRequestEvent *ev = &xev->xconfigurerequest;
+	Client *c = find_client(ev->window);
+
+	if (c && (!is_floating(c) || c->fullscreen))
+		return;
+
+	/* allow client to configure itself */
+	XWindowChanges wc = {
+		.x = ev->x,
+		.y = ev->y,
+		.width = ev->width,
+		.height = ev->height,
+		.border_width = ev->border_width,
+		.sibling = ev->above,
+		.stack_mode = ev->detail
+	};
+	XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
+}
+
+void on_dummy(XEvent *xev)
+{
+	(void)xev;
+}
+
+void on_destroy_ntf(XEvent *xev)
+{
+	Client *c = find_client(xev->xdestroywindow.window);
+	if (!c)
+		return;
+
+	int ws = c->ws;
+	Bool was_focused = workspaces[ws].focused == c;
+	Client *prev = c->prev;
+	Client *next = c->next;
+
+	/* unlink from workspace list */
+	unlink_client(c);
+	if (was_focused)
+		workspaces[ws].focused = NULL;
+	if (drag_client == c) {
+		drag_client = NULL;
+		drag_mode = DRAG_NONE;
+	}
+	free(c);
+	open_windows--;
+	update_net_client_list();
+
+	if (ws != current_ws)
+		return;
+
+	tile();
+	update_borders();
+
+	if (!was_focused)
+		return;
+
+	/* prefer previous window else next */
+	Client *foc_new = NULL;
+	if (prev && prev->mapped && prev->mon == current_mon)
+		foc_new = prev;
+	else if (next && next->mapped && next->mon == current_mon)
+		foc_new = next;
+	else {
+		Client *lists[] = { workspaces[ws].tiled, workspaces[ws].floating };
+		for (int i = 0; i < 2 && !foc_new; i++)
+			for (Client *p = lists[i]; p; p = p->next)
+				if (p->mapped && p->mon == current_mon) {
+					foc_new = p;
+					break;
+				}
+	}
+	set_input_focus(foc_new, True, True);
+}
+
+void on_keypress(XEvent *xev)
+{
+	KeyCode code = xev->xkey.keycode;
+	int mods = clean_mask(xev->xkey.state);
+
+	for (int i = 0; i < user_config.n_binds; i++) {
+		Binding *bind = &user_config.binds[i];
+		if (bind->keycode == code && clean_mask(bind->mods) == mods) {
+			switch (bind->type) {
+				case TYPE_CMD: spawn(bind->action.cmd); break;
+				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
+				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
+				case TYPE_WS_MOVE: move_to_workspace(bind->action.ws); update_net_client_list(); break;
+			}
+			return;
+		}
+	}
+}
+
+void on_mapping_ntf(XEvent *xev)
+{
+	XRefreshKeyboardMapping(&xev->xmapping);
+	update_modifier_masks();
+	grab_keys();
+}
+
+void on_map_req(XEvent *xev)
+{
+	Window w = xev->xmaprequest.window;
+	XWindowAttributes wa;
+
+	if (!XGetWindowAttributes(dpy, w, &wa))
+		return;
+
+	if (wa.override_redirect || wa.width <= 0 || wa.height <= 0) {
+		XMapWindow(dpy, w);
+		return;
+	}
+
+	/* already managed */
+	Client *c = find_client(w);
+	if (c) {
+		if (c->ws != current_ws)
+			return;
+
+		if (!c->mapped) {
+			XMapWindow(dpy, w);
+			c->mapped = True;
+		}
+
+		if (user_config.new_win_focus)
+			set_input_focus(c, True, True);
+		else
+			update_borders();
+		return;
+	}
+
+	WindowType type = get_window_type(w);
+	if (type == WINDOW_DOCK) {
+		XMapWindow(dpy, w);
+		return;
+	}
+
+	if (open_windows >= MAX_CLIENTS) {
+		fprintf(stderr, "sxwm: max clients reached, ignoring map request\n");
+		return;
+	}
+
+	/* classify window before adding */
+	Bool fullscreen = window_should_start_fullscreen(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
+
+	XSizeHints hints;
+	long supplied;
+	Bool fixed = XGetWMNormalHints(dpy, w, &hints, &supplied) &&
+	             (hints.flags & PMinSize) && (hints.flags & PMaxSize) &&
+	             hints.min_width == hints.max_width && hints.min_height == hints.max_height;
+
+	Bool floating = type == WINDOW_FLOAT || global_floating || fixed ||
+	                window_should_float(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_MODAL]);
+
+	Window transient;
+	if (!floating && XGetTransientForHint(dpy, w, &transient))
+		floating = True;
+
+	if (fullscreen)
+		floating = False;
+
+	int ws = get_workspace_for_window(w);
+	c = add_client(w, floating, ws);
+	if (!c)
+		return;
+
+	c->ws = ws;
+	c->fixed = fixed;
+	set_wm_state(w, NormalState);
+
+	/* position floating windows */
+	if (floating) {
+		c->w = MAX(c->w, 64);
+		c->h = MAX(c->h, 64);
+		centre_client(c);
+		XSetWindowBorderWidth(dpy, w, user_config.border_width);
+	}
+
+	/* initialise fullscreen through the existing helper */
+	if (fullscreen)
+		apply_fullscreen(c, True);
+
+	update_net_client_list();
+
+	if (ws != current_ws)
+		return;
+
+	XMapWindow(dpy, w);
+	c->mapped = True;
+
+	if (!floating && !fullscreen)
+		tile();
+	else if (floating)
+		XRaiseWindow(dpy, w);
+
+	set_frame_extents(w);
+
+	if (user_config.new_win_focus)
+		set_input_focus(c, True, True);
+	else
+		update_borders();
+}
+
+void on_motion(XEvent *xev)
+{
+	XMotionEvent *motion_ev = &xev->xmotion;
+
+	if ((drag_mode == DRAG_NONE || !drag_client) ||
+		(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle)))
+		return;
+	last_motion_time = motion_ev->time;
+
+	/* figure out which monitor the pointer is in right now */
+	int mon = 0;
+	for (int i = 0; i < n_mons; i++) {
+		Bool is_current_mon =
+			motion_ev->x_root >= mons[i].x &&
+			motion_ev->x_root < mons[i].x + mons[i].w &&
+			motion_ev->y_root >= mons[i].y &&
+			motion_ev->y_root < mons[i].y + mons[i].h;
+
+		if (is_current_mon) {
+			mon = i;
+			break;
+		}
+	}
+	Monitor *current_mon_motion = &mons[mon];
+
+	if (drag_mode == DRAG_MOVE) {
+		int dx = motion_ev->x_root - drag.sx;
+		int dy = motion_ev->y_root - drag.sy;
+		int nx = drag.ox + dx;
+		int ny = drag.oy + dy;
+
+		int outer_w = drag_client->w + 2 * user_config.border_width;
+		int outer_h = drag_client->h + 2 * user_config.border_width;
+
+		/* snap relative to this mons bounds: */
+		int rel_x = nx - current_mon_motion->x;
+		int rel_y = ny - current_mon_motion->y;
+
+		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, user_config.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, user_config.snap_distance);
+
+		nx = current_mon_motion->x + rel_x;
+		ny = current_mon_motion->y + rel_y;
+
+		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
+			UDIST(ny, drag_client->y) > user_config.snap_distance)) {
+			toggle_floating();
+		}
+
+		XMoveWindow(dpy, drag_client->win, nx, ny);
+		drag_client->x = nx;
+		drag_client->y = ny;
+	}
+	else if (drag_mode == DRAG_RESIZE) {
+		int dx = motion_ev->x_root - drag.sx;
+		int dy = motion_ev->y_root - drag.sy;
+		int nw = drag.ow + dx;
+		int nh = drag.oh + dy;
+
+		/* clamp relative to this mon */
+		int max_w = (current_mon_motion->w - (drag_client->x - current_mon_motion->x));
+		int max_h = (current_mon_motion->h - (drag_client->y - current_mon_motion->y));
+
+		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
+		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
+
+		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
+	}
+}
+
+void on_property_ntf(XEvent *xev)
+{
+	XPropertyEvent *property_ev = &xev->xproperty;
+
+	if (property_ev->window == root) {
+		if (property_ev->atom == atoms[ATOM_NET_CURRENT_DESKTOP]) {
+			long *val = NULL;
+			Atom actual;
+			int fmt;
+			unsigned long n;
+			unsigned long after;
+			if (XGetWindowProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], 0, 1, False, XA_CARDINAL, &actual,
+						           &fmt, &n, &after, (unsigned char **)&val) == Success && val) {
+				change_workspace((int)val[0]);
+				XFree(val);
+			}
+		}
+		else if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL]) {
+			update_struts();
+			tile();
+			update_borders();
+		}
+	}
+
+	/* client window properties */
+	if (property_ev->atom == atoms[ATOM_NET_WM_STATE]) {
+		Client *c = find_client(find_toplevel(property_ev->window));
+		if (!c)
+			return;
+
+		Bool want = window_has_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN]);
+		if (want != c->fullscreen)
+			apply_fullscreen(c, want);
+	}
+}
+
+void on_unmap_ntf(XEvent *xev)
+{
+	Client *c = find_client(xev->xunmap.window);
+	if (!c || c->ws != current_ws || !c->mapped)
+		return;
+
+	c->mapped = False;
+	tile();
+
+	if (workspaces[current_ws].focused == c)
+		set_input_focus(NULL, False, False);
+	else
+		update_borders();
 }
 
 void other_wm(void)
@@ -1795,7 +1795,7 @@ void scan_existing_windows(void)
 			XEvent fake_event = {None};
 			fake_event.type = MapRequest;
 			fake_event.xmaprequest.window = children[i];
-			hdl_map_req(&fake_event);
+			on_map_req(&fake_event);
 		}
 		if (children)
 			XFree(children);
@@ -1875,19 +1875,19 @@ void setup(void)
 	XSync(dpy, False);
 
 	for (int i = 0; i < LASTEvent; i++)
-		evtable[i] = hdl_dummy;
-	evtable[ButtonPress] = hdl_button;
-	evtable[ButtonRelease] = hdl_button_release;
-	evtable[ClientMessage] = hdl_client_msg;
-	evtable[ConfigureNotify] = hdl_config_ntf;
-	evtable[ConfigureRequest] = hdl_config_req;
-	evtable[DestroyNotify] = hdl_destroy_ntf;
-	evtable[KeyPress] = hdl_keypress;
-	evtable[MappingNotify] = hdl_mapping_ntf;
-	evtable[MapRequest] = hdl_map_req;
-	evtable[MotionNotify] = hdl_motion;
-	evtable[PropertyNotify] = hdl_property_ntf;
-	evtable[UnmapNotify] = hdl_unmap_ntf;
+		evtable[i] = on_dummy;
+	evtable[ButtonPress] = on_button;
+	evtable[ButtonRelease] = on_button_release;
+	evtable[ClientMessage] = on_client_msg;
+	evtable[ConfigureNotify] = on_config_ntf;
+	evtable[ConfigureRequest] = on_config_req;
+	evtable[DestroyNotify] = on_destroy_ntf;
+	evtable[KeyPress] = on_keypress;
+	evtable[MappingNotify] = on_mapping_ntf;
+	evtable[MapRequest] = on_map_req;
+	evtable[MotionNotify] = on_motion;
+	evtable[PropertyNotify] = on_property_ntf;
+	evtable[UnmapNotify] = on_unmap_ntf;
 	scan_existing_windows();
 
 	/* prevent child processes from becoming zombies */
