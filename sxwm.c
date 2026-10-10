@@ -72,7 +72,7 @@ static void move_client(ClientList* list, Client* c);
 /* void move_master_prev(void); */
 /* void move_next_mon(void); */
 /* void move_prev_mon(void); */
-static void move_to_workspace(int ws);
+static void move_to_workspace(Client* c, int ws);
 static void move_win(Direction dir);
 /* void move_win_down(void); */
 /* void move_win_left(void); */
@@ -729,23 +729,33 @@ static WindowType get_window_type(Window w)
 static int get_workspace_for_window(Window w)
 {
 	XClassHint ch = { 0 };
-	if (!XGetClassHint(dpy, w, &ch))
-		return ws_cur;
-
-	for (int i = 0; i < MAX_ITEMS && cfg.open_in_workspace[i].name; i++) {
-		WorkspaceRule* rule = &cfg.open_in_workspace[i];
-		if ((ch.res_class && strcasecmp(ch.res_class, rule->name) == 0) ||
-		    (ch.res_name && strcasecmp(ch.res_name, rule->name) == 0)) {
-			XFree(ch.res_class);
-			XFree(ch.res_name);
-			return rule->workspace;
+	if (XGetClassHint(dpy, w, &ch)) {
+		for (int i = 0; i < MAX_ITEMS && cfg.open_in_workspace[i].name; i++) {
+			WorkspaceRule* rule = &cfg.open_in_workspace[i];
+			if ((ch.res_class && strcasecmp(ch.res_class, rule->name) == 0) ||
+			    (ch.res_name && strcasecmp(ch.res_name, rule->name) == 0)) {
+				if (ch.res_class) XFree(ch.res_class);
+				if (ch.res_name) XFree(ch.res_name);
+				return rule->workspace;
+			}
 		}
+		if (ch.res_class) XFree(ch.res_class);
+		if (ch.res_name) XFree(ch.res_name);
 	}
 
-	XFree(ch.res_class);
-	XFree(ch.res_name);
+	Atom type;
+	int format;
+	unsigned long count, remaining, *desktop = NULL;
+	int ws = ws_cur;
 
-	return ws_cur; /* default */
+	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_DESKTOP], 0, 1, False, XA_CARDINAL,
+	                       &type, &format, &count, &remaining, (unsigned char**)&desktop) == Success &&
+	    type == XA_CARDINAL && format == 32 && count == 1 &&
+	    desktop && *desktop < NUM_WORKSPACES)
+		ws = (int)*desktop;
+	if (desktop)
+		XFree(desktop);
+	return ws;
 }
 
 static void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks)
@@ -971,34 +981,41 @@ void move_prev_mon(void)
 	update_borders();
 }
 
-static void move_to_workspace(int ws)
+static void move_to_workspace(Client* c, int ws)
 {
-	if (!workspaces[ws_cur].focused || ws < 0 || ws >= NUM_WORKSPACES || ws == ws_cur)
+	if (!c || ws < 0 || ws >= NUM_WORKSPACES)
 		return;
 
-	Client* moved = workspaces[ws_cur].focused;
-	int from_ws = ws_cur;
+	int from_ws = get_client_workspace(c);
+	if (from_ws < 0 || from_ws == ws)
+		return;
 
-	if (moved->mapped)
-		XUnmapWindow(dpy, moved->win);
+	Bool was_focused = workspaces[from_ws].focused == c;
+	Client* replacement = was_focused ? find_new_focus(c) : NULL;
 
-	/* remove from current list */
-	Bool floating = is_floating(moved);
+	if (from_ws == ws_cur && c->mapped)
+		XUnmapWindow(dpy, c->win);
 
-	/* push to target list */
-	ClientList* list = &workspaces[ws].lists[floating ? LIST_FLOATING : LIST_TILED];
-	move_client(list, moved);
+	ClientList* list = &workspaces[ws].lists[is_floating(c) ? LIST_FLOATING : LIST_TILED];
+	move_client(list, c);
+
+	if (ws == ws_cur && c->mapped)
+		XMapWindow(dpy, c->win);
+
+	if (was_focused) {
+		workspaces[from_ws].focused = replacement;
+		if (ws != ws_cur)
+			workspaces[ws].focused = c;
+	}
+
 	long desktop = ws;
-	XChangeProperty(dpy, moved->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
-		        PropModeReplace, (unsigned char *)&desktop, 1);
+	XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
+	                PropModeReplace, (unsigned char *)&desktop, 1);
 
-	/* remember it as last-focused for the target workspace */
-	workspaces[ws].focused = moved;
-
-	/* retile current workspace and pick a new focus there */
-	workspaces[from_ws].focused = workspaces[from_ws].lists[LIST_TILED].head ? workspaces[from_ws].lists[LIST_TILED].head : workspaces[from_ws].lists[LIST_FLOATING].head;
-	tile();
-	set_input_focus(workspaces[from_ws].focused, False, False);
+	if (from_ws == ws_cur || ws == ws_cur)
+		tile();
+	if (from_ws == ws_cur && was_focused)
+		set_input_focus(replacement, False, False);
 }
 
 static void move_win(Direction dir)
@@ -1114,6 +1131,13 @@ static void on_client_msg(XEvent* xev)
 		if (ws != ws_cur)
 			change_workspace(ws);
 		set_input_focus(c, True, False);
+		return;
+	}
+
+	if (xev->xclient.message_type == atoms[ATOM_NET_WM_DESKTOP] && xev->xclient.format == 32) {
+		unsigned long ws = (unsigned long)xev->xclient.data.l[0];
+		if (ws < NUM_WORKSPACES)
+			move_to_workspace(find_client(xev->xclient.window), (int)ws);
 		return;
 	}
 
@@ -1242,7 +1266,7 @@ static void on_keypress(XEvent* xev)
 				case TYPE_CMD: spawn(bind->action.cmd); break;
 				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
 				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
-				case TYPE_WS_MOVE: move_to_workspace(bind->action.ws); update_net_client_list(); break;
+				case TYPE_WS_MOVE: move_to_workspace(get_focused(), bind->action.ws); break;
 			}
 			return;
 		}
