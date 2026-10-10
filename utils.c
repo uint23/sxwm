@@ -10,8 +10,7 @@ static const char* error_messages[E_COUNT] = {
 	[E_OK] = "Success",
 	[E_OOM] = "Out of memory",
 	[E_DISPLAY] = "Could not open X display",
-	[E_WM_RUNNING] = "Another window manager is already running",
-	[E_EXEC] = "Could not execute command"
+	[E_WM_RUNNING] = "Another window manager is already running"
 };
 
 void die(ErrorCode ec, const char* fmt, ...)

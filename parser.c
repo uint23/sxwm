@@ -1,13 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <X11/keysym.h>
-#include <X11/XF86keysym.h>
 #include <X11/Xlib.h>
 
 #include "common.h"
@@ -15,15 +14,20 @@
 #include "parser.h"
 #include "utils.h"
 
-static Binding* alloc_bind(Config* cfg, unsigned mods, KeySym ks);
-static char** alloc_str_pair(const char* a, const char* b);
-static void dedupe_binds(Config* cfg);
-static int find_free_slot(char** arr[], int max);
-static FILE* open_config(char* path, size_t pathsz);
-static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char* ctx, char** out_act);
-static unsigned parse_combo(const char* combo, Config* cfg, KeySym* out_ks);
-static int parse_csv_to_array(char* rest, char** arr[], int* idx, int max, int alloc_pair);
-static char** split_cmd(const char* cmd, int* out_argc);
+typedef enum { OPT_INT, OPT_BOOL, OPT_COLOR } OptionType;
+
+typedef struct {
+	const char* name;
+	size_t offset;
+	OptionType type;
+} Option;
+
+static Binding* alloc_bind(Config* cfg, Binding bind);
+static int append_rules(char** rules, char* value);
+static FILE* open_config(char* path, size_t size);
+static void parse_binding(Config* cfg, const char* key, char* value, int line);
+static unsigned parse_combo(const char* combo, Config* cfg, KeySym* keysym);
+static KeySym parse_keysym(const char* key);
 static char* strip(char* s);
 static char* strip_comment(char* s);
 static char* strip_quotes(char* s);
@@ -60,203 +64,205 @@ static const CommandEntry call_table[] = {
 	{ NULL, NULL },
 };
 
-static Binding* alloc_bind(Config* cfg, unsigned mods, KeySym ks)
+static const Option options[] = {
+	{ "border_width",             offsetof(Config, border_width), OPT_INT },
+	{ "floating_on_top",          offsetof(Config, floating_on_top), OPT_BOOL },
+	{ "focused_border_colour",    offsetof(Config, border_foc_col), OPT_COLOR },
+	{ "gaps",                     offsetof(Config, gaps), OPT_INT },
+	{ "motion_throttle",          offsetof(Config, motion_throttle), OPT_INT },
+	{ "move_window_amount",       offsetof(Config, move_window_amt), OPT_INT },
+	{ "new_win_focus",            offsetof(Config, new_win_focus), OPT_BOOL },
+	{ "new_win_master",           offsetof(Config, new_win_master), OPT_BOOL },
+	{ "resize_master_amount",     offsetof(Config, resize_master_amt), OPT_INT },
+	{ "resize_window_amount",     offsetof(Config, resize_window_amt), OPT_INT },
+	{ "snap_distance",            offsetof(Config, snap_distance), OPT_INT },
+	{ "unfocused_border_colour",  offsetof(Config, border_ufoc_col), OPT_COLOR },
+	{ "warp_cursor",              offsetof(Config, warp_cursor), OPT_BOOL },
+};
+
+static Binding* alloc_bind(Config* cfg, Binding bind)
 {
 	for (int i = 0; i < cfg->n_binds; i++) {
-		if (cfg->binds[i].mods == (int)mods && cfg->binds[i].keysym == ks)
-			return &cfg->binds[i];
+		Binding* b = &cfg->binds[i];
+		if (b->mods == bind.mods && b->keysym == bind.keysym) {
+			if (b->type == TYPE_CMD)
+				free(b->action.cmd);
+			*b = bind;
+			return b;
+		}
 	}
 
 	if (cfg->n_binds >= MAX_BINDS)
 		return NULL;
 
 	Binding* b = &cfg->binds[cfg->n_binds++];
-	b->mods = mods;
-	b->keysym = ks;
+	*b = bind;
 	return b;
 }
 
-static char** alloc_str_pair(const char* a, const char* b)
+static int append_rules(char** rules, char* value)
 {
-	char** p = malloc(2 * sizeof(char *));
-	if (!p)
-		return NULL;
+	char* save;
+	for (char* item = strtok_r(value, ",", &save); item; item = strtok_r(NULL, ",", &save)) {
+		item = strip_quotes(strip(item));
+		if (!*item)
+			continue;
 
-	p[0] = a ? strdup(a) : NULL;
-	p[1] = b ? strdup(b) : NULL;
-	return p;
-}
-
-const char** build_argv(const char* cmd)
-{
-	int argc = 0;
-	char** tmp = split_cmd(cmd, &argc);
-	if (!tmp)
-		return NULL;
-
-	return (const char **)tmp;
-}
-
-static void dedupe_binds(Config* cfg)
-{
-	for (int i = 0; i < cfg->n_binds; i++) {
-		for (int j = i + 1; j < cfg->n_binds; j++) {
-			Bool dup = cfg->binds[i].mods == cfg->binds[j].mods &&
-			           cfg->binds[i].keysym == cfg->binds[j].keysym;
-			if (dup) {
-				memmove(
-					&cfg->binds[j], &cfg->binds[j + 1],
-					sizeof(Binding) * (cfg->n_binds - j - 1)
-				);
-				cfg->n_binds--;
-				j--;
-			}
-		}
+		int i = 0;
+		while (i < MAX_ITEMS && rules[i])
+			i++;
+		if (i == MAX_ITEMS || !(rules[i] = strdup(item)))
+			return -1;
 	}
+	return 0;
 }
 
-static int find_free_slot(char** arr[], int max)
+void free_config(Config* cfg)
 {
-	for (int i = 0; i < max; i++) {
-		if (!arr[i])
-			return i;
-	}
+	for (int i = 0; i < cfg->n_binds; i++)
+		if (cfg->binds[i].type == TYPE_CMD)
+			free(cfg->binds[i].action.cmd);
 
-	return -1;
+	for (int i = 0; i < MAX_ITEMS; i++) {
+		free(cfg->to_run[i]);
+		free(cfg->should_float[i]);
+		free(cfg->start_fullscreen[i]);
+		free(cfg->open_in_workspace[i].name);
+	}
+	memset(cfg, 0, sizeof(*cfg));
 }
 
-static FILE* open_config(char* path, size_t pathsz)
+static FILE* open_config(char* path, size_t size)
 {
 	const char* home = getenv("HOME");
+	const char* xdg = getenv("XDG_CONFIG_HOME");
+	const char* paths[] = { "%s/sxwmrc", "%s/sxwm/sxwmrc" };
+
+	if (xdg) {
+		for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+			snprintf(path, size, paths[i], xdg);
+			if (access(path, R_OK) == 0)
+				goto found;
+		}
+	}
 	if (!home) {
 		wlog("HOME not set");
 		return NULL;
 	}
 
-	const char* xdg = getenv("XDG_CONFIG_HOME");
-	const char* paths[] = {
-		"%s/sxwmrc",
-		"%s/sxwm/sxwmrc",
-	};
-
-	if (xdg) {
-		for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
-			snprintf(path, pathsz, paths[i], xdg);
-			if (access(path, R_OK) == 0)
-				goto found;
-		}
-	}
-
-	snprintf(path, pathsz, "%s/.config/sxwmrc", home);
+	snprintf(path, size, "%s/.config/sxwmrc", home);
 	if (access(path, R_OK) == 0)
 		goto found;
 
-	snprintf(path, pathsz, "/usr/local/share/sxwmrc");
+	snprintf(path, size, "/usr/local/share/sxwmrc");
 	if (access(path, R_OK) == 0)
 		goto found;
 
 	wlog("No configuration file found");
 	return NULL;
 
-found:
-	wlog("Using configuration file %s", path);
+found:;
 	FILE* f = fopen(path, "r");
 	if (!f)
 		wlog("Cannot open configuration %s: %s", path, strerror(errno));
-
+	else
+		wlog("Using configuration file %s", path);
 	return f;
 }
 
-static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char* ctx, char** out_act)
+static void parse_binding(Config* cfg, const char* key, char* value, int line)
 {
-	char* mid = strchr(rest, ':');
-	if (!mid) {
-		wlog("config:%d: %s missing action", lineno, ctx);
-		return NULL;
+	char* action = strchr(value, ':');
+	if (!action) {
+		wlog("config:%d: %s missing action", line, key);
+		return;
 	}
-	*mid = '\0';
-	*out_act = strip(mid + 1);
+	*action++ = '\0';
+	action = strip(action);
 
-	KeySym ks;
-	unsigned mods = parse_combo(strip(rest), cfg, &ks);
-	if (ks == NoSymbol) {
-		wlog("config:%d: bad key in '%s'", lineno, rest);
-		return NULL;
+	KeySym keysym;
+	Binding bind = { 0 };
+	bind.mods = parse_combo(strip(value), cfg, &keysym);
+	if (keysym == NoSymbol) {
+		wlog("config:%d: bad key in '%s'", line, value);
+		return;
+	}
+	bind.keysym = keysym;
+
+	if (!strcmp(key, "workspace")) {
+		int ws;
+		if (sscanf(action, "move %d", &ws) == 1)
+			bind.type = TYPE_WS_CHANGE;
+		else if (sscanf(action, "swap %d", &ws) == 1)
+			bind.type = TYPE_WS_MOVE;
+		else
+			ws = 0;
+		if (ws < 1 || ws > NUM_WORKSPACES) {
+			wlog("config:%d: invalid workspace action '%s'", line, action);
+			return;
+		}
+		bind.action.ws = ws - 1;
+	}
+	else if (!strcmp(key, "bind") && *action == '"') {
+		bind.type = TYPE_CMD;
+		bind.action.cmd = strdup(strip_quotes(action));
+		if (!bind.action.cmd) {
+			wlog("config:%d: failed to parse command '%s'", line, action);
+			return;
+		}
+	}
+	else {
+		bind.type = TYPE_FUNC;
+		for (int i = 0; call_table[i].name; i++)
+			if (!strcmp(action, call_table[i].name)) {
+				bind.action.fn = call_table[i].fn;
+				break;
+			}
+		if (!bind.action.fn) {
+			wlog("config:%d: unknown function '%s'", line, action);
+			return;
+		}
 	}
 
-	Binding* b = alloc_bind(cfg, mods, ks);
-	if (!b)
-		wlog("Too many key bindings");
-
-	return b;
+	if (!alloc_bind(cfg, bind)) {
+		if (bind.type == TYPE_CMD)
+			free(bind.action.cmd);
+		wlog("config:%d: too many key bindings", line);
+	}
 }
 
-static unsigned parse_combo(const char* combo, Config* cfg, KeySym* out_ks)
+static unsigned parse_combo(const char* combo, Config* cfg, KeySym* keysym)
 {
-	unsigned m = 0;
-	KeySym ks = NoSymbol;
+	unsigned mods = 0;
 	char buf[MAX_ITEMS];
-
-	strncpy(buf, combo, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\0';
-
-	for (char* p = buf; *p; p++) {
+	snprintf(buf, sizeof(buf), "%s", combo);
+	for (char* p = buf; *p; p++)
 		if (*p == '+' || isspace((unsigned char)*p))
 			*p = '+';
-	}
 
-	for (char* tok = strtok(buf, "+"); tok; tok = strtok(NULL, "+")) {
-		if (!strcmp(tok, "mod")) m |= cfg->modkey;
-		else if (!strcmp(tok, "shift")) m |= ShiftMask;
-		else if (!strcmp(tok, "ctrl")) m |= ControlMask;
-		else if (!strcmp(tok, "alt")) m |= Mod1Mask;
-		else if (!strcmp(tok, "super")) m |= Mod4Mask;
-		else {
-			ks = XStringToKeysym(tok);
-			if (ks == NoSymbol)
-				ks = parse_keysym(tok);
-		}
-	}
-	*out_ks = ks;
-	return m;
-}
-
-static int parse_csv_to_array(char* rest, char** arr[], int* idx, int max, int alloc_pair)
-{
+	*keysym = NoSymbol;
 	char* save;
-	char* tok;
-	for (tok = strtok_r(rest, ",", &save); tok && *idx < max; tok = strtok_r(NULL, ",", &save)) {
-		char* item = strip_quotes(strip(tok));
-		if (!*item)
-			continue;
-
-		if (alloc_pair) {
-			arr[*idx] = alloc_str_pair(item, NULL);
-			if (!arr[*idx])
-				return -1;
-		}
-		else {
-			if (!arr[*idx])
-				arr[*idx] = calloc(2, sizeof(char *));
-			if (!arr[*idx])
-				return -1;
-			arr[*idx][0] = strdup(item);
-		}
-		(*idx)++;
+	for (char* tok = strtok_r(buf, "+", &save); tok; tok = strtok_r(NULL, "+", &save)) {
+		if (!strcmp(tok, "mod")) mods |= cfg->modkey;
+		else if (!strcmp(tok, "shift")) mods |= ShiftMask;
+		else if (!strcmp(tok, "ctrl")) mods |= ControlMask;
+		else if (!strcmp(tok, "alt")) mods |= Mod1Mask;
+		else if (!strcmp(tok, "super")) mods |= Mod4Mask;
+		else *keysym = parse_keysym(tok);
 	}
-	return 0;
+	return mods;
 }
 
-KeySym parse_keysym(const char* key)
+static KeySym parse_keysym(const char* key)
 {
 	KeySym ks = XStringToKeysym(key);
-	if (ks != NoSymbol)
+	if (ks != NoSymbol || !*key)
 		return ks;
 
 	char buf[64];
 	size_t n = strlen(key);
-	if (n >= sizeof buf)
-		n = sizeof buf - 1;
+	if (n >= sizeof(buf))
+		n = sizeof(buf) - 1;
 
 	/* try Capitalized */
 	buf[0] = toupper((unsigned char)key[0]);
@@ -277,13 +283,7 @@ KeySym parse_keysym(const char* key)
 	return NoSymbol;
 }
 
-int parse_mods(const char* mods, Config* cfg)
-{
-	KeySym dummy;
-	return parse_combo(mods, cfg, &dummy);
-}
-
-int parser(Config* cfg)
+int parse(Config* cfg)
 {
 	char path[PATH_MAX];
 	FILE* f = open_config(path, sizeof(path));
@@ -291,15 +291,8 @@ int parser(Config* cfg)
 		return -1;
 
 	char line[512];
-	int lineno = 0, should_floatn = 0, to_run = 0;
-
-	for (int j = 0; j < MAX_ITEMS; j++) {
-		cfg->should_float[j] = calloc(2, sizeof(char *));
-		if (!cfg->should_float[j])
-			goto cleanup;
-	}
-
-	while (fgets(line, sizeof line, f)) {
+	int lineno = 0, n_exec = 0;
+	while (fgets(line, sizeof(line), f)) {
 		lineno++;
 		char* s = strip(line);
 		if (!*s || *s == '#')
@@ -310,245 +303,91 @@ int parser(Config* cfg)
 			wlog("config:%d: missing ':'", lineno);
 			continue;
 		}
-		*sep = '\0';
+		*sep++ = '\0';
 		char* key = strip(s);
-		char* rest = strip(sep + 1);
+		char* value = strip(sep);
 
-		if (!strcmp(key, "border_width"))
-			cfg->border_width = atoi(rest);
-		else if (!strcmp(key, "call") || !strcmp(key, "bind")) {
-			char* act;
-			Binding* b = parse_bind_line(cfg, rest, lineno, key, &act);
-			if (!b)
-				continue;
+		char** rules = NULL;
+		if (!strcmp(key, "should_float")) rules = cfg->should_float;
+		else if (!strcmp(key, "start_fullscreen")) rules = cfg->start_fullscreen;
 
-			if (*act == '"' && !strcmp(key, "bind")) {
-				b->type = TYPE_CMD;
-				b->action.cmd = build_argv(strip_quotes(act));
-				if (!b->action.cmd) {
-					wlog("config:%d: failed to parse command: %s", lineno, act);
-					b->type = -1;
-				}
-			}
-			else {
-				b->type = TYPE_FUNC;
-				b->action.fn = NULL;
-				for (int i = 0; call_table[i].name; i++) {
-					if (!strcmp(act, call_table[i].name)) {
-						b->action.fn = call_table[i].fn;
-						break;
-					}
-				}
-				if (!b->action.fn)
-					wlog("config:%d: unknown function '%s'", lineno, act);
-			}
+		if (rules) {
+			if (append_rules(rules, strip_comment(value)) < 0)
+				goto error;
 		}
-		else if (!strcmp(key, "can_be_swallowed")) {
-			int idx = find_free_slot(cfg->can_be_swallowed, MAX_ITEMS);
-			if (idx < 0)
-				idx = 0;
-			parse_csv_to_array(rest, cfg->can_be_swallowed, &idx, MAX_ITEMS, 1);
-		}
-		else if (!strcmp(key, "can_swallow")) {
-			int idx = find_free_slot(cfg->can_swallow, MAX_ITEMS);
-			if (idx < 0)
-				idx = 0;
-			parse_csv_to_array(rest, cfg->can_swallow, &idx, MAX_ITEMS, 1);
-		}
+		else if (!strcmp(key, "bind") || !strcmp(key, "call") || !strcmp(key, "workspace"))
+			parse_binding(cfg, key, value, lineno);
 		else if (!strcmp(key, "exec")) {
-			if (to_run >= MAX_ITEMS) {
+			if (n_exec >= MAX_ITEMS) {
 				wlog("config:%d: too many exec commands", lineno);
 				continue;
 			}
-			char* cmd = strip_quotes(strip_comment(rest));
-			if (!*cmd) {
+			value = strip_quotes(strip_comment(value));
+			if (!*value) {
 				wlog("config:%d: empty exec command", lineno);
 				continue;
 			}
-			cfg->to_run[to_run] = strdup(cmd);
-			if (!cfg->to_run[to_run])
-				goto cleanup;
-			to_run++;
+			if (!(cfg->to_run[n_exec++] = strdup(value)))
+				goto error;
 		}
-		else if (!strcmp(key, "floating_on_top"))
-			cfg->floating_on_top = !strcmp(rest, "true");
-		else if (!strcmp(key, "focused_border_colour"))
-			cfg->border_foc_col = parse_col(rest);
-		else if (!strcmp(key, "gaps"))
-			cfg->gaps = atoi(rest);
-		else if (!strcmp(key, "master_width")) {
-			float mf = (float)atoi(rest) / 100.0f;
-			for (int i = 0; i < MAX_MONITORS; i++)
-				cfg->master_width[i] = mf;
-		}
-		else if (!strcmp(key, "mod_key")) {
-			unsigned m = parse_mods(rest, cfg);
-			if (m & (Mod1Mask | Mod4Mask | ShiftMask | ControlMask))
-				cfg->modkey = m;
-			else
-				wlog("config:%d: unknown mod_key '%s'", lineno, rest);
-		}
-		else if (!strcmp(key, "motion_throttle"))
-			cfg->motion_throttle = atoi(rest);
-		else if (!strcmp(key, "move_window_amount"))
-			cfg->move_window_amt = atoi(rest);
-		else if (!strcmp(key, "new_win_focus"))
-			cfg->new_win_focus = !strcmp(rest, "true");
-		else if (!strcmp(key, "new_win_master"))
-			cfg->new_win_master = !strcmp(rest, "true");
 		else if (!strcmp(key, "open_in_workspace")) {
-			char* mid = strchr(rest, ':');
+			char* mid = strchr(value, ':');
 			if (!mid) {
 				wlog("config:%d: open_in_workspace missing workspace", lineno);
 				continue;
 			}
-			*mid = '\0';
-			char* cls = strip_quotes(strip(rest));
-			int ws = atoi(strip(mid + 1));
+			*mid++ = '\0';
+			int ws = atoi(strip(mid));
 			if (ws < 1 || ws > NUM_WORKSPACES) {
 				wlog("config:%d: invalid workspace number %d", lineno, ws);
 				continue;
 			}
-			int slot = find_free_slot(cfg->open_in_workspace, MAX_ITEMS);
-			if (slot >= 0) {
-				char ws_buf[16];
-				snprintf(ws_buf, sizeof(ws_buf), "%d", ws - 1);
-				cfg->open_in_workspace[slot] = alloc_str_pair(cls, ws_buf);
-			}
+			int slot = 0;
+			while (slot < MAX_ITEMS && cfg->open_in_workspace[slot].name)
+				slot++;
+			if (slot == MAX_ITEMS || !(cfg->open_in_workspace[slot].name =
+			    strdup(strip_quotes(strip(value)))))
+				goto error;
+			cfg->open_in_workspace[slot].workspace = ws - 1;
 		}
-		else if (!strcmp(key, "resize_master_amount"))
-			cfg->resize_master_amt = atoi(rest);
-		else if (!strcmp(key, "resize_window_amount"))
-			cfg->resize_window_amt = atoi(rest);
-		else if (!strcmp(key, "should_float")) {
-			char* clean = strip_comment(rest);
-			if (parse_csv_to_array(clean, cfg->should_float, &should_floatn, MAX_ITEMS, 0) < 0)
-				goto cleanup;
+		else if (!strcmp(key, "master_width")) {
+			float fraction = (float)atoi(value) / 100.0f;
+			for (int i = 0; i < MAX_MONITORS; i++)
+				cfg->master_width[i] = fraction;
 		}
-		else if (!strcmp(key, "snap_distance"))
-			cfg->snap_distance = atoi(rest);
-		else if (!strcmp(key, "start_fullscreen")) {
-			int idx = find_free_slot(cfg->start_fullscreen, MAX_ITEMS);
-			if (idx < 0)
-				idx = 0;
-
-			char* clean = strip_comment(rest);
-			if (parse_csv_to_array(clean, cfg->start_fullscreen, &idx, MAX_ITEMS, 1) < 0)
-				goto cleanup;
-		}
-		else if (!strcmp(key, "unfocused_border_colour"))
-			cfg->border_ufoc_col = parse_col(rest);
-		else if (!strcmp(key, "warp_cursor"))
-			cfg->warp_cursor = !strcmp(rest, "true");
-		else if (!strcmp(key, "workspace")) {
-			char* act;
-			Binding* b = parse_bind_line(cfg, rest, lineno, "workspace", &act);
-			if (!b)
-				continue;
-
-			int n;
-			if (sscanf(act, "move %d", &n) == 1 && n >= 1 && n <= NUM_WORKSPACES) {
-				b->type = TYPE_WS_CHANGE;
-				b->action.ws = n - 1;
-			}
-			else if (sscanf(act, "swap %d", &n) == 1 && n >= 1 && n <= NUM_WORKSPACES) {
-				b->type = TYPE_WS_MOVE;
-				b->action.ws = n - 1;
-			}
-			else {
-				wlog("config:%d: invalid workspace action '%s'", lineno, act);
-			}
+		else if (!strcmp(key, "mod_key")) {
+			KeySym sym;
+			unsigned mods = parse_combo(value, cfg, &sym);
+			if (mods & (Mod1Mask | Mod4Mask | ShiftMask | ControlMask))
+				cfg->modkey = mods;
+			else
+				wlog("config:%d: unknown mod_key '%s'", lineno, value);
 		}
 		else {
-			wlog("config:%d: unknown option '%s'", lineno, key);
+			size_t i;
+			for (i = 0; i < sizeof(options) / sizeof(options[0]); i++) {
+				if (strcmp(key, options[i].name))
+					continue;
+				char* field = (char*)cfg + options[i].offset;
+				switch (options[i].type) {
+				case OPT_INT: *(int*)field = atoi(value); break;
+				case OPT_BOOL: *(Bool*)field = !strcmp(value, "true"); break;
+				case OPT_COLOR: *(long*)field = parse_col(value); break;
+				}
+				break;
+			}
+			if (i == sizeof(options) / sizeof(options[0]))
+				wlog("config:%d: unknown option '%s'", lineno, key);
 		}
 	}
-
 	fclose(f);
-	dedupe_binds(cfg);
 	return 0;
 
-cleanup:
+error:
+	wlog("config:%d: out of memory or rule limit exceeded", lineno);
 	fclose(f);
-	for (int j = 0; j < MAX_ITEMS; j++) {
-		if (cfg->should_float[j]) {
-			free(cfg->should_float[j][0]);
-			free(cfg->should_float[j]);
-		}
-
-		if (cfg->can_swallow[j]) {
-			free(cfg->can_swallow[j][0]);
-			free(cfg->can_swallow[j]);
-		}
-
-		if (cfg->can_be_swallowed[j]) {
-			free(cfg->can_be_swallowed[j][0]);
-			free(cfg->can_be_swallowed[j]);
-		}
-
-		if (cfg->open_in_workspace[j]) {
-			free(cfg->open_in_workspace[j][0]);
-			free(cfg->open_in_workspace[j][1]);
-			free(cfg->open_in_workspace[j]);
-		}
-	}
-	for (int i = 0; i < to_run; i++)
-		free(cfg->to_run[i]);
-
+	free_config(cfg);
 	return -1;
-}
-
-static char** split_cmd(const char* cmd, int* out_argc)
-{
-	enum { NORMAL, IN_QUOTE } state = NORMAL;
-	size_t cap = 8, argc = 0, toklen = 0;
-	char* token = malloc(strlen(cmd) + 1);
-	char** argv = malloc(cap * sizeof *argv);
-
-	if (!token || !argv)
-		goto err;
-
-	for (const char* p = cmd; *p; p++) {
-		if (state == NORMAL && isspace((unsigned char)*p)) {
-			if (toklen) {
-				token[toklen] = '\0';
-				if (argc + 1 >= cap) {
-					cap *= 2;
-					char** tmp = realloc(argv, cap * sizeof *argv);
-					if (!tmp)
-						goto err;
-
-					argv = tmp;
-				}
-				argv[argc++] = strdup(token);
-				toklen = 0;
-			}
-		}
-		else if (*p == '"')
-			state = (state == NORMAL) ? IN_QUOTE : NORMAL;
-		else if (*p == '\'')
-			state = (state == NORMAL) ? IN_QUOTE : NORMAL;
-		else
-			token[toklen++] = *p;
-	}
-
-	if (toklen) {
-		token[toklen] = '\0';
-		argv[argc++] = strdup(token);
-	}
-	argv[argc] = NULL;
-	*out_argc = argc;
-	free(token);
-	return argv;
-
-err:
-	free(token);
-	if (argv) {
-		for (size_t i = 0; i < argc; i++)
-			free(argv[i]);
-		free(argv);
-	}
-	return NULL;
 }
 
 static char* strip(char* s)
@@ -557,9 +396,9 @@ static char* strip(char* s)
 		s++;
 	if (!*s)
 		return s;
-	char* e = s + strlen(s) - 1;
-	while (e > s && isspace((unsigned char)*e))
-		*e-- = '\0';
+	char* end = s + strlen(s) - 1;
+	while (end > s && isspace((unsigned char)*end))
+		*end-- = '\0';
 	return s;
 }
 
@@ -574,11 +413,12 @@ static char* strip_comment(char* s)
 static char* strip_quotes(char* s)
 {
 	size_t len = strlen(s);
-	if (len > 0 && s[0] == '"') {
+	if (len && s[0] == '"') {
 		s++;
 		len--;
 	}
-	if (len > 0 && s[len - 1] == '"')
+	if (len && s[len - 1] == '"')
 		s[len - 1] = '\0';
 	return s;
 }
+

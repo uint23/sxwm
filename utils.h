@@ -8,7 +8,6 @@ typedef enum {
 	E_OOM,
 	E_DISPLAY,
 	E_WM_RUNNING,
-	E_EXEC,
 	E_COUNT
 } ErrorCode;
 

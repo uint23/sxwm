@@ -115,8 +115,7 @@ static void set_wm_state(Window w, long state);
 static void setup(void);
 static void setup_atoms(void);
 static int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
-static void spawn(const char* const* argv);
-static void startup_exec(void);
+static void spawn(const char* cmd);
 static void switch_client_list(Client* c, Bool floating);
 /* void switch_previous_workspace(void); */
 static void tile(void);
@@ -1773,7 +1772,12 @@ static void setup(void)
 	}
 	update_modifier_masks();
 	grab_keys();
-	startup_exec();
+
+	/* prevent child processes from becoming zombies */
+	signal(SIGCHLD, SIG_IGN);
+	for (int i = 0; i < MAX_ITEMS; i++)
+		if (cfg.to_run[i])
+			spawn(cfg.to_run[i]);
 
 	cursors.normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
 	cursors.move = XcursorLibraryLoadCursor(dpy, "fleur");
@@ -1821,9 +1825,6 @@ static void setup(void)
 			ws->lists[j].type = (ListType)j;
 		}
 	}
-
-	/* prevent child processes from becoming zombies */
-	signal(SIGCHLD, SIG_IGN);
 }
 
 static void setup_atoms(void)
@@ -1873,140 +1874,19 @@ static int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 	return pos;
 }
 
-static void spawn(const char* const* argv)
+static void spawn(const char* cmd)
 {
-	int argc = 0;
-	while (argv[argc])
-		argc++;
-
-	int cmd_count = 1;
-	for (int i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "|") == 0)
-			cmd_count++;
+	pid_t pid = fork();
+	if (pid == 0) {
+		close(ConnectionNumber(dpy));
+		setsid();
+		signal(SIGCHLD, SIG_DFL);
+		execl("/bin/sh", "sh", "-c", cmd, (char*)NULL);
+		wlog("Could not execute shell: %s", strerror(errno));
+		_exit(127);
 	}
-
-	const char*** commands = malloc(cmd_count * sizeof(char **)); /* *** bruh */
-	if (!commands) {
-		wlog("Could not allocate commands: %s", strerror(errno));
-		return;
-	}
-
-	/* initialize all command pointers to NULL for safe cleanup */
-	for (int i = 0; i < cmd_count; i++)
-		commands[i] = NULL;
-
-	int cmd_idx = 0;
-	int arg_start = 0;
-	for (int i = 0; i <= argc; i++) {
-		if (!argv[i] || strcmp(argv[i], "|") == 0) {
-			int len = i - arg_start;
-			const char** cmd_args = malloc((len + 1) * sizeof(char *));
-
-			if (!cmd_args) {
-				wlog("Could not allocate command arguments: %s", strerror(errno));
-
-				for (int j = 0; j < cmd_idx; j++)
-					free(commands[j]);
-
-				free(commands);
-				return;
-			}
-
-			for (int j = 0; j < len; j++)
-				cmd_args[j] = argv[arg_start + j];
-
-			cmd_args[len] = NULL;
-			commands[cmd_idx++] = cmd_args;
-			arg_start = i + 1;
-		}
-	}
-
-	int (*pipes)[2] = malloc(sizeof(int[2]) * (cmd_count - 1));
-	if (!pipes) {
-		wlog("Could not allocate pipes: %s", strerror(errno));
-
-		for (int j = 0; j < cmd_count; j++)
-			free(commands[j]);
-
-		free(commands);
-		return;
-	}
-
-	for (int i = 0; i < cmd_count - 1; i++) {
-		if (pipe(pipes[i]) == -1) {
-			wlog("Could not create pipe: %s", strerror(errno));
-
-			for (int j = 0; j < cmd_count; j++)
-				free(commands[j]);
-
-			free(commands);
-			free(pipes);
-			return;
-		}
-	}
-
-	for (int i = 0; i < cmd_count; i++) {
-		if (!commands[i] || !commands[i][0])
-			continue;
-
-		pid_t pid = fork();
-		if (pid < 0) {
-			wlog("Could not fork: %s", strerror(errno));
-
-			for (int k = 0; k < cmd_count - 1; k++) {
-				close(pipes[k][0]);
-				close(pipes[k][1]);
-			}
-
-			for (int j = 0; j < cmd_count; j++)
-				free(commands[j]);
-
-			free(commands);
-			free(pipes);
-			return;
-		}
-		if (pid == 0) {
-			close(ConnectionNumber(dpy));
-
-			if (i > 0)
-				dup2(pipes[i - 1][0], STDIN_FILENO);
-
-			if (i < cmd_count - 1)
-				dup2(pipes[i][1], STDOUT_FILENO);
-
-			for (int k = 0; k < cmd_count - 1; k++) {
-				close(pipes[k][0]);
-				close(pipes[k][1]);
-			}
-
-			execvp(commands[i][0], (char* const*)(void*)commands[i]);
-			die(E_EXEC, "%s: %s", commands[i][0], strerror(errno));
-		}
-	}
-
-	for (int i = 0; i < cmd_count - 1; i++) {
-		close(pipes[i][0]);
-		close(pipes[i][1]);
-	}
-
-	for (int i = 0; i < cmd_count; i++)
-		free(commands[i]);
-
-	free(commands);
-	free(pipes);
-}
-
-static void startup_exec(void)
-{
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (cfg.to_run[i]) {
-			const char** argv = build_argv(cfg.to_run[i]);
-			if (argv) {
-				spawn(argv);
-				free_argv(argv);
-			}
-		}
-	}
+	if (pid < 0)
+		wlog("Could not fork: %s", strerror(errno));
 }
 
 static void switch_client_list(Client* c, Bool floating)

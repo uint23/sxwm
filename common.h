@@ -56,7 +56,7 @@ typedef struct Workspace Workspace;
 typedef struct WorkspaceRule WorkspaceRule;
 
 union Action {
-	const char** cmd;
+	char* cmd;
 	void (*fn)(void);
 	int ws;
 };
