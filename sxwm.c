@@ -1105,6 +1105,18 @@ static void on_button_release(XEvent* xev)
 
 static void on_client_msg(XEvent* xev)
 {
+	if (xev->xclient.message_type == atoms[ATOM_NET_ACTIVE_WINDOW]) {
+		Client* c = find_client(xev->xclient.window);
+		if (!c || !c->mapped)
+			return;
+
+		int ws = get_client_workspace(c);
+		if (ws != ws_cur)
+			change_workspace(ws);
+		set_input_focus(c, True, False);
+		return;
+	}
+
 	if (xev->xclient.message_type == atoms[ATOM_NET_CURRENT_DESKTOP]) {
 		int ws = (int)xev->xclient.data.l[0];
 		change_workspace(ws);
