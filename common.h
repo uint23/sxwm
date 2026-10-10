@@ -1,4 +1,3 @@
-/* See LICENSE for more information on use */
 #ifndef COMMON_H
 #define COMMON_H
 
@@ -11,13 +10,11 @@
 #define MF_MIN           0.05f
 #define MF_MAX           0.95f
 #define MAX(a, b)        ((a) > (b) ? (a) : (b))
-#define MIN(a, b)        ((a) < (b) ? (a) : (b))
 #define UDIST(a, b)      abs((int)(a) - (int)(b))
 #define CLAMP(x, lo, hi) (((x) < (lo)) ? (lo) : ((x) > (hi)) ? (hi) : (x))
 
 #define MAX_MONITORS    32
 #define MAX_BINDS       256
-#define MAX_CLIENTS     99
 #define MAX_ITEMS       256
 #define MIN_WINDOW_SIZE 20
 #define PATH_MAX        4096
@@ -56,11 +53,12 @@ typedef struct CommandEntry CommandEntry;
 typedef struct Monitor Monitor;
 typedef struct Point Point;
 typedef struct Workspace Workspace;
+typedef struct WorkspaceRule WorkspaceRule;
 
 union Action {
 	const char** cmd;
 	void (*fn)(void);
-	int ws; /* workspace */
+	int ws;
 };
 
 struct Binding {
@@ -73,51 +71,33 @@ struct Binding {
 
 struct Client {
 	Window win;
-	int x, y, w, h;
-	int orig_x, orig_y, orig_w, orig_h;
-	int custom_stack_height;
-	int mon;
-	Bool fixed;
-	Bool fullscreen;
-	Bool mapped;
-	pid_t pid;
+	int x, y, w, h, ox, oy, ow, oh, mon;
+	Bool fixed, fullscreen, mapped;
 	ClientList* list;
-	Client* next;
-	Client* prev;
+	Client* next, *prev;
 };
 
 struct ClientList {
-	Client* head;
-	Client* tail;
+	Client* head, *tail;
 	Workspace* workspace;
 	ListType type;
 	unsigned int count;
 };
 
+struct WorkspaceRule {
+	char* name;
+	int workspace;
+};
+
 struct Config {
-	int modkey;
-	int gaps;
-	int border_width;
-	long border_foc_col;
-	long border_ufoc_col;
+	int modkey, gaps, border_width, motion_throttle, resize_master_amt;
+	int snap_distance, n_binds, move_window_amt, resize_window_amt;
+	long border_foc_col, border_ufoc_col;
 	float master_width[MAX_MONITORS];
-	int motion_throttle;
-	int resize_master_amt;
-	int snap_distance;
-	int n_binds;
-	int move_window_amt;
-	int resize_window_amt;
-	Bool new_win_focus;
-	Bool warp_cursor;
-	Bool floating_on_top;
-	Bool new_win_master;
+	char* should_float[MAX_ITEMS], *start_fullscreen[MAX_ITEMS], *to_run[MAX_ITEMS];
+	Bool new_win_focus ,warp_cursor ,floating_on_top ,new_win_master;
+	WorkspaceRule open_in_workspace[MAX_ITEMS];
 	Binding binds[MAX_ITEMS];
-	char** should_float[MAX_ITEMS];
-	char** start_fullscreen[MAX_ITEMS];
-	char** can_swallow[MAX_ITEMS];
-	char** can_be_swallowed[MAX_ITEMS];
-	char** open_in_workspace[MAX_ITEMS];
-	char* to_run[MAX_ITEMS];
 };
 
 struct CommandEntry {

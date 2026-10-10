@@ -133,7 +133,7 @@ static void update_struts(void);
 static void update_workarea(void);
 static void warp_cursor(Client* c);
 static Bool window_has_ewmh_state(Window w, Atom state);
-static Bool window_matches_class(Window w, char*** rules);
+static Bool window_matches_class(Window w, char* const* rules);
 static void window_set_ewmh_state(Window w, Atom state, Bool add);
 static Bool window_should_float(Window w);
 static Bool window_should_start_fullscreen(Window w);
@@ -183,10 +183,8 @@ struct {
 } cursors;
 
 struct {
-	int type;
 	int sx, sy; /* start (x, y) */
 	int ox, oy, ow, oh; /* original (x, y), (w, h) */
-	Client* c;
 } drag;
 
 static Workspace workspaces[NUM_WORKSPACES] = { 0 };
@@ -203,8 +201,8 @@ static int mon_cur = 0;
 static int mon_cnt = 0;
 static int scrw = 0;
 static int scrh = 0;
-static Bool global_floating = False;
 static Bool running = False;
+static Bool global_floating = False;
 static Mask numlock_mask = 0;
 static Mask mode_switch_mask = 0;
 
@@ -299,10 +297,10 @@ static void apply_fullscreen(Client* c, Bool on)
 		if (!XGetWindowAttributes(dpy, c->win, &win_attr))
 			return;
 
-		c->orig_x = win_attr.x;
-		c->orig_y = win_attr.y;
-		c->orig_w = win_attr.width;
-		c->orig_h = win_attr.height;
+		c->ox = win_attr.x;
+		c->oy = win_attr.y;
+		c->ow = win_attr.width;
+		c->oh = win_attr.height;
 
 		c->fullscreen = True;
 
@@ -323,14 +321,14 @@ static void apply_fullscreen(Client* c, Bool on)
 		c->fullscreen = False;
 
 		/* restore win attributes */
-		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
+		XMoveResizeWindow(dpy, c->win, c->ox, c->oy, c->ow, c->oh);
 		XSetWindowBorderWidth(dpy, c->win, cfg.border_width);
 		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], False);
 
-		c->x = c->orig_x;
-		c->y = c->orig_y;
-		c->w = c->orig_w;
-		c->h = c->orig_h;
+		c->x = c->ox;
+		c->y = c->oy;
+		c->w = c->ow;
+		c->h = c->oh;
 
 		if (!is_floating(c))
 			c->mon = get_monitor_for_point(get_window_center(c));
@@ -732,21 +730,13 @@ static int get_workspace_for_window(Window w)
 	if (!XGetClassHint(dpy, w, &ch))
 		return ws_cur;
 
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		/* TODO: Add docs for open_in_workspace */
-		if (!cfg.open_in_workspace[i])
-			break;
-
-		char* rule_class = cfg.open_in_workspace[i][0];
-		char* rule_ws = cfg.open_in_workspace[i][1];
-
-		if (rule_class && rule_ws) {
-			if ((ch.res_class && strcasecmp(ch.res_class, rule_class) == 0) ||
-			    (ch.res_name && strcasecmp(ch.res_name, rule_class) == 0)) {
-				XFree(ch.res_class);
-				XFree(ch.res_name);
-				return atoi(rule_ws);
-			}
+	for (int i = 0; i < MAX_ITEMS && cfg.open_in_workspace[i].name; i++) {
+		WorkspaceRule* rule = &cfg.open_in_workspace[i];
+		if ((ch.res_class && strcasecmp(ch.res_class, rule->name) == 0) ||
+		    (ch.res_name && strcasecmp(ch.res_name, rule->name) == 0)) {
+			XFree(ch.res_class);
+			XFree(ch.res_name);
+			return rule->workspace;
 		}
 	}
 
@@ -825,11 +815,6 @@ static void init_defaults(void)
 
 	for (int i = 0; i < MAX_MONITORS; i++)
 		cfg.master_width[i] = 50 / 100.0f;
-
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		cfg.open_in_workspace[i] = NULL;
-		cfg.start_fullscreen[i] = NULL;
-	}
 
 	cfg.motion_throttle = 60;
 	cfg.resize_master_amt = 5;
@@ -1539,7 +1524,7 @@ void reload_config(void)
 
 	free_config(&cfg);
 	init_defaults();
-	if (parser(&cfg)) {
+	if (parse(&cfg)) {
 		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
@@ -1782,7 +1767,7 @@ static void setup(void)
 	setup_atoms();
 	other_wm();
 	init_defaults();
-	if (parser(&cfg)) {
+	if (parse(&cfg)) {
 		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
@@ -2487,15 +2472,15 @@ static Bool window_has_ewmh_state(Window w, Atom state)
 	return False;
 }
 
-static Bool window_matches_class(Window w, char*** rules)
+static Bool window_matches_class(Window w, char* const* rules)
 {
 	XClassHint ch = { 0 };
 	if (!XGetClassHint(dpy, w, &ch))
 		return False;
 
 	Bool matched = False;
-	for (int i = 0; i < MAX_ITEMS && rules[i] && rules[i][0]; i++) {
-		const char* name = rules[i][0];
+	for (int i = 0; i < MAX_ITEMS && rules[i]; i++) {
+		const char* name = rules[i];
 		if ((ch.res_class && !strcmp(ch.res_class, name)) || (ch.res_name && !strcmp(ch.res_name, name))) {
 			matched = True;
 			break;
