@@ -74,7 +74,7 @@ struct Client {
 	int x, y, w, h, ox, oy, ow, oh, mon;
 	Bool fixed, fullscreen, mapped;
 	ClientList* list;
-	Client* next, *prev;
+	Client* next, *prev, *managed_next;
 };
 
 struct ClientList {

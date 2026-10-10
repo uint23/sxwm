@@ -189,6 +189,7 @@ struct {
 } drag = { 0 };
 
 static Workspace workspaces[NUM_WORKSPACES] = { 0 };
+static Client* managed_clients = NULL;
 static Config cfg = { 0 };
 static EventHandler evtable[LASTEvent] = { NULL };
 static Display* dpy = NULL;
@@ -217,6 +218,8 @@ static Client* add_client(Window w, Bool floating, int ws)
 	c->list = NULL;
 	c->next = NULL;
 	c->prev = NULL;
+	c->managed_next = managed_clients;
+	managed_clients = c;
 
 	/* subscribing to certain events */
 	Mask window_masks = EnterWindowMask | LeaveWindowMask | FocusChangeMask | PropertyChangeMask |
@@ -1182,7 +1185,12 @@ static void on_destroy_ntf(XEvent* xev)
 	Bool was_focused = workspaces[ws].focused == c;
 	Client* new_foc = was_focused ? find_new_focus(c) : NULL;
 
-	/* unlink from workspace list */
+	/* unlink from management order and workspace list */
+	Client** link = &managed_clients;
+	while (*link && *link != c)
+		link = &(*link)->managed_next;
+	if (*link)
+		*link = c->managed_next;
 	unlink_client(c);
 	if (was_focused)
 		workspaces[ws].focused = NULL;
@@ -1801,6 +1809,8 @@ static void setup(void)
 	scrh = XDisplayHeight(dpy, DefaultScreen(dpy));
 
 	update_mons();
+	update_struts();
+	update_net_client_list();
 
 	/* select events wm should look for on root */
 	Mask wm_masks = StructureNotifyMask | SubstructureRedirectMask | SubstructureNotifyMask |
@@ -1875,7 +1885,6 @@ static void setup_atoms(void)
 	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTED], XA_ATOM, 32,
 			        PropModeReplace, (const unsigned char *)atoms, ATOM_COUNT);
 
-	update_workarea();
 }
 
 static int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
@@ -2141,14 +2150,10 @@ static void update_mons(void)
 static void update_net_client_list(void)
 {
 	size_t count = 0;
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
-		for (int i = 0; i < LIST_COUNT; i++) {
-			unsigned int n = workspaces[ws].lists[i].count;
-			if (n > (size_t)INT_MAX - count) {
-				wlog("Client list exceeds X property size");
-				return;
-			}
-			count += n;
+	for (Client* c = managed_clients; c; c = c->managed_next)
+		if (++count > INT_MAX) {
+			wlog("Client list exceeds X property size");
+			return;
 		}
 
 	if (count > SIZE_MAX / sizeof(Window))
@@ -2160,13 +2165,12 @@ static void update_net_client_list(void)
 		return;
 	}
 
-	int n = 0;
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++)
-		for (int i = 0; i < LIST_COUNT; i++)
-			for (Client* c = workspaces[ws].lists[i].head; c; c = c->next)
-				wins[n++] = c->win;
+	size_t n = count;
+	for (Client* c = managed_clients; c; c = c->managed_next)
+		wins[--n] = c->win;
 
-	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace, (unsigned char *)wins, n);
+	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace,
+	                (unsigned char *)wins, (int)count);
 	free(wins);
 }
 
@@ -2178,8 +2182,10 @@ static void update_struts(void)
 	Window root_ret, parent_ret, *children = NULL;
 	unsigned int count = 0;
 
-	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count))
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count)) {
+		update_workarea();
 		return;
+	}
 
 	for (unsigned int i = 0; i < count; i++) {
 		if (get_window_type(children[i]) != WINDOW_DOCK)
@@ -2243,16 +2249,32 @@ static void update_struts(void)
 
 static void update_workarea(void)
 {
-	long workarea[4 * MAX_MONITORS];
+	long left = 0, top = 0, right = scrw, bottom = scrh;
 
-	for (int i = 0; i < mon_cnt && i < MAX_MONITORS; i++) {
-		workarea[i * 4 + 0] = mons[i].x + mons[i].res.left;
-		workarea[i * 4 + 1] = mons[i].y + mons[i].res.top;
-		workarea[i * 4 + 2] = mons[i].w - mons[i].res.left - mons[i].res.right;
-		workarea[i * 4 + 3] = mons[i].h - mons[i].res.top - mons[i].res.bottom;
+	/* EWMH specifies one desktop-wide rectangle, not one per monitor. */
+	for (int i = 0; i < mon_cnt; i++) {
+		Monitor* m = &mons[i];
+		if (m->res.left && m->x + m->res.left > left)
+			left = m->x + m->res.left;
+		if (m->res.top && m->y + m->res.top > top)
+			top = m->y + m->res.top;
+		if (m->res.right && m->x + m->w - m->res.right < right)
+			right = m->x + m->w - m->res.right;
+		if (m->res.bottom && m->y + m->h - m->res.bottom < bottom)
+			bottom = m->y + m->h - m->res.bottom;
 	}
 
-	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, mon_cnt * 4);
+	if (right < left) right = left;
+	if (bottom < top) bottom = top;
+
+	long rect[4] = { left, top, right - left, bottom - top };
+	long workarea[4 * NUM_WORKSPACES];
+
+	for (int i = 0; i < NUM_WORKSPACES; i++)
+		memcpy(&workarea[i * 4], rect, sizeof(rect));
+
+	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace,
+	                (unsigned char *)workarea, 4 * NUM_WORKSPACES);
 }
 
 static void warp_cursor(Client* c)
@@ -2316,37 +2338,40 @@ static void window_set_ewmh_state(Window w, Atom state, Bool add)
 {
 	Atom type;
 	int format;
-	unsigned long n_atoms = 0;
-	unsigned long unread = 0;
-	Atom* found_atoms = NULL;
+	unsigned long count = 0, remaining = 0;
+	Atom* old = NULL;
 
-	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 1024, False, XA_ATOM, &type,
-		&format, &n_atoms, &unread, (unsigned char**)&found_atoms) != Success) {
-		found_atoms = NULL;
-		n_atoms = 0;
+	int status = XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 1024, False, XA_ATOM,
+	                                &type, &format, &count, &remaining, (unsigned char**)&old);
+	if (status != Success || remaining || (type != None && (type != XA_ATOM || format != 32))) {
+		if (old)
+			XFree(old);
+		return;
 	}
 
-	/* build new list */
-	Atom buf[16];
-	Atom* list = buf;
-	unsigned long list_len = 0;
-
-	if (found_atoms) {
-		for (unsigned long i = 0; i < n_atoms; i++) {
-			if (found_atoms[i] != state)
-				list[list_len++] = found_atoms[i];	
-		}
+	Atom* list = malloc((count + 1) * sizeof(*list));
+	if (!list) {
+		if (old)
+			XFree(old);
+		return;
 	}
-	if (add && list_len < 16)
-		list[list_len++] = state;
 
-	if (list_len == 0)
-		XDeleteProperty(dpy, w, atoms[ATOM_NET_WM_STATE]);
+	unsigned long n = 0;
+	for (unsigned long i = 0; i < count; i++)
+		if (old[i] != state)
+			list[n++] = old[i];
+	if (add)
+		list[n++] = state;
+
+	if (n)
+		XChangeProperty(dpy, w, atoms[ATOM_NET_WM_STATE], XA_ATOM, 32, PropModeReplace,
+		                (unsigned char*)list, (int)n);
 	else
-		XChangeProperty(dpy, w, atoms[ATOM_NET_WM_STATE], XA_ATOM, 32, PropModeReplace, (unsigned char*)list, list_len);
+		XDeleteProperty(dpy, w, atoms[ATOM_NET_WM_STATE]);
 
-	if (found_atoms)
-		XFree(found_atoms);	
+	free(list);
+	if (old)
+		XFree(old);
 }
 
 static Bool window_should_float(Window w)
