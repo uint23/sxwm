@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@
 #include "common.h"
 #include "extern.h"
 #include "parser.h"
+#include "utils.h"
 
 static Binding* alloc_bind(Config* cfg, unsigned mods, KeySym ks);
 static char** alloc_str_pair(const char* a, const char* b);
@@ -127,7 +129,7 @@ static FILE* open_config(char* path, size_t pathsz)
 {
 	const char* home = getenv("HOME");
 	if (!home) {
-		fputs("sxwmrc: HOME not set\n", stderr);
+		wlog("HOME not set");
 		return NULL;
 	}
 
@@ -153,14 +155,14 @@ static FILE* open_config(char* path, size_t pathsz)
 	if (access(path, R_OK) == 0)
 		goto found;
 
-	fprintf(stderr, "sxwmrc: no configuration file found\n");
+	wlog("No configuration file found");
 	return NULL;
 
 found:
-	printf("sxwmrc: using configuration file %s\n", path);
+	wlog("Using configuration file %s", path);
 	FILE* f = fopen(path, "r");
 	if (!f)
-		fprintf(stderr, "sxwmrc: cannot open %s\n", path);
+		wlog("Cannot open configuration %s: %s", path, strerror(errno));
 
 	return f;
 }
@@ -169,7 +171,7 @@ static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char*
 {
 	char* mid = strchr(rest, ':');
 	if (!mid) {
-		fprintf(stderr, "sxwmrc:%d: %s missing action\n", lineno, ctx);
+		wlog("config:%d: %s missing action", lineno, ctx);
 		return NULL;
 	}
 	*mid = '\0';
@@ -178,13 +180,13 @@ static Binding* parse_bind_line(Config* cfg, char* rest, int lineno, const char*
 	KeySym ks;
 	unsigned mods = parse_combo(strip(rest), cfg, &ks);
 	if (ks == NoSymbol) {
-		fprintf(stderr, "sxwmrc:%d: bad key in '%s'\n", lineno, rest);
+		wlog("config:%d: bad key in '%s'", lineno, rest);
 		return NULL;
 	}
 
 	Binding* b = alloc_bind(cfg, mods, ks);
 	if (!b)
-		fputs("sxwm: too many binds\n", stderr);
+		wlog("Too many key bindings");
 
 	return b;
 }
@@ -271,7 +273,7 @@ KeySym parse_keysym(const char* key)
 	if ((ks = XStringToKeysym(buf)) != NoSymbol)
 		return ks;
 
-	fprintf(stderr, "sxwmrc: unknown keysym '%s'\n", key);
+	wlog("Unknown keysym '%s'", key);
 	return NoSymbol;
 }
 
@@ -305,7 +307,7 @@ int parser(Config* cfg)
 
 		char* sep = strchr(s, ':');
 		if (!sep) {
-			fprintf(stderr, "sxwmrc:%d: missing ':'\n", lineno);
+			wlog("config:%d: missing ':'", lineno);
 			continue;
 		}
 		*sep = '\0';
@@ -324,7 +326,7 @@ int parser(Config* cfg)
 				b->type = TYPE_CMD;
 				b->action.cmd = build_argv(strip_quotes(act));
 				if (!b->action.cmd) {
-					fprintf(stderr, "sxwmrc:%d: failed to parse command: %s\n", lineno, act);
+					wlog("config:%d: failed to parse command: %s", lineno, act);
 					b->type = -1;
 				}
 			}
@@ -338,7 +340,7 @@ int parser(Config* cfg)
 					}
 				}
 				if (!b->action.fn)
-					fprintf(stderr, "sxwmrc:%d: unknown function '%s'\n", lineno, act);
+					wlog("config:%d: unknown function '%s'", lineno, act);
 			}
 		}
 		else if (!strcmp(key, "can_be_swallowed")) {
@@ -355,12 +357,12 @@ int parser(Config* cfg)
 		}
 		else if (!strcmp(key, "exec")) {
 			if (to_run >= MAX_ITEMS) {
-				fprintf(stderr, "sxwmrc:%d: too many exec commands\n", lineno);
+				wlog("config:%d: too many exec commands", lineno);
 				continue;
 			}
 			char* cmd = strip_quotes(strip_comment(rest));
 			if (!*cmd) {
-				fprintf(stderr, "sxwmrc:%d: empty exec command\n", lineno);
+				wlog("config:%d: empty exec command", lineno);
 				continue;
 			}
 			cfg->to_run[to_run] = strdup(cmd);
@@ -384,7 +386,7 @@ int parser(Config* cfg)
 			if (m & (Mod1Mask | Mod4Mask | ShiftMask | ControlMask))
 				cfg->modkey = m;
 			else
-				fprintf(stderr, "sxwmrc:%d: unknown mod_key '%s'\n", lineno, rest);
+				wlog("config:%d: unknown mod_key '%s'", lineno, rest);
 		}
 		else if (!strcmp(key, "motion_throttle"))
 			cfg->motion_throttle = atoi(rest);
@@ -397,14 +399,14 @@ int parser(Config* cfg)
 		else if (!strcmp(key, "open_in_workspace")) {
 			char* mid = strchr(rest, ':');
 			if (!mid) {
-				fprintf(stderr, "sxwmrc:%d: open_in_workspace missing workspace\n", lineno);
+				wlog("config:%d: open_in_workspace missing workspace", lineno);
 				continue;
 			}
 			*mid = '\0';
 			char* cls = strip_quotes(strip(rest));
 			int ws = atoi(strip(mid + 1));
 			if (ws < 1 || ws > NUM_WORKSPACES) {
-				fprintf(stderr, "sxwmrc:%d: invalid workspace number %d\n", lineno, ws);
+				wlog("config:%d: invalid workspace number %d", lineno, ws);
 				continue;
 			}
 			int slot = find_free_slot(cfg->open_in_workspace, MAX_ITEMS);
@@ -454,11 +456,11 @@ int parser(Config* cfg)
 				b->action.ws = n - 1;
 			}
 			else {
-				fprintf(stderr, "sxwmrc:%d: invalid workspace action '%s'\n", lineno, act);
+				wlog("config:%d: invalid workspace action '%s'", lineno, act);
 			}
 		}
 		else {
-			fprintf(stderr, "sxwmrc:%d: unknown option '%s'\n", lineno, key);
+			wlog("config:%d: unknown option '%s'", lineno, key);
 		}
 	}
 

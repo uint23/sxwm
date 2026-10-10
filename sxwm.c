@@ -12,6 +12,7 @@
   
    (c) uint 2024-2026 */
 
+#include <errno.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdint.h>
@@ -35,6 +36,7 @@
 #include "common.h"
 #include "extern.h"
 #include "parser.h"
+#include "utils.h"
 
 static Client* add_client(Window w, Bool floating, int ws);
 static void append_client(ClientList* list, Client* c);
@@ -212,7 +214,7 @@ static Client* add_client(Window w, Bool floating, int ws)
 {
 	Client* c = malloc(sizeof(Client));
 	if (!c) {
-		fprintf(stderr, "sxwm: could not alloc memory for client\n");
+		wlog("Out of memory. Could not allocate client");
 		return NULL;
 	}
 
@@ -1481,11 +1483,10 @@ static void other_wm(void)
 
 static int other_wm_err(Display* d, XErrorEvent* ee)
 {
-	fprintf(stderr, "can't start because another window manager is already running");
-	exit(EXIT_FAILURE);
-	return 0;
 	(void)d;
 	(void)ee;
+	die(E_WM_RUNNING, NULL);
+	return 0;
 }
 
 long parse_col(const char* hex)
@@ -1494,12 +1495,12 @@ long parse_col(const char* hex)
 	Colormap cmap = DefaultColormap(dpy, DefaultScreen(dpy));
 
 	if (!XParseColor(dpy, cmap, hex, &col)) {
-		fprintf(stderr, "sxwm: cannot parse color %s\n", hex);
+		wlog("Cannot parse color %s", hex);
 		return WhitePixel(dpy, DefaultScreen(dpy));
 	}
 
 	if (!XAllocColor(dpy, cmap, &col)) {
-		fprintf(stderr, "sxwm: cannot allocate color %s\n", hex);
+		wlog("Cannot allocate color %s", hex);
 		return WhitePixel(dpy, DefaultScreen(dpy));
 	}
 
@@ -1529,13 +1530,13 @@ void quit(void)
 	XFreeCursor(dpy, cursors.normal);
 	XFreeCursor(dpy, cursors.resize);
 	XCloseDisplay(dpy);
-	puts("quitting...");
+	wlog("Quitting");
 	running = False;
 }
 
 void reload_config(void)
 {
-	puts("sxwm: reloading config...");
+	wlog("Reloading configuration");
 
 	/* free binding commands without */
 	for (int i = 0; i < user_config.n_binds; i++) {
@@ -1587,7 +1588,7 @@ void reload_config(void)
 	memset(&user_config, 0, sizeof(user_config));
 	init_defaults();
 	if (parser(&user_config)) {
-		fprintf(stderr, "sxwmrc: error parsing config file\n");
+		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
 
@@ -1822,17 +1823,15 @@ static void set_wm_state(Window w, long state)
 
 static void setup(void)
 {
-	if ((dpy = XOpenDisplay(NULL)) == NULL) {
-		fprintf(stderr, "can't open display.\nquitting...");
-		exit(EXIT_FAILURE);
-	}
+	if ((dpy = XOpenDisplay(NULL)) == NULL)
+		die(E_DISPLAY, NULL);
 	root = XDefaultRootWindow(dpy);
 
 	setup_atoms();
 	other_wm();
 	init_defaults();
 	if (parser(&user_config)) {
-		fprintf(stderr, "sxwmrc: error parsing config file\n");
+		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
 	update_modifier_masks();
@@ -1951,7 +1950,7 @@ static void spawn(const char* const* argv)
 
 	const char*** commands = malloc(cmd_count * sizeof(char **)); /* *** bruh */
 	if (!commands) {
-		perror("malloc commands");
+		wlog("Could not allocate commands: %s", strerror(errno));
 		return;
 	}
 
@@ -1967,7 +1966,7 @@ static void spawn(const char* const* argv)
 			const char** cmd_args = malloc((len + 1) * sizeof(char *));
 
 			if (!cmd_args) {
-				perror("malloc cmd_args");
+				wlog("Could not allocate command arguments: %s", strerror(errno));
 
 				for (int j = 0; j < cmd_idx; j++)
 					free(commands[j]);
@@ -1987,7 +1986,7 @@ static void spawn(const char* const* argv)
 
 	int (*pipes)[2] = malloc(sizeof(int[2]) * (cmd_count - 1));
 	if (!pipes) {
-		perror("malloc pipes");
+		wlog("Could not allocate pipes: %s", strerror(errno));
 
 		for (int j = 0; j < cmd_count; j++)
 			free(commands[j]);
@@ -1998,7 +1997,7 @@ static void spawn(const char* const* argv)
 
 	for (int i = 0; i < cmd_count - 1; i++) {
 		if (pipe(pipes[i]) == -1) {
-			perror("pipe");
+			wlog("Could not create pipe: %s", strerror(errno));
 
 			for (int j = 0; j < cmd_count; j++)
 				free(commands[j]);
@@ -2015,7 +2014,7 @@ static void spawn(const char* const* argv)
 
 		pid_t pid = fork();
 		if (pid < 0) {
-			perror("fork");
+			wlog("Could not fork: %s", strerror(errno));
 
 			for (int k = 0; k < cmd_count - 1; k++) {
 				close(pipes[k][0]);
@@ -2044,8 +2043,7 @@ static void spawn(const char* const* argv)
 			}
 
 			execvp(commands[i][0], (char* const*)(void*)commands[i]);
-			fprintf(stderr, "sxwm: execvp '%s' failed\n", commands[i][0]);
-			exit(EXIT_FAILURE);
+			die(E_EXEC, "%s: %s", commands[i][0], strerror(errno));
 		}
 	}
 
@@ -2288,8 +2286,7 @@ static void update_mons(void)
 		info = XineramaQueryScreens(dpy, &n_mons);
 		mons = malloc(sizeof *mons * n_mons);
 		if (!mons) {
-			fputs("sxwm: failed to allocate monitors\n", stderr);
-			exit(EXIT_FAILURE);
+			die(E_OOM, "monitors");
 		}
 		for (int i = 0; i < n_mons; i++) {
 			mons[i].x = info[i].x_org;
@@ -2303,8 +2300,7 @@ static void update_mons(void)
 		n_mons = 1;
 		mons = malloc(sizeof *mons);
 		if (!mons) {
-			fputs("sxwm: failed to allocate monitor\n", stderr);
-			exit(EXIT_FAILURE);
+			die(E_OOM, "monitor");
 		}
 		mons[0].x = 0;
 		mons[0].y = 0;
@@ -2322,7 +2318,7 @@ static void update_net_client_list(void)
 		for (int i = 0; i < LIST_COUNT; i++) {
 			unsigned int n = workspaces[ws].lists[i].count;
 			if (n > (size_t)INT_MAX - count) {
-				fputs("sxwm: client list exceeds X property size\n", stderr);
+				wlog("Client list exceeds X property size");
 				return;
 			}
 			count += n;
@@ -2333,7 +2329,7 @@ static void update_net_client_list(void)
 
 	Window* wins = count ? malloc(count * sizeof(*wins)) : NULL;
 	if (count && !wins) {
-		fputs("sxwm: could not allocate client list\n", stderr);
+		wlog("Could not allocate client list");
 		return;
 	}
 
@@ -2643,7 +2639,7 @@ static void xev_case(XEvent* xev)
 	if (xev->type >= 0 && xev->type < LASTEvent)
 		evtable[xev->type](xev);
 	else
-		fprintf(stderr, "sxwm: invalid event type: %d\n", xev->type);
+		llog("Invalid event type: %d", xev->type);
 }
 
 int main(int ac, char* av[])
@@ -2660,7 +2656,7 @@ int main(int ac, char* av[])
 		}
 	}
 	setup();
-	puts("sxwm: starting...");
+	wlog("Starting");
 	run();
 	return EXIT_SUCCESS;
 }

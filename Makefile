@@ -9,8 +9,8 @@ CPPFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700
 CFLAGS = -std=c99 -pedantic -Wall -Wextra -O2 ${CPPFLAGS} -I/usr/X11R6/include
 LDFLAGS = ${LIBS} -L/usr/X11R6/lib
 
-SRC = sxwm.c parser.c
-HDR = common.h extern.h parser.h
+SRC = sxwm.c parser.c utils.c
+HDR = common.h extern.h parser.h utils.h
 OUT = sxwm
 
 all: ${SRC} ${HDR}
