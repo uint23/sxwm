@@ -268,10 +268,6 @@ static Client* add_client(Window w, Bool floating, int ws)
 	long desktop = ws;
 	XChangeProperty(dpy, w, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 
-	/* graceful exits */
-	Atom protos[] = { atoms[ATOM_WM_DELETE_WINDOW] };
-	XSetWMProtocols(dpy, w, protos, 1);
-
 	XRaiseWindow(dpy, w);
 	return c;
 }
@@ -698,17 +694,17 @@ static WindowType get_window_type(Window w)
 {
 	Atom actual_type;
 	int format;
-	unsigned long count, remaining;
+	unsigned long cnt, remaining;
 	Atom* types = NULL;
 	WindowType type = WINDOW_NORMAL;
 
 	Bool prop = XGetWindowProperty(
 		dpy, w, atoms[ATOM_NET_WM_WINDOW_TYPE], 0, 32, False, XA_ATOM,
-		&actual_type, &format, &count, &remaining, (unsigned char **)&types
+		&actual_type, &format, &cnt, &remaining, (unsigned char **)&types
 	) == Success && actual_type == XA_ATOM && format == 32 && types;
 
 	if (prop) {
-		for (unsigned long i = 0; i < count; i++) {
+		for (unsigned long i = 0; i < cnt; i++) {
 			Atom t = types[i];
 
 			if (t == atoms[ATOM_NET_WM_WINDOW_TYPE_DOCK]) {
@@ -754,12 +750,12 @@ static int get_workspace_for_window(Window w)
 
 	Atom type;
 	int format;
-	unsigned long count, remaining, *desktop = NULL;
+	unsigned long cnt, remaining, *desktop = NULL;
 	int ws = ws_cur;
 
 	if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_DESKTOP], 0, 1, False, XA_CARDINAL,
-	                       &type, &format, &count, &remaining, (unsigned char**)&desktop) == Success &&
-	    type == XA_CARDINAL && format == 32 && count == 1 &&
+	                       &type, &format, &cnt, &remaining, (unsigned char**)&desktop) == Success &&
+	    type == XA_CARDINAL && format == 32 && cnt == 1 &&
 	    desktop && *desktop < NUM_WORKSPACES)
 		ws = (int)*desktop;
 	if (desktop)
@@ -1167,11 +1163,6 @@ static void on_config_req(XEvent* xev)
 {
 	XConfigureRequestEvent* ev = &xev->xconfigurerequest;
 	Client* c = find_client(ev->window);
-
-	if (c && (!is_floating(c) || c->fullscreen))
-		return;
-
-	/* allow client to configure itself */
 	XWindowChanges wc = {
 		.x = ev->x,
 		.y = ev->y,
@@ -1181,9 +1172,58 @@ static void on_config_req(XEvent* xev)
 		.sibling = ev->above,
 		.stack_mode = ev->detail
 	};
-	XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
-	if (c && (ev->value_mask & CWStackMode))
+
+	if (!c) {
+		XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
+		return;
+	}
+
+	Mask mask = (!is_floating(c) || c->fullscreen) ? 0 : ev->value_mask & ~CWBorderWidth;
+	if (!(mask & CWStackMode))
+		mask &= ~CWSibling;
+	if (mask)
+		XConfigureWindow(dpy, c->win, mask, &wc);
+	if (mask & CWStackMode)
 		update_net_client_list_stacking();
+
+	XWindowAttributes wa;
+	if (!XGetWindowAttributes(dpy, c->win, &wa))
+		return;
+
+	c->x = wa.x;
+	c->y = wa.y;
+	c->w = wa.width;
+	c->h = wa.height;
+	if (mask & (CWX | CWY))
+		c->mon = get_monitor_for_point(get_window_center(c));
+
+	Window root_ret, parent_ret, *children = NULL;
+	unsigned int cnt = 0;
+	Window above = None;
+	if (XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &cnt)) {
+		for (unsigned int i = 0; i < cnt; i++)
+			if (children[i] == c->win) {
+				if (i)
+					above = children[i - 1];
+				break;
+			}
+	}
+	if (children)
+		XFree(children);
+
+	XEvent notify = { .xconfigure = {
+		.type = ConfigureNotify,
+		.event = c->win,
+		.window = c->win,
+		.x = wa.x,
+		.y = wa.y,
+		.width = wa.width,
+		.height = wa.height,
+		.border_width = wa.border_width,
+		.above = above,
+		.override_redirect = wa.override_redirect
+	} };
+	XSendEvent(dpy, c->win, False, StructureNotifyMask, &notify);
 }
 
 static void on_destroy_ntf(XEvent* xev)
@@ -2165,28 +2205,28 @@ static void update_mons(void)
 
 static void update_net_client_list(void)
 {
-	size_t count = 0;
+	size_t cnt = 0;
 	for (Client* c = managed_clients; c; c = c->managed_next)
-		if (++count > INT_MAX) {
+		if (++cnt > INT_MAX) {
 			wlog("Client list exceeds X property size");
 			return;
 		}
 
-	if (count > SIZE_MAX / sizeof(Window))
+	if (cnt > SIZE_MAX / sizeof(Window))
 		return;
 
-	Window* wins = count ? malloc(count * sizeof(*wins)) : NULL;
-	if (count && !wins) {
+	Window* wins = cnt ? malloc(cnt * sizeof(*wins)) : NULL;
+	if (cnt && !wins) {
 		wlog("Could not allocate client list");
 		return;
 	}
 
-	size_t n = count;
+	size_t n = cnt;
 	for (Client* c = managed_clients; c; c = c->managed_next)
 		wins[--n] = c->win;
 
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace,
-	                (unsigned char *)wins, (int)count);
+	                (unsigned char *)wins, (int)cnt);
 	free(wins);
 	update_net_client_list_stacking();
 }
@@ -2194,19 +2234,19 @@ static void update_net_client_list(void)
 static void update_net_client_list_stacking(void)
 {
 	Window root_ret, parent_ret, *children = NULL;
-	unsigned int count = 0;
+	unsigned int cnt = 0;
 
-	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count))
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &cnt))
 		return;
 
-	if (count > INT_MAX) {
+	if (cnt > INT_MAX) {
 		if (children)
 			XFree(children);
 		return;
 	}
 
 	int n = 0;
-	for (unsigned int i = 0; i < count; i++)
+	for (unsigned int i = 0; i < cnt; i++)
 		if (find_client(children[i]))
 			children[n++] = children[i];
 
@@ -2222,14 +2262,14 @@ static void update_struts(void)
 		memset(&mons[i].res, 0, sizeof(mons[i].res));
 
 	Window root_ret, parent_ret, *children = NULL;
-	unsigned int count = 0;
+	unsigned int cnt = 0;
 
-	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count)) {
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &cnt)) {
 		update_workarea();
 		return;
 	}
 
-	for (unsigned int i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < cnt; i++) {
 		if (get_window_type(children[i]) != WINDOW_DOCK)
 			continue;
 
@@ -2380,18 +2420,18 @@ static void window_set_ewmh_state(Window w, Atom state, Bool add)
 {
 	Atom type;
 	int format;
-	unsigned long count = 0, remaining = 0;
+	unsigned long cnt = 0, remaining = 0;
 	Atom* old = NULL;
 
 	int status = XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STATE], 0, 1024, False, XA_ATOM,
-	                                &type, &format, &count, &remaining, (unsigned char**)&old);
+	                                &type, &format, &cnt, &remaining, (unsigned char**)&old);
 	if (status != Success || remaining || (type != None && (type != XA_ATOM || format != 32))) {
 		if (old)
 			XFree(old);
 		return;
 	}
 
-	Atom* list = malloc((count + 1) * sizeof(*list));
+	Atom* list = malloc((cnt + 1) * sizeof(*list));
 	if (!list) {
 		if (old)
 			XFree(old);
@@ -2399,7 +2439,7 @@ static void window_set_ewmh_state(Window w, Atom state, Bool add)
 	}
 
 	unsigned long n = 0;
-	for (unsigned long i = 0; i < count; i++)
+	for (unsigned long i = 0; i < cnt; i++)
 		if (old[i] != state)
 			list[n++] = old[i];
 	if (add)
