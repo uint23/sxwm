@@ -128,6 +128,7 @@ static void update_client_desktop_properties(void);
 static void update_modifier_masks(void);
 static void update_mons(void);
 static void update_net_client_list(void);
+static void update_net_client_list_stacking(void);
 static void update_struts(void);
 static void update_workarea(void);
 static void warp_cursor(Client* c);
@@ -157,6 +158,7 @@ static const char* atom_names[ATOM_COUNT] = {
 	[ATOM_UTF8_STRING]                      = "UTF8_STRING",
 	[ATOM_NET_WM_DESKTOP]                   = "_NET_WM_DESKTOP",
 	[ATOM_NET_CLIENT_LIST]                  = "_NET_CLIENT_LIST",
+	[ATOM_NET_CLIENT_LIST_STACKING]         = "_NET_CLIENT_LIST_STACKING",
 	[ATOM_NET_FRAME_EXTENTS]                = "_NET_FRAME_EXTENTS",
 	[ATOM_NET_NUMBER_OF_DESKTOPS]           = "_NET_NUMBER_OF_DESKTOPS",
 	[ATOM_NET_DESKTOP_NAMES]                = "_NET_DESKTOP_NAMES",
@@ -317,6 +319,7 @@ static void apply_fullscreen(Client* c, Bool on)
 		c->h = mons[mon].h;
 
 		XRaiseWindow(dpy, c->win);
+		update_net_client_list_stacking();
 		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], True);
 	}
 	else {
@@ -344,8 +347,14 @@ static void centre_client(Client* c)
 	if (!c || mon_cnt < 1)
 		return;
 
-	c->x = mons[c->mon].x + (mons[c->mon].w - c->w) / 2 - cfg.border_width;
-	c->y = mons[c->mon].y + (mons[c->mon].h - c->h) / 2 - cfg.border_width;
+	Monitor* m = &mons[c->mon];
+	int x = m->x + m->res.left;
+	int y = m->y + m->res.top;
+	int w = MAX(1, m->w - m->res.left - m->res.right);
+	int h = MAX(1, m->h - m->res.top - m->res.bottom);
+
+	c->x = x + MAX(0, (w - c->w - 2 * cfg.border_width) / 2);
+	c->y = y + MAX(0, (h - c->h - 2 * cfg.border_width) / 2);
 	XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
 }
 
@@ -905,27 +914,9 @@ void move_next_mon(void)
 	focused->mon = target_mon;
 	mon_cur = target_mon;
 
-	/* if window is floating, center it on the target monitor */
-	if (is_floating(focused)) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
+	/* if window is floating, center it in the target monitor's workarea */
+	if (is_floating(focused))
+		centre_client(focused);
 
 	/* retile to update layouts on both monitors */
 	tile();
@@ -949,27 +940,9 @@ void move_prev_mon(void)
 	focused->mon = target_mon;
 	mon_cur = target_mon;
 
-	/* if window is floating, center it on the target monitor */
-	if (is_floating(focused)) {
-		int mx = mons[target_mon].x, my = mons[target_mon].y;
-		int mw = mons[target_mon].w, mh = mons[target_mon].h;
-		int x = mx + (mw - focused->w) / 2;
-		int y = my + (mh - focused->h) / 2;
-
-		/* ensure window stays within monitor bounds */
-		if (x < mx)
-			x = mx;
-		if (y < my)
-			y = my;
-		if (x + focused->w > mx + mw)
-			x = mx + mw - focused->w;
-		if (y + focused->h > my + mh)
-			y = my + mh - focused->h;
-
-		focused->x = x;
-		focused->y = y;
-		XMoveWindow(dpy, focused->win, x, y);
-	}
+	/* if window is floating, center it in the target monitor's workarea */
+	if (is_floating(focused))
+		centre_client(focused);
 
 	/* retile to update layouts on both monitors */
 	tile();
@@ -1209,6 +1182,8 @@ static void on_config_req(XEvent* xev)
 		.stack_mode = ev->detail
 	};
 	XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
+	if (c && (ev->value_mask & CWStackMode))
+		update_net_client_list_stacking();
 }
 
 static void on_destroy_ntf(XEvent* xev)
@@ -1356,8 +1331,10 @@ static void on_map_req(XEvent* xev)
 
 	if (!floating && !fullscreen)
 		tile();
-	else if (floating)
+	else if (floating) {
 		XRaiseWindow(dpy, w);
+		update_net_client_list_stacking();
+	}
 
 	set_frame_extents(w);
 
@@ -1788,8 +1765,10 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(w);
 
-		if (raise_win && (is_floating(c) || !cfg.floating_on_top))
+		if (raise_win && (is_floating(c) || !cfg.floating_on_top)) {
 			XRaiseWindow(dpy, w);
+			update_net_client_list_stacking();
+		}
 
 		/* EWMH focus hint */
 		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
@@ -1968,6 +1947,7 @@ static void switch_client_list(Client* c, Bool floating)
 			c->h = wa.height;
 		}
 		XRaiseWindow(dpy, c->win);
+		update_net_client_list_stacking();
 	}
 	else
 		c->mon = get_monitor_for_point(get_window_center(c));
@@ -2208,6 +2188,32 @@ static void update_net_client_list(void)
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST], XA_WINDOW, 32, PropModeReplace,
 	                (unsigned char *)wins, (int)count);
 	free(wins);
+	update_net_client_list_stacking();
+}
+
+static void update_net_client_list_stacking(void)
+{
+	Window root_ret, parent_ret, *children = NULL;
+	unsigned int count = 0;
+
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count))
+		return;
+
+	if (count > INT_MAX) {
+		if (children)
+			XFree(children);
+		return;
+	}
+
+	int n = 0;
+	for (unsigned int i = 0; i < count; i++)
+		if (find_client(children[i]))
+			children[n++] = children[i];
+
+	XChangeProperty(dpy, root, atoms[ATOM_NET_CLIENT_LIST_STACKING], XA_WINDOW, 32,
+	                PropModeReplace, (unsigned char *)children, n);
+	if (children)
+		XFree(children);
 }
 
 static void update_struts(void)
