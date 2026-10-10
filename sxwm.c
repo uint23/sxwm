@@ -428,11 +428,11 @@ void close_focused(void)
 	if (XGetWMProtocols(dpy, focused->win, &protocols, &n_protocols) && protocols) {
 		for (int i = 0; i < n_protocols; i++) {
 			if (protocols[i] == atoms[ATOM_WM_DELETE_WINDOW]) {
-				XEvent ev = {.xclient = {
+				XEvent ev = { .xclient = {
 					.type = ClientMessage,
 					.window = focused->win,
 					.message_type = atoms[ATOM_WM_PROTOCOLS],
-					.format = 32}
+					.format = 32 }
 				};
 
 				ev.xclient.data.l[0] = atoms[ATOM_WM_DELETE_WINDOW];
@@ -728,7 +728,7 @@ static WindowType get_window_type(Window w)
 
 static int get_workspace_for_window(Window w)
 {
-	XClassHint ch = {0};
+	XClassHint ch = { 0 };
 	if (!XGetClassHint(dpy, w, &ch))
 		return current_ws;
 
@@ -1472,10 +1472,10 @@ static void on_unmap_ntf(XEvent* xev)
 static void other_wm(void)
 {
 	XSetErrorHandler(other_wm_err);
-	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){.event_mask = SubstructureRedirectMask});
+	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){ .event_mask = SubstructureRedirectMask });
 	XSync(dpy, False);
 	XSetErrorHandler(xerr);
-	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){.event_mask = 0});
+	XChangeWindowAttributes(dpy, root, CWEventMask, &(XSetWindowAttributes){ .event_mask = 0 });
 	XSync(dpy, False);
 }
 
@@ -1727,7 +1727,7 @@ static void scan_existing_windows(void)
 				|| wa.override_redirect || wa.map_state != IsViewable)
 				continue;
 
-			XEvent fake_event = {None};
+			XEvent fake_event = { None };
 			fake_event.type = MapRequest;
 			fake_event.xmaprequest.window = children[i];
 			on_map_req(&fake_event);
@@ -1757,7 +1757,7 @@ static void send_wm_take_focus(Window w)
 						.type = ClientMessage,
 						.window = w,
 						.message_type = wm_protocols,
-						.format = 32}
+						.format = 32 }
 				};
 				ev.xclient.data.l[0] = wm_take_focus;
 				ev.xclient.data.l[1] = CurrentTime;
@@ -2624,10 +2624,10 @@ static int xerr(Display* d, XErrorEvent* ee)
 	const struct {
 		int req, code;
 	} ignore[] = {
-		{0, BadWindow},
-		{X_GetGeometry, BadDrawable},
-		{X_SetInputFocus, BadMatch},
-		{X_ConfigureWindow, BadMatch},
+		{ 0, BadWindow },
+		{ X_GetGeometry, BadDrawable },
+		{ X_SetInputFocus, BadMatch },
+		{ X_ConfigureWindow, BadMatch },
 	};
 
 	for (size_t i = 0; i < sizeof(ignore) / sizeof(ignore[0]); i++) {
