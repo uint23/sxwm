@@ -976,7 +976,8 @@ static void move_to_workspace(int ws)
 	Client* moved = workspaces[ws_cur].focused;
 	int from_ws = ws_cur;
 
-	XUnmapWindow(dpy, moved->win);
+	if (moved->mapped)
+		XUnmapWindow(dpy, moved->win);
 
 	/* remove from current list */
 	Bool floating = is_floating(moved);
@@ -1244,14 +1245,11 @@ static void on_map_req(XEvent* xev)
 	/* already managed */
 	Client* c = find_client(w);
 	if (c) {
+		c->mapped = True;
 		if (get_client_workspace(c) != ws_cur)
 			return;
 
-		if (!c->mapped) {
-			XMapWindow(dpy, w);
-			c->mapped = True;
-		}
-
+		XMapWindow(dpy, w);
 		if (cfg.new_win_focus)
 			set_input_focus(c, True, True);
 		else
@@ -1441,11 +1439,26 @@ static void on_property_ntf(XEvent* xev)
 
 static void on_unmap_ntf(XEvent* xev)
 {
-	Client* c = find_client(xev->xunmap.window);
-	if (!c || get_client_workspace(c) != ws_cur || !c->mapped)
+	XUnmapEvent* ev = &xev->xunmap;
+	Client* c = find_client(ev->window);
+	if (!c || (ev->event != c->win && !ev->send_event))
 		return;
 
+	if (!c->mapped)
+		return;
+
+	/* An old workspace unmap may arrive after the window was remapped. */
+	if (!ev->send_event) {
+		XWindowAttributes wa;
+		if (get_client_workspace(c) != ws_cur ||
+		    !XGetWindowAttributes(dpy, c->win, &wa) ||
+		    wa.map_state != IsUnmapped)
+			return;
+	}
+
 	c->mapped = False;
+	if (get_client_workspace(c) != ws_cur)
+		return;
 	tile();
 
 	if (workspaces[ws_cur].focused == c)
