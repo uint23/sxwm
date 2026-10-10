@@ -179,17 +179,17 @@ struct {
 	Cursor normal;
 	Cursor move;
 	Cursor resize;
-} cursors;
+} cursors = { 0 };
 
 struct {
 	int sx, sy; /* start (x, y) */
 	int ox, oy, ow, oh; /* original (x, y), (w, h) */
-} drag;
+	DragMode mode;
+	Client* client;
+} drag = { 0 };
 
 static Workspace workspaces[NUM_WORKSPACES] = { 0 };
 static Config cfg = { 0 };
-static DragMode drag_mode = DRAG_NONE;
-static Client* drag_client = NULL;
 static EventHandler evtable[LASTEvent] = { NULL };
 static Display* dpy = NULL;
 static Window root = None;
@@ -1079,8 +1079,8 @@ static void on_button(XEvent* xev)
 	                 GrabModeAsync, GrabModeAsync, None, cursor, ev->time) != GrabSuccess)
 		return;
 
-	drag_client = c;
-	drag_mode = ev->button == Button1 ? DRAG_MOVE : DRAG_RESIZE;
+	drag.client = c;
+	drag.mode = ev->button == Button1 ? DRAG_MOVE : DRAG_RESIZE;
 	drag.sx = ev->x_root;
 	drag.sy = ev->y_root;
 	drag.ox = c->x;
@@ -1095,8 +1095,8 @@ static void on_button_release(XEvent* xev)
 
 	XUngrabPointer(dpy, CurrentTime);
 
-	drag_mode = DRAG_NONE;
-	drag_client = NULL;
+	drag.mode = DRAG_NONE;
+	drag.client = NULL;
 }
 
 static void on_client_msg(XEvent* xev)
@@ -1185,9 +1185,9 @@ static void on_destroy_ntf(XEvent* xev)
 	unlink_client(c);
 	if (was_focused)
 		workspaces[ws].focused = NULL;
-	if (drag_client == c) {
-		drag_client = NULL;
-		drag_mode = DRAG_NONE;
+	if (drag.client == c) {
+		drag.client = NULL;
+		drag.mode = DRAG_NONE;
 	}
 	free(c);
 	update_net_client_list();
@@ -1337,7 +1337,7 @@ static void on_motion(XEvent* xev)
 	static Time last_motion_time = 0;
 	XMotionEvent* motion_ev = &xev->xmotion;
 
-	if ((drag_mode == DRAG_NONE || !drag_client) || (motion_ev->time - last_motion_time <= (1000 / (Time)cfg.motion_throttle)))
+	if ((drag.mode == DRAG_NONE || !drag.client) || (motion_ev->time - last_motion_time <= (1000 / (Time)cfg.motion_throttle)))
 		return;
 
 	last_motion_time = motion_ev->time;
@@ -1358,14 +1358,14 @@ static void on_motion(XEvent* xev)
 	}
 	Monitor* mon_cur_motion = &mons[mon];
 
-	if (drag_mode == DRAG_MOVE) {
+	if (drag.mode == DRAG_MOVE) {
 		int dx = motion_ev->x_root - drag.sx;
 		int dy = motion_ev->y_root - drag.sy;
 		int nx = drag.ox + dx;
 		int ny = drag.oy + dy;
 
-		int outer_w = drag_client->w + 2 * cfg.border_width;
-		int outer_h = drag_client->h + 2 * cfg.border_width;
+		int outer_w = drag.client->w + 2 * cfg.border_width;
+		int outer_h = drag.client->h + 2 * cfg.border_width;
 
 		/* snap relative to this mons bounds: */
 		int rel_x = nx - mon_cur_motion->x;
@@ -1377,29 +1377,29 @@ static void on_motion(XEvent* xev)
 		nx = mon_cur_motion->x + rel_x;
 		ny = mon_cur_motion->y + rel_y;
 
-		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > cfg.snap_distance ||
-			UDIST(ny, drag_client->y) > cfg.snap_distance)) {
+		if (!is_floating(drag.client) && (UDIST(nx, drag.client->x) > cfg.snap_distance ||
+			UDIST(ny, drag.client->y) > cfg.snap_distance)) {
 			toggle_floating();
 		}
 
-		XMoveWindow(dpy, drag_client->win, nx, ny);
-		drag_client->x = nx;
-		drag_client->y = ny;
+		XMoveWindow(dpy, drag.client->win, nx, ny);
+		drag.client->x = nx;
+		drag.client->y = ny;
 	}
-	else if (drag_mode == DRAG_RESIZE) {
+	else if (drag.mode == DRAG_RESIZE) {
 		int dx = motion_ev->x_root - drag.sx;
 		int dy = motion_ev->y_root - drag.sy;
 		int nw = drag.ow + dx;
 		int nh = drag.oh + dy;
 
 		/* clamp relative to this mon */
-		int max_w = (mon_cur_motion->w - (drag_client->x - mon_cur_motion->x));
-		int max_h = (mon_cur_motion->h - (drag_client->y - mon_cur_motion->y));
+		int max_w = (mon_cur_motion->w - (drag.client->x - mon_cur_motion->x));
+		int max_h = (mon_cur_motion->h - (drag.client->y - mon_cur_motion->y));
 
-		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
-		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
+		drag.client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
+		drag.client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
 
-		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
+		XResizeWindow(dpy, drag.client->win, drag.client->w, drag.client->h);
 	}
 }
 
