@@ -190,7 +190,7 @@ struct {
 } drag;
 
 static Workspace workspaces[NUM_WORKSPACES] = { 0 };
-static Config user_config = { 0 };
+static Config cfg = { 0 };
 static DragMode drag_mode = DRAG_NONE;
 static Client* drag_client = NULL;
 static EventHandler evtable[LASTEvent] = { NULL };
@@ -228,8 +228,8 @@ static Client* add_client(Window w, Bool floating, int ws)
 	                    StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	select_input(w, window_masks);
 	grab_button(Button1, None, w, False, ButtonPressMask);
-	grab_button(Button1, user_config.modkey, w, False, ButtonPressMask);
-	grab_button(Button3, user_config.modkey, w, False, ButtonPressMask);
+	grab_button(Button1, cfg.modkey, w, False, ButtonPressMask);
+	grab_button(Button3, cfg.modkey, w, False, ButtonPressMask);
 
 	XWindowAttributes wa;
 	XGetWindowAttributes(dpy, w, &wa);
@@ -252,7 +252,7 @@ static Client* add_client(Window w, Bool floating, int ws)
 
 	ClientList* list = &workspaces[ws].lists[floating ? LIST_FLOATING : LIST_TILED];
 
-	if (!floating && user_config.new_win_master)
+	if (!floating && cfg.new_win_master)
 		prepend_client(list, c);
 	else
 		append_client(list, c);
@@ -326,7 +326,7 @@ static void apply_fullscreen(Client* c, Bool on)
 
 		/* restore win attributes */
 		XMoveResizeWindow(dpy, c->win, c->orig_x, c->orig_y, c->orig_w, c->orig_h);
-		XSetWindowBorderWidth(dpy, c->win, user_config.border_width);
+		XSetWindowBorderWidth(dpy, c->win, cfg.border_width);
 		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], False);
 
 		c->x = c->orig_x;
@@ -346,8 +346,8 @@ static void centre_client(Client* c)
 	if (!c || n_mons < 1)
 		return;
 
-	c->x = mons[c->mon].x + (mons[c->mon].w - c->w) / 2 - user_config.border_width;
-	c->y = mons[c->mon].y + (mons[c->mon].h - c->h) / 2 - user_config.border_width;
+	c->x = mons[c->mon].x + (mons[c->mon].w - c->w) / 2 - cfg.border_width;
+	c->y = mons[c->mon].y + (mons[c->mon].h - c->h) / 2 - cfg.border_width;
 	XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
 }
 
@@ -453,14 +453,14 @@ void close_focused(void)
 
 static void configure_tile(Client* c, int x, int y, int w, int h)
 {
-	int bw = 2 * user_config.border_width;
+	int bw = 2 * cfg.border_width;
 	w = MAX(1, w - bw);
 	h = MAX(1, h - bw);
 
 	if (c->x != x || c->y != y || c->w != w || c->h != h) {
 		XWindowChanges wc = {
 			.x = x, .y = y, .width = w, .height = h,
-			.border_width = user_config.border_width
+			.border_width = cfg.border_width
 		};
 		XConfigureWindow(dpy, c->win, CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &wc);
 	}
@@ -473,8 +473,8 @@ static void configure_tile(Client* c, int x, int y, int w, int h)
 
 void dec_gaps(void)
 {
-	if (user_config.gaps > 0) {
-		user_config.gaps--;
+	if (cfg.gaps > 0) {
+		cfg.gaps--;
 		tile();
 		update_borders();
 	}
@@ -736,11 +736,11 @@ static int get_workspace_for_window(Window w)
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
 		/* TODO: Add docs for open_in_workspace */
-		if (!user_config.open_in_workspace[i])
+		if (!cfg.open_in_workspace[i])
 			break;
 
-		char* rule_class = user_config.open_in_workspace[i][0];
-		char* rule_ws = user_config.open_in_workspace[i][1];
+		char* rule_class = cfg.open_in_workspace[i][0];
+		char* rule_ws = cfg.open_in_workspace[i][1];
 
 		if (rule_class && rule_ws) {
 			if ((ch.res_class && strcasecmp(ch.res_class, rule_class) == 0) ||
@@ -789,11 +789,11 @@ static void grab_keys(void)
 	};
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 
-	for (int i = 0; i < user_config.n_binds; i++) {
-		Binding* bind = &user_config.binds[i];
+	for (int i = 0; i < cfg.n_binds; i++) {
+		Binding* bind = &cfg.binds[i];
 
-		if ((bind->type == TYPE_WS_CHANGE && bind->mods != user_config.modkey) ||
-			(bind->type == TYPE_WS_MOVE   && bind->mods != (user_config.modkey | ShiftMask))) {
+		if ((bind->type == TYPE_WS_CHANGE && bind->mods != cfg.modkey) ||
+			(bind->type == TYPE_WS_MOVE   && bind->mods != (cfg.modkey | ShiftMask))) {
 			continue;
 		}
 
@@ -810,37 +810,37 @@ static void grab_keys(void)
 
 void inc_gaps(void)
 {
-	user_config.gaps++;
+	cfg.gaps++;
 	tile();
 	update_borders();
 }
 
 static void init_defaults(void)
 {
-	user_config.modkey = Mod4Mask;
-	user_config.gaps = 10;
-	user_config.border_width = 1;
-	user_config.border_foc_col = parse_col("#c0cbff");
-	user_config.border_ufoc_col = parse_col("#555555");
-	user_config.move_window_amt = 10;
-	user_config.resize_window_amt = 10;
+	cfg.modkey = Mod4Mask;
+	cfg.gaps = 10;
+	cfg.border_width = 1;
+	cfg.border_foc_col = parse_col("#c0cbff");
+	cfg.border_ufoc_col = parse_col("#555555");
+	cfg.move_window_amt = 10;
+	cfg.resize_window_amt = 10;
 
 	for (int i = 0; i < MAX_MONITORS; i++)
-		user_config.master_width[i] = 50 / 100.0f;
+		cfg.master_width[i] = 50 / 100.0f;
 
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		user_config.open_in_workspace[i] = NULL;
-		user_config.start_fullscreen[i] = NULL;
+		cfg.open_in_workspace[i] = NULL;
+		cfg.start_fullscreen[i] = NULL;
 	}
 
-	user_config.motion_throttle = 60;
-	user_config.resize_master_amt = 5;
-	user_config.snap_distance = 5;
-	user_config.n_binds = 0;
-	user_config.new_win_focus = True;
-	user_config.warp_cursor = True;
-	user_config.new_win_master = False;
-	user_config.floating_on_top = True;
+	cfg.motion_throttle = 60;
+	cfg.resize_master_amt = 5;
+	cfg.snap_distance = 5;
+	cfg.n_binds = 0;
+	cfg.new_win_focus = True;
+	cfg.warp_cursor = True;
+	cfg.new_win_master = False;
+	cfg.floating_on_top = True;
 }
 
 static Bool is_floating(Client* c)
@@ -868,7 +868,7 @@ void move_master_next(void)
 
 	tile();
 
-	if (user_config.warp_cursor && old_focused)
+	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
 	if (old_focused)
 		send_wm_take_focus(old_focused->win);
@@ -890,7 +890,7 @@ void move_master_prev(void)
 
 	tile();
 
-	if (user_config.warp_cursor && old_focused)
+	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
 	if (old_focused)
 		send_wm_take_focus(old_focused->win);
@@ -936,7 +936,7 @@ void move_next_mon(void)
 	tile();
 
 	/* follow the window with cursor if enabled */
-	if (user_config.warp_cursor)
+	if (cfg.warp_cursor)
 		warp_cursor(focused);
 
 	update_borders();
@@ -980,7 +980,7 @@ void move_prev_mon(void)
 	tile();
 
 	/* follow the window with cursor if enabled */
-	if (user_config.warp_cursor)
+	if (cfg.warp_cursor)
 		warp_cursor(focused);
 
 	update_borders();
@@ -1018,7 +1018,7 @@ static void move_to_workspace(int ws)
 static void move_win(Direction dir)
 {
 	Client* c = get_focused();
-	int amount = user_config.move_window_amt;
+	int amount = cfg.move_window_amt;
 	if (!c || !is_floating(c))
 		return;
 
@@ -1067,7 +1067,7 @@ static void on_button(XEvent* xev)
 	XButtonEvent* ev = &xev->xbutton;
 	Window w = ev->subwindow != None ? ev->subwindow : ev->window;
 	Client* c = find_client(find_toplevel(w));
-	Bool mod = (clean_mask(ev->state) & user_config.modkey) == user_config.modkey;
+	Bool mod = (clean_mask(ev->state) & cfg.modkey) == cfg.modkey;
 
 	if (!c || get_client_workspace(c) != current_ws) {
 		XAllowEvents(dpy, ReplayPointer, ev->time);
@@ -1232,8 +1232,8 @@ static void on_keypress(XEvent* xev)
 	KeyCode code = xev->xkey.keycode;
 	int mods = clean_mask(xev->xkey.state);
 
-	for (int i = 0; i < user_config.n_binds; i++) {
-		Binding* bind = &user_config.binds[i];
+	for (int i = 0; i < cfg.n_binds; i++) {
+		Binding* bind = &cfg.binds[i];
 		if (bind->keycode == code && clean_mask(bind->mods) == mods) {
 			switch (bind->type) {
 				case TYPE_CMD: spawn(bind->action.cmd); break;
@@ -1270,7 +1270,7 @@ static void on_map_req(XEvent* xev)
 			c->mapped = True;
 		}
 
-		if (user_config.new_win_focus)
+		if (cfg.new_win_focus)
 			set_input_focus(c, True, True);
 		else
 			update_borders();
@@ -1315,7 +1315,7 @@ static void on_map_req(XEvent* xev)
 		c->w = MAX(c->w, 64);
 		c->h = MAX(c->h, 64);
 		centre_client(c);
-		XSetWindowBorderWidth(dpy, w, user_config.border_width);
+		XSetWindowBorderWidth(dpy, w, cfg.border_width);
 	}
 
 	/* initialise fullscreen through the existing helper */
@@ -1337,7 +1337,7 @@ static void on_map_req(XEvent* xev)
 
 	set_frame_extents(w);
 
-	if (user_config.new_win_focus)
+	if (cfg.new_win_focus)
 		set_input_focus(c, True, True);
 	else
 		update_borders();
@@ -1355,7 +1355,7 @@ static void on_motion(XEvent* xev)
 	XMotionEvent* motion_ev = &xev->xmotion;
 
 	if ((drag_mode == DRAG_NONE || !drag_client) ||
-		(motion_ev->time - last_motion_time <= (1000 / (Time)user_config.motion_throttle)))
+		(motion_ev->time - last_motion_time <= (1000 / (Time)cfg.motion_throttle)))
 		return;
 	last_motion_time = motion_ev->time;
 
@@ -1381,21 +1381,21 @@ static void on_motion(XEvent* xev)
 		int nx = drag.ox + dx;
 		int ny = drag.oy + dy;
 
-		int outer_w = drag_client->w + 2 * user_config.border_width;
-		int outer_h = drag_client->h + 2 * user_config.border_width;
+		int outer_w = drag_client->w + 2 * cfg.border_width;
+		int outer_h = drag_client->h + 2 * cfg.border_width;
 
 		/* snap relative to this mons bounds: */
 		int rel_x = nx - current_mon_motion->x;
 		int rel_y = ny - current_mon_motion->y;
 
-		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, user_config.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, user_config.snap_distance);
+		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, cfg.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, cfg.snap_distance);
 
 		nx = current_mon_motion->x + rel_x;
 		ny = current_mon_motion->y + rel_y;
 
-		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > user_config.snap_distance ||
-			UDIST(ny, drag_client->y) > user_config.snap_distance)) {
+		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > cfg.snap_distance ||
+			UDIST(ny, drag_client->y) > cfg.snap_distance)) {
 			toggle_floating();
 		}
 
@@ -1538,56 +1538,9 @@ void reload_config(void)
 {
 	wlog("Reloading configuration");
 
-	/* free binding commands without */
-	for (int i = 0; i < user_config.n_binds; i++) {
-		if (user_config.binds[i].type == TYPE_CMD && user_config.binds[i].action.cmd)
-			free(user_config.binds[i].action.cmd);
-		user_config.binds[i].action.cmd = NULL;
-		user_config.binds[i].action.fn = NULL;
-		user_config.binds[i].type = -1;
-		user_config.binds[i].keysym = 0;
-		user_config.binds[i].mods = 0;
-	}
-
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.open_in_workspace[i]) {
-			if (user_config.open_in_workspace[i][0])
-				free(user_config.open_in_workspace[i][0]);
-			if (user_config.open_in_workspace[i][1])
-				free(user_config.open_in_workspace[i][1]);
-			free(user_config.open_in_workspace[i]);
-			user_config.open_in_workspace[i] = NULL;
-		}
-		if (user_config.start_fullscreen[i]) {
-			if (user_config.start_fullscreen[i][0])
-				free(user_config.start_fullscreen[i][0]);
-			free(user_config.start_fullscreen[i]);
-			user_config.start_fullscreen[i] = NULL;
-		}
-	}
-
-	/* free should_float arrays */
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.should_float[i]) {
-			if (user_config.should_float[i][0])
-				free(user_config.should_float[i][0]);
-			free(user_config.should_float[i]);
-			user_config.should_float[i] = NULL;
-		}
-	}
-
-	/* free any exec strings */
-	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.to_run[i]) {
-			free(user_config.to_run[i]);
-			user_config.to_run[i] = NULL;
-		}
-	}
-
-	/* wipe everything else */
-	memset(&user_config, 0, sizeof(user_config));
+	free_config(&cfg);
 	init_defaults();
-	if (parser(&user_config)) {
+	if (parser(&cfg)) {
 		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
@@ -1603,15 +1556,15 @@ void reload_config(void)
 
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
+	grab_button(Button1, cfg.modkey, root, True, root_click_masks);
+	grab_button(Button3, cfg.modkey, root, True, root_resize_masks);
 
 	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
 		for (int i = 0; i < LIST_COUNT; i++) {
 			for (Client* c = workspaces[ws].lists[i].head; c; c = c->next) {
 				grab_button(Button1, None, c->win, False, ButtonPressMask);
-				grab_button(Button1, user_config.modkey, c->win, False, ButtonPressMask);
-				grab_button(Button2, user_config.modkey, c->win, False, ButtonPressMask);
+				grab_button(Button1, cfg.modkey, c->win, False, ButtonPressMask);
+				grab_button(Button2, cfg.modkey, c->win, False, ButtonPressMask);
 			}
 		}
 	}
@@ -1628,7 +1581,7 @@ static void resize_master(int amount)
 {
 	Client* focused = get_focused();
 	int m = focused ? focused->mon : 0;
-	float* mw = &user_config.master_width[m];
+	float* mw = &cfg.master_width[m];
 
 	*mw = CLAMP(*mw + (float)amount / 100.0f, MF_MIN, MF_MAX);
 
@@ -1638,12 +1591,12 @@ static void resize_master(int amount)
 
 void resize_master_add(void)
 {
-	resize_master(user_config.resize_master_amt);
+	resize_master(cfg.resize_master_amt);
 }
 
 void resize_master_sub(void)
 {
-	resize_master(-user_config.resize_master_amt);
+	resize_master(-cfg.resize_master_amt);
 }
 
 static void resize_win(Direction dir)
@@ -1651,7 +1604,7 @@ static void resize_win(Direction dir)
 	Client* c = get_focused();
 	int* size;
 	int max;
-	int amount = user_config.resize_window_amt;
+	int amount = cfg.resize_window_amt;
 	Monitor* m = &mons[c->mon];
 	if (!c || !is_floating(c))
 		return;
@@ -1772,10 +1725,10 @@ static void send_wm_take_focus(Window w)
 static void set_frame_extents(Window w)
 {
 	long extents[4] = {
-		user_config.border_width,
-		user_config.border_width,
-		user_config.border_width,
-		user_config.border_width
+		cfg.border_width,
+		cfg.border_width,
+		cfg.border_width,
+		cfg.border_width
 	};
 	XChangeProperty(dpy, w, atoms[ATOM_NET_FRAME_EXTENTS], XA_CARDINAL, 32,
 	                PropModeReplace, (unsigned char *)extents, 4);
@@ -1795,14 +1748,14 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
 		send_wm_take_focus(w);
 
-		if (raise_win && (is_floating(c) || !user_config.floating_on_top))
+		if (raise_win && (is_floating(c) || !cfg.floating_on_top))
 			XRaiseWindow(dpy, w);
 
 		/* EWMH focus hint */
 		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
 		                PropModeReplace, (unsigned char *)&w, 1);
 
-		if (warp && user_config.warp_cursor)
+		if (warp && cfg.warp_cursor)
 			warp_cursor(c);
 	}
 	else {
@@ -1830,7 +1783,7 @@ static void setup(void)
 	setup_atoms();
 	other_wm();
 	init_defaults();
-	if (parser(&user_config)) {
+	if (parser(&cfg)) {
 		wlog("Could not parse configuration; using defaults");
 		init_defaults();
 	}
@@ -1856,8 +1809,8 @@ static void setup(void)
 	/* grab mouse button events on root window */
 	Mask root_click_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 	Mask root_resize_masks = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
-	grab_button(Button1, user_config.modkey, root, True, root_click_masks);
-	grab_button(Button3, user_config.modkey, root, True, root_resize_masks);
+	grab_button(Button1, cfg.modkey, root, True, root_click_masks);
+	grab_button(Button3, cfg.modkey, root, True, root_resize_masks);
 	XSync(dpy, False);
 
 	for (int i = 0; i < LASTEvent; i++)
@@ -2062,14 +2015,11 @@ static void spawn(const char* const* argv)
 static void startup_exec(void)
 {
 	for (int i = 0; i < MAX_ITEMS; i++) {
-		if (user_config.to_run[i]) {
-			const char** argv = build_argv(user_config.to_run[i]);
+		if (cfg.to_run[i]) {
+			const char** argv = build_argv(cfg.to_run[i]);
 			if (argv) {
 				spawn(argv);
-				for (int j = 0; argv[j]; j++)
-					free((void*)(uintptr_t)argv[j]);
-
-				free(argv);
+				free_argv(argv);
 			}
 		}
 	}
@@ -2128,12 +2078,12 @@ static void tile(void)
 			continue;
 
 		Monitor* mon = &mons[m];
-		int gaps = user_config.gaps;
+		int gaps = cfg.gaps;
 		int x = mon->x + mon->res.left + gaps;
 		int y = mon->y + mon->res.top + gaps;
 		int w = MAX(1, mon->w - mon->res.left - mon->res.right - 2 * gaps);
 		int h = MAX(1, mon->h - mon->res.top - mon->res.bottom - 2 * gaps);
-		int master_w = n > 1 ? (int)(w * CLAMP(user_config.master_width[m], MF_MIN, MF_MAX)) : w;
+		int master_w = n > 1 ? (int)(w * CLAMP(cfg.master_width[m], MF_MIN, MF_MAX)) : w;
 
 		/* master */
 		configure_tile(master, x, y, master_w, h);
@@ -2146,7 +2096,7 @@ static void tile(void)
 		int stack_x = x + master_w + gaps;
 		int stack_w = w - master_w - gaps;
 		int available = h - (n_stack - 1) * gaps;
-		int stack_h = MAX(2 * user_config.border_width + 1, available / n_stack);
+		int stack_h = MAX(2 * cfg.border_width + 1, available / n_stack);
 		int extra = MAX(0, available - n_stack * stack_h);
 		int stack_y = y;
 
@@ -2231,7 +2181,7 @@ static void update_borders(void)
 
 	for (int i = 0; i < LIST_COUNT; i++)
 		for (Client* c = workspaces[current_ws].lists[i].head; c; c = c->next)
-			XSetWindowBorder(dpy, c->win, c == focused ? user_config.border_foc_col : user_config.border_ufoc_col);
+			XSetWindowBorder(dpy, c->win, c == focused ? cfg.border_foc_col : cfg.border_ufoc_col);
 }
 
 static void update_client_desktop_properties(void)
@@ -2603,12 +2553,12 @@ static void window_set_ewmh_state(Window w, Atom state, Bool add)
 
 static Bool window_should_float(Window w)
 {
-	return window_matches_class(w, user_config.should_float);
+	return window_matches_class(w, cfg.should_float);
 }
 
 static Bool window_should_start_fullscreen(Window w)
 {
-	return window_matches_class(w, user_config.start_fullscreen);
+	return window_matches_class(w, cfg.start_fullscreen);
 }
 
 static int xerr(Display* d, XErrorEvent* ee)
