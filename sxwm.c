@@ -118,7 +118,7 @@ static int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 static void spawn(const char* const* argv);
 static void startup_exec(void);
 static void switch_client_list(Client* c, Bool floating);
-/* void switch_ws_prv(void); */
+/* void switch_previous_workspace(void); */
 static void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
@@ -201,13 +201,12 @@ static int ws_prv = 0;
 static int ws_cur = 0;
 static int mon_cur = 0;
 static int mon_cnt = 0;
-static long last_motion_time = 0;
+static int scrw = 0;
+static int scrh = 0;
 static Bool global_floating = False;
 static Bool running = False;
 static Mask numlock_mask = 0;
 static Mask mode_switch_mask = 0;
-static int scr_width;
-static int scr_height;
 
 static Client* add_client(Window w, Bool floating, int ws)
 {
@@ -261,7 +260,7 @@ static Client* add_client(Window w, Bool floating, int ws)
 		workspaces[ws].focused = c;
 
 	if (ws == ws_cur && workspaces[ws].focused == c)
-		current_mon = c->mon;
+		mon_cur = c->mon;
 
 	/* associate with workspace ws */
 	long desktop = ws;
@@ -307,7 +306,7 @@ static void apply_fullscreen(Client* c, Bool on)
 
 		c->fullscreen = True;
 
-		int mon = CLAMP(c->mon, 0, n_mons - 1);
+		int mon = CLAMP(c->mon, 0, mon_cnt - 1);
 		/* make window fill mon */
 		XSetWindowBorderWidth(dpy, c->win, 0);
 		XMoveResizeWindow(dpy, c->win, mons[mon].x, mons[mon].y, mons[mon].w, mons[mon].h);
@@ -342,7 +341,7 @@ static void apply_fullscreen(Client* c, Bool on)
 
 static void centre_client(Client* c)
 {
-	if (!c || n_mons < 1)
+	if (!c || mon_cnt < 1)
 		return;
 
 	c->x = mons[c->mon].x + (mons[c->mon].w - c->w) / 2 - cfg.border_width;
@@ -397,7 +396,7 @@ static void change_workspace(int ws)
 				break;
 			}
 
-			if (!fallback || (fallback->mon != current_mon && c->mon == current_mon))
+			if (!fallback || (fallback->mon != mon_cur && c->mon == mon_cur))
 				fallback = c;
 		}
 		if (focused)
@@ -493,15 +492,15 @@ static Client* find_client(Window w)
 static Client* find_new_focus(Client* c)
 {
 	/* prefer previous window else next */
-	if (c->prev && c->prev->mapped && c->prev->mon == current_mon)
+	if (c->prev && c->prev->mapped && c->prev->mon == mon_cur)
 		return c->prev;
-	if (c->next && c->next->mapped && c->next->mon == current_mon)
+	if (c->next && c->next->mapped && c->next->mon == mon_cur)
 		return c->next;
 
 	Workspace* ws = c->list->workspace;
 	for (int i = 0; i < LIST_COUNT; i++)
 		for (Client* p = ws->lists[i].head; p; p = p->next)
-			if (p != c && p->mapped && p->mon == current_mon)
+			if (p != c && p->mapped && p->mon == mon_cur)
 				return p;
 	return NULL;
 }
@@ -549,22 +548,22 @@ void focus_next(void)
 			c = lists[LIST_TILED].head ? lists[LIST_TILED].head : lists[LIST_FLOATING].head;
 		else
 			c = lists[LIST_FLOATING].head ? lists[LIST_FLOATING].head : lists[LIST_TILED].head;
-	} while ((!c->mapped || c->mon != current_mon) && c != start);
+	} while ((!c->mapped || c->mon != mon_cur) && c != start);
 
 	/* if we return to start: */
-	if (!c->mapped || c->mon != current_mon)
+	if (!c->mapped || c->mon != mon_cur)
 		return;
 
-	current_mon = c->mon;
+	mon_cur = c->mon;
 	set_input_focus(c, True, True);
 }
 
 void focus_next_mon(void)
 {
-	if (n_mons <= 1)
+	if (mon_cnt <= 1)
 		return;
 
-	int target_mon = (current_mon + 1) % n_mons;
+	int target_mon = (mon_cur + 1) % mon_cnt;
 	/* find the first window on the target monitor in current workspace */
 	Client* target_client = NULL;
 	for (int i = 0; i < LIST_COUNT && !target_client; i++) {
@@ -578,12 +577,12 @@ void focus_next_mon(void)
 
 	if (target_client) {
 		/* focus the window on target monitor */
-		current_mon = target_mon;
+		mon_cur = target_mon;
 		set_input_focus(target_client, True, True);
 	}
 	else {
-		/* no windows on target monitor, just move cursor to center and update current_mon */
-		current_mon = target_mon;
+		/* no windows on target monitor, just move cursor to center and update mon_cur */
+		mon_cur = target_mon;
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
@@ -609,21 +608,21 @@ void focus_prev(void)
 			c = lists[LIST_TILED].tail ? lists[LIST_TILED].tail : lists[LIST_FLOATING].tail;
 		else
 			c = lists[LIST_FLOATING].tail ? lists[LIST_FLOATING].tail : lists[LIST_TILED].tail;
-	} while ((!c->mapped || c->mon != current_mon) && c != start);
+	} while ((!c->mapped || c->mon != mon_cur) && c != start);
 
-	if (!c->mapped || c->mon != current_mon)
+	if (!c->mapped || c->mon != mon_cur)
 		return;
 
-	current_mon = c->mon;
+	mon_cur = c->mon;
 	set_input_focus(c, True, True);
 }
 
 void focus_prev_mon(void)
 {
-	if (n_mons <= 1)
+	if (mon_cnt <= 1)
 		return; /* only one monitor, nothing to switch to */
 
-	int target_mon = (current_mon - 1 + n_mons) % n_mons;
+	int target_mon = (mon_cur - 1 + mon_cnt) % mon_cnt;
 	/* find the first window on the target monitor in current workspace */
 	Client* target_client = NULL;
 	for (int i = 0; i < LIST_COUNT && !target_client; i++) {
@@ -637,11 +636,11 @@ void focus_prev_mon(void)
 
 	if (target_client) {
 		/* focus the window on target monitor */
-		current_mon = target_mon;
+		mon_cur = target_mon;
 		set_input_focus(target_client, True, True);
 	}
 	else {
-		current_mon = target_mon;
+		mon_cur = target_mon;
 		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
 		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
 		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
@@ -674,7 +673,7 @@ static Client* get_focused(void)
 
 static int get_monitor_for_point(Point p)
 {
-	for (int m = 0; m < n_mons; m++) {
+	for (int m = 0; m < mon_cnt; m++) {
 		if (p.x >= mons[m].x && p.x < mons[m].x + mons[m].w && p.y >= mons[m].y && p.y < mons[m].y + mons[m].h)
 			return m;
 	}
@@ -900,14 +899,14 @@ void move_master_prev(void)
 void move_next_mon(void)
 {
 	Client* focused = get_focused();
-	if (!focused || n_mons <= 1)
+	if (!focused || mon_cnt <= 1)
 		return; /* no focused window or only one monitor */
 
-	int target_mon = (focused->mon + 1) % n_mons;
+	int target_mon = (focused->mon + 1) % mon_cnt;
 
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
-	current_mon = target_mon;
+	mon_cur = target_mon;
 
 	/* if window is floating, center it on the target monitor */
 	if (is_floating(focused)) {
@@ -944,14 +943,14 @@ void move_next_mon(void)
 void move_prev_mon(void)
 {
 	Client* focused = get_focused();
-	if (!focused || n_mons <= 1)
+	if (!focused || mon_cnt <= 1)
 		return; /* no focused window or only one monitor */
 
-	int target_mon = (focused->mon - 1 + n_mons) % n_mons;
+	int target_mon = (focused->mon - 1 + mon_cnt) % mon_cnt;
 
 	/* update window's monitor assignment */
 	focused->mon = target_mon;
-	current_mon = target_mon;
+	mon_cur = target_mon;
 
 	/* if window is floating, center it on the target monitor */
 	if (is_floating(focused)) {
@@ -1351,28 +1350,29 @@ static void on_mapping_ntf(XEvent* xev)
 
 static void on_motion(XEvent* xev)
 {
+	static Time last_motion_time = 0;
 	XMotionEvent* motion_ev = &xev->xmotion;
 
-	if ((drag_mode == DRAG_NONE || !drag_client) ||
-		(motion_ev->time - last_motion_time <= (1000 / (Time)cfg.motion_throttle)))
+	if ((drag_mode == DRAG_NONE || !drag_client) || (motion_ev->time - last_motion_time <= (1000 / (Time)cfg.motion_throttle)))
 		return;
+
 	last_motion_time = motion_ev->time;
 
 	/* figure out which monitor the pointer is in right now */
 	int mon = 0;
-	for (int i = 0; i < n_mons; i++) {
-		Bool is_current_mon =
+	for (int i = 0; i < mon_cnt; i++) {
+		Bool is_mon_cur =
 			motion_ev->x_root >= mons[i].x &&
 			motion_ev->x_root < mons[i].x + mons[i].w &&
 			motion_ev->y_root >= mons[i].y &&
 			motion_ev->y_root < mons[i].y + mons[i].h;
 
-		if (is_current_mon) {
+		if (is_mon_cur) {
 			mon = i;
 			break;
 		}
 	}
-	Monitor* current_mon_motion = &mons[mon];
+	Monitor* mon_cur_motion = &mons[mon];
 
 	if (drag_mode == DRAG_MOVE) {
 		int dx = motion_ev->x_root - drag.sx;
@@ -1384,14 +1384,14 @@ static void on_motion(XEvent* xev)
 		int outer_h = drag_client->h + 2 * cfg.border_width;
 
 		/* snap relative to this mons bounds: */
-		int rel_x = nx - current_mon_motion->x;
-		int rel_y = ny - current_mon_motion->y;
+		int rel_x = nx - mon_cur_motion->x;
+		int rel_y = ny - mon_cur_motion->y;
 
-		rel_x = snap_coordinate(rel_x, outer_w, current_mon_motion->w, cfg.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, current_mon_motion->h, cfg.snap_distance);
+		rel_x = snap_coordinate(rel_x, outer_w, mon_cur_motion->w, cfg.snap_distance);
+		rel_y = snap_coordinate(rel_y, outer_h, mon_cur_motion->h, cfg.snap_distance);
 
-		nx = current_mon_motion->x + rel_x;
-		ny = current_mon_motion->y + rel_y;
+		nx = mon_cur_motion->x + rel_x;
+		ny = mon_cur_motion->y + rel_y;
 
 		if (!is_floating(drag_client) && (UDIST(nx, drag_client->x) > cfg.snap_distance ||
 			UDIST(ny, drag_client->y) > cfg.snap_distance)) {
@@ -1409,8 +1409,8 @@ static void on_motion(XEvent* xev)
 		int nh = drag.oh + dy;
 
 		/* clamp relative to this mon */
-		int max_w = (current_mon_motion->w - (drag_client->x - current_mon_motion->x));
-		int max_h = (current_mon_motion->h - (drag_client->y - current_mon_motion->y));
+		int max_w = (mon_cur_motion->w - (drag_client->x - mon_cur_motion->x));
+		int max_h = (mon_cur_motion->h - (drag_client->y - mon_cur_motion->y));
 
 		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
 		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
@@ -1741,7 +1741,7 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 	workspaces[ws_cur].focused = (c && c->mapped) ? c : NULL;
 
 	if (workspaces[ws_cur].focused) {
-		current_mon = CLAMP(c->mon, 0, n_mons - 1);
+		mon_cur = CLAMP(c->mon, 0, mon_cnt - 1);
 		Window w = find_toplevel(c->win);
 
 		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
@@ -1795,8 +1795,8 @@ static void setup(void)
 	cursors.resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
 	XDefineCursor(dpy, root, cursors.normal);
 
-	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
-	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
+	scrw = XDisplayWidth(dpy, DefaultScreen(dpy));
+	scrh = XDisplayHeight(dpy, DefaultScreen(dpy));
 
 	update_mons();
 
@@ -2050,7 +2050,7 @@ static void switch_client_list(Client* c, Bool floating)
 		c->mon = get_monitor_for_point(get_window_center(c));
 }
 
-void switch_ws_prv(void)
+void switch_previous_workspace(void)
 {
 	change_workspace(ws_prv);
 }
@@ -2061,7 +2061,7 @@ static void tile(void)
 
 	update_struts();
 
-	for (int m = 0; m < n_mons; m++) {
+	for (int m = 0; m < mon_cnt; m++) {
 		Client* master = NULL;
 		int n = 0;
 
@@ -2223,8 +2223,8 @@ static void update_mons(void)
 	XineramaScreenInfo* info;
 	Monitor* old = mons;
 
-	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
-	scr_height = XDisplayHeight(dpy, DefaultScreen(dpy));
+	scrw = XDisplayWidth(dpy, DefaultScreen(dpy));
+	scrh = XDisplayHeight(dpy, DefaultScreen(dpy));
 
 	for (int s = 0; s < ScreenCount(dpy); s++) {
 		Window scr_root = RootWindow(dpy, s);
@@ -2232,12 +2232,12 @@ static void update_mons(void)
 	}
 
 	if (XineramaIsActive(dpy)) {
-		info = XineramaQueryScreens(dpy, &n_mons);
-		mons = malloc(sizeof *mons * n_mons);
+		info = XineramaQueryScreens(dpy, &mon_cnt);
+		mons = malloc(sizeof *mons * mon_cnt);
 		if (!mons) {
 			die(E_OOM, "monitors");
 		}
-		for (int i = 0; i < n_mons; i++) {
+		for (int i = 0; i < mon_cnt; i++) {
 			mons[i].x = info[i].x_org;
 			mons[i].y = info[i].y_org;
 			mons[i].w = info[i].width;
@@ -2246,15 +2246,15 @@ static void update_mons(void)
 		XFree(info);
 	}
 	else {
-		n_mons = 1;
+		mon_cnt = 1;
 		mons = malloc(sizeof *mons);
 		if (!mons) {
 			die(E_OOM, "monitor");
 		}
 		mons[0].x = 0;
 		mons[0].y = 0;
-		mons[0].w = scr_width;
-		mons[0].h = scr_height;
+		mons[0].w = scrw;
+		mons[0].h = scrh;
 	}
 
 	free(old);
@@ -2295,7 +2295,7 @@ static void update_net_client_list(void)
 static void update_struts(void)
 {
 	/* reset all reserves */
-	for (int i = 0; i < n_mons; i++) {
+	for (int i = 0; i < mon_cnt; i++) {
 		mons[i].res.left   = 0;
 		mons[i].res.right  = 0;
 		mons[i].res.top    = 0;
@@ -2309,9 +2309,6 @@ static void update_struts(void)
 
 	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &n_children))
 		return;
-
-	int screen_w = scr_width;
-	int screen_h = scr_height;
 
 	for (unsigned int i = 0; i < n_children; i++) {
 		Window w = children[i];
@@ -2359,7 +2356,7 @@ static void update_struts(void)
 			if (!left && !right && !top && !bottom)
 				continue;
 
-			for (int m = 0; m < n_mons; m++) {
+			for (int m = 0; m < mon_cnt; m++) {
 				int mx = mons[m].x;
 				int my = mons[m].y;
 				int mw = mons[m].w;
@@ -2391,7 +2388,7 @@ static void update_struts(void)
 							 mons right edge = mx + mw
 							 amount that cuts into monitor = MAX(0, (screen_w - right) - mx)
 						 */
-						int global_reserved_left = screen_w - (int)right;
+						int global_reserved_left = scrw - (int)right;
 						int overlap = (mx + mw) - global_reserved_left;
 						int reserve = MAX(0, overlap);
 						if (reserve > 0)
@@ -2425,7 +2422,7 @@ static void update_struts(void)
 						   overlap = (my + mh) - global_reserved_top;
 						   reserve_bottom = MAX(0, overlap)
 						 */
-						int global_reserved_top = screen_h - (int)bottom;
+						int global_reserved_top = scrh - (int)bottom;
 						int overlap = (my + mh) - global_reserved_top;
 						int reserve = MAX(0, overlap);
 						if (reserve > 0)
@@ -2446,14 +2443,14 @@ static void update_workarea(void)
 {
 	long workarea[4 * MAX_MONITORS];
 
-	for (int i = 0; i < n_mons && i < MAX_MONITORS; i++) {
+	for (int i = 0; i < mon_cnt && i < MAX_MONITORS; i++) {
 		workarea[i * 4 + 0] = mons[i].x + mons[i].res.left;
 		workarea[i * 4 + 1] = mons[i].y + mons[i].res.top;
 		workarea[i * 4 + 2] = mons[i].w - mons[i].res.left - mons[i].res.right;
 		workarea[i * 4 + 3] = mons[i].h - mons[i].res.top - mons[i].res.bottom;
 	}
 
-	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, n_mons * 4);
+	XChangeProperty(dpy, root, atoms[ATOM_NET_WORKAREA], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)workarea, mon_cnt * 4);
 }
 
 static void warp_cursor(Client* c)
