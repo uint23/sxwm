@@ -173,6 +173,9 @@ static const char *atom_names[ATOM_COUNT] = {
 Cursor cursor_normal;
 Cursor cursor_move;
 Cursor cursor_resize;
+/* NEW: per-edge / per-corner resize cursors */
+Cursor cursor_resize_l, cursor_resize_r, cursor_resize_t, cursor_resize_b;
+Cursor cursor_resize_tl, cursor_resize_tr, cursor_resize_bl, cursor_resize_br;
 
 Client *workspaces[NUM_WORKSPACES] = {NULL};
 Config user_config;
@@ -207,6 +210,7 @@ int scr_height;
 int open_windows = 0;
 int drag_start_x, drag_start_y;
 int drag_orig_x, drag_orig_y, drag_orig_w, drag_orig_h;
+int resize_edge = 0;   /* 1=left 2=right 4=top 8=bottom */
 
 int reserve_left = 0;
 int reserve_right = 0;
@@ -924,8 +928,32 @@ void hdl_button(XEvent *xev)
 
 		if (c->fixed && xbutton->button == right_click)
 			return;
+		Cursor cursor = cursor_move;
+		resize_edge = 0;
+    if (xbutton->button == right_click) {
+    int outer_w = c->w + 2 * user_config.border_width;
+    int outer_h = c->h + 2 * user_config.border_width;
+    int rel_x = xbutton->x_root - (c->x - user_config.border_width);
+    int rel_y = xbutton->y_root - (c->y - user_config.border_width);
 
-		Cursor cursor = (xbutton->button == left_click) ? cursor_move : cursor_resize;
+    if (rel_x < outer_w / 2)
+        resize_edge |= 1;
+    else
+        resize_edge |= 2;
+
+    if (rel_y < outer_h / 2)
+        resize_edge |= 4;
+    else
+        resize_edge |= 8;
+
+    switch (resize_edge) {
+        case 1|4: cursor = cursor_resize_tl; break;
+        case 2|4: cursor = cursor_resize_tr; break;
+        case 1|8: cursor = cursor_resize_bl; break;
+        case 2|8: cursor = cursor_resize_br; break;
+    }
+}
+
 		XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
 				     GrabModeAsync, GrabModeAsync, None, cursor, CurrentTime);
 
@@ -963,6 +991,7 @@ void hdl_button_release(XEvent *xev)
 	drag_mode = DRAG_NONE;
 	drag_client = NULL;
 	swap_target = NULL;
+	resize_edge = 0;
 }
 
 void hdl_client_msg(XEvent *xev)
@@ -1482,17 +1511,80 @@ void hdl_motion(XEvent *xev)
 	else if (drag_mode == DRAG_RESIZE) {
 		int dx = motion_ev->x_root - drag_start_x;
 		int dy = motion_ev->y_root - drag_start_y;
-		int nw = drag_orig_w + dx;
-		int nh = drag_orig_h + dy;
 
-		/* clamp relative to this mon */
-		int max_w = (current_mon_motion->w - (drag_client->x - current_mon_motion->x));
-		int max_h = (current_mon_motion->h - (drag_client->y - current_mon_motion->y));
+		int nx = drag_orig_x;
+		int ny = drag_orig_y;
+		int nw = drag_orig_w;
+		int nh = drag_orig_h;
 
-		drag_client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
-		drag_client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
+		/* Horizontal: left moves x AND shrinks w; right only grows w */
+		if (resize_edge & 1) {
+			nx = drag_orig_x + dx;
+			nw = drag_orig_w - dx;
+		}
+		else if (resize_edge & 2) {
+			nw = drag_orig_w + dx;
+		}
 
-		XResizeWindow(dpy, drag_client->win, drag_client->w, drag_client->h);
+		/* Vertical: top moves y AND shrinks h; bottom only grows h */
+		if (resize_edge & 4) {
+			ny = drag_orig_y + dy;
+			nh = drag_orig_h - dy;
+		}
+		else if (resize_edge & 8) {
+			nh = drag_orig_h + dy;
+		}
+
+		/* Enforce minimum size, keeping opposite edge anchored */
+		if (nw < MIN_WINDOW_SIZE) {
+			if (resize_edge & 1)
+				nx = drag_orig_x + drag_orig_w - MIN_WINDOW_SIZE;
+			nw = MIN_WINDOW_SIZE;
+		}
+		if (nh < MIN_WINDOW_SIZE) {
+			if (resize_edge & 4)
+				ny = drag_orig_y + drag_orig_h - MIN_WINDOW_SIZE;
+			nh = MIN_WINDOW_SIZE;
+		}
+
+		/* Clamp to monitor work area (struts respected) */
+		int wa_x = current_mon_motion->x + mons[mon].reserve_left;
+		int wa_y = current_mon_motion->y + mons[mon].reserve_top;
+		int wa_w = current_mon_motion->w
+		         - mons[mon].reserve_left - mons[mon].reserve_right;
+		int wa_h = current_mon_motion->h
+		         - mons[mon].reserve_top  - mons[mon].reserve_bottom;
+
+		if (resize_edge & 1) {           /* growing leftwards past edge */
+			if (nx < wa_x) {
+				nw -= (wa_x - nx);
+				nx  = wa_x;
+			}
+		}
+		if (resize_edge & 4) {           /* growing upwards past edge */
+			if (ny < wa_y) {
+				nh -= (wa_y - ny);
+				ny  = wa_y;
+			}
+		}
+		if (resize_edge & 2) {           /* growing rightwards past edge */
+			if (nx + nw > wa_x + wa_w)
+				nw = wa_x + wa_w - nx;
+		}
+		if (resize_edge & 8) {           /* growing downwards past edge */
+			if (ny + nh > wa_y + wa_h)
+				nh = wa_y + wa_h - ny;
+		}
+
+		if (nw < MIN_WINDOW_SIZE) nw = MIN_WINDOW_SIZE;
+		if (nh < MIN_WINDOW_SIZE) nh = MIN_WINDOW_SIZE;
+
+		drag_client->x = nx;
+		drag_client->y = ny;
+		drag_client->w = nw;
+		drag_client->h = nh;
+
+		XMoveResizeWindow(dpy, drag_client->win, nx, ny, nw, nh);
 	}
 }
 
@@ -1898,6 +1990,14 @@ void quit(void)
 	XFreeCursor(dpy, cursor_move);
 	XFreeCursor(dpy, cursor_normal);
 	XFreeCursor(dpy, cursor_resize);
+	XFreeCursor(dpy, cursor_resize_l);
+	XFreeCursor(dpy, cursor_resize_r);
+	XFreeCursor(dpy, cursor_resize_t);
+	XFreeCursor(dpy, cursor_resize_b);
+	XFreeCursor(dpy, cursor_resize_tl);
+	XFreeCursor(dpy, cursor_resize_tr);
+	XFreeCursor(dpy, cursor_resize_bl);
+	XFreeCursor(dpy, cursor_resize_br);
 	XCloseDisplay(dpy);
 	puts("quitting...");
 	running = False;
@@ -2232,6 +2332,16 @@ void setup(void)
 	cursor_normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
 	cursor_move = XcursorLibraryLoadCursor(dpy, "fleur");
 	cursor_resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
+
+	cursor_resize_l  = XcursorLibraryLoadCursor(dpy, "left_side");
+	cursor_resize_r  = XcursorLibraryLoadCursor(dpy, "right_side");
+	cursor_resize_t  = XcursorLibraryLoadCursor(dpy, "top_side");
+	cursor_resize_b  = XcursorLibraryLoadCursor(dpy, "bottom_side");
+	cursor_resize_tl = XcursorLibraryLoadCursor(dpy, "top_left_corner");
+	cursor_resize_tr = XcursorLibraryLoadCursor(dpy, "top_right_corner");
+	cursor_resize_bl = XcursorLibraryLoadCursor(dpy, "bottom_left_fcorner");
+	cursor_resize_br = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
+
 	XDefineCursor(dpy, root, cursor_normal);
 
 	scr_width = XDisplayWidth(dpy, DefaultScreen(dpy));
@@ -3434,4 +3544,3 @@ int main(int ac, char **av)
 	run();
 	return EXIT_SUCCESS;
 }
-
