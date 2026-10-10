@@ -2159,143 +2159,67 @@ static void update_net_client_list(void)
 
 static void update_struts(void)
 {
-	/* reset all reserves */
-	for (int i = 0; i < mon_cnt; i++) {
-		mons[i].res.left   = 0;
-		mons[i].res.right  = 0;
-		mons[i].res.top    = 0;
-		mons[i].res.bottom = 0;
-	}
+	for (int i = 0; i < mon_cnt; i++)
+		memset(&mons[i].res, 0, sizeof(mons[i].res));
 
-	Window root_ret;
-	Window parent_ret;
-	Window* children = NULL;
-	unsigned int n_children = 0;
+	Window root_ret, parent_ret, *children = NULL;
+	unsigned int count = 0;
 
-	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &n_children))
+	if (!XQueryTree(dpy, root, &root_ret, &parent_ret, &children, &count))
 		return;
 
-	for (unsigned int i = 0; i < n_children; i++) {
-		Window w = children[i];
-
-		if (get_window_type(w) != WINDOW_DOCK)
+	for (unsigned int i = 0; i < count; i++) {
+		if (get_window_type(children[i]) != WINDOW_DOCK)
 			continue;
 
+		Atom type;
+		int format;
+		unsigned long len, rem;
 		long* str = NULL;
-		Atom actual;
-		int sfmt;
-		unsigned long len;
-		unsigned long rem;
 
-		if (XGetWindowProperty(dpy, w, atoms[ATOM_NET_WM_STRUT_PARTIAL], 0, 12, False, XA_CARDINAL,
-					&actual, &sfmt, &len, &rem,
-					(unsigned char **)&str) == Success && str && len >= 12) {
+		int status = XGetWindowProperty(
+			dpy, children[i], atoms[ATOM_NET_WM_STRUT_PARTIAL], 0, 12,
+			False, XA_CARDINAL, &type, &format, &len, &rem, (unsigned char**)&str
+		);
 
-			/*
-			 ewmh:
-			 [0] left, [1] right, [2] top, [3] bottom
-			 
-			 [4] left_start_y,   [5] left_end_y
-			 [6] right_start_y,  [7] right_end_y
-			 [8] top_start_x,    [9] top_end_x
-			 [10] bottom_start_x,[11] bottom_end_x
-			 
-			 all coords are in root space.
-			 */
-			long left = str[0];
-			long right = str[1];
-			long top = str[2];
-			long bottom = str[3];
-			long left_start_y = str[4];
-			long left_end_y = str[5];
-			long right_start_y = str[6];
-			long right_end_y = str[7];
-			long top_start_x = str[8];
-			long top_end_x = str[9];
-			long bot_start_x = str[10];
-			long bot_end_x = str[11];
+		if (status != Success || !str || type != XA_CARDINAL ||
+		    format != 32 || len < 12) {
+			if (str)
+				XFree(str);
+			continue;
+		}
 
-			XFree(str);
+		for (int m = 0; m < mon_cnt; m++) {
+			Monitor* mon = &mons[m];
+			int* res[] = {
+				&mon->res.left, &mon->res.right,
+				&mon->res.top, &mon->res.bottom
+			};
 
-			/* skip empty struts */
-			if (!left && !right && !top && !bottom)
-				continue;
+			for (int j = 0; j < 4; j++) {
+				if (str[j] <= 0)
+					continue;
 
-			for (int m = 0; m < mon_cnt; m++) {
-				int mx = mons[m].x;
-				int my = mons[m].y;
-				int mw = mons[m].w;
-				int mh = mons[m].h;
+				int vertical = j < 2;
+				long start = vertical ? mon->y : mon->x;
+				long extent = vertical ? mon->h : mon->w;
 
-				/* strip monitors whose vertical span dostn intersect */
-				if (left > 0) {
-					long span_start = left_start_y;
-					long span_end   = left_end_y;
-					if (span_end >= my && span_start <= my + mh - 1) {
-						/*
-						 left is distance from root left edge to reserved area
-						 to map to mon, the portion is:
-						     reserve_left = MAX(0, left - mx)
-						 */
-						int reserve = (int)MAX(0, left - mx);
-						if (reserve > 0)
-							mons[m].res.left = MAX(mons[m].res.left, reserve);
-					}
-				}
+				if (str[4 + j * 2] > start + extent - 1 ||
+				    str[5 + j * 2] < start)
+					continue;
 
-				if (right > 0) {
-					long span_start = right_start_y;
-					long span_end   = right_end_y;
-					if (span_end >= my && span_start <= my + mh - 1) {
-						/*
-						 right is distance from root right edge to reserved area:
-						     right edge = screen_w
-							 mons right edge = mx + mw
-							 amount that cuts into monitor = MAX(0, (screen_w - right) - mx)
-						 */
-						int global_reserved_left = scrw - (int)right;
-						int overlap = (mx + mw) - global_reserved_left;
-						int reserve = MAX(0, overlap);
-						if (reserve > 0)
-							mons[m].res.right = MAX(mons[m].res.right, reserve);
-					}
-				}
+				long pos = vertical ? mon->x : mon->y;
+				long size = vertical ? mon->w : mon->h;
+				long screen = vertical ? scrw : scrh;
 
-				if (top > 0) {
-					long span_start = top_start_x;
-					long span_end   = top_end_x;
-					if (span_end >= mx && span_start <= mx + mw - 1) {
-						/*
-						 top is distance from root top to reserved area
-							 mons top is at my, amount eaten:
-							 reserve_top = MAX(0, top - my)
-						 */
-						int reserve = (int)MAX(0, top - my);
-						if (reserve > 0)
-							mons[m].res.top = MAX(mons[m].res.top, reserve);
-					}
-				}
+				long reserve = (j & 1) ? (pos + size - (screen - str[j])) : (str[j] - pos);
 
-				if (bottom > 0) {
-					long span_start = bot_start_x;
-					long span_end   = bot_end_x;
-					if (span_end >= mx && span_start <= mx + mw - 1) {
-						/*
-						 bottom is distance from root bottom to reserved area
-						 global_reserved_top = screen_h - bottom;
-						 overlap to mon:
-						   overlap = (my + mh) - global_reserved_top;
-						   reserve_bottom = MAX(0, overlap)
-						 */
-						int global_reserved_top = scrh - (int)bottom;
-						int overlap = (my + mh) - global_reserved_top;
-						int reserve = MAX(0, overlap);
-						if (reserve > 0)
-							mons[m].res.bottom = MAX(mons[m].res.bottom, reserve);
-					}
-				}
+				if (reserve > *res[j])
+					*res[j] = (int)(reserve > size ? size : reserve);
 			}
 		}
+
+		XFree(str);
 	}
 
 	if (children)
