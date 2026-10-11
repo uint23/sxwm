@@ -39,7 +39,7 @@ enum {
 };
 
 typedef enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE } DragMode;
-typedef enum { LIST_TILED, LIST_FLOATING, LIST_COUNT } ListType;
+typedef enum { LIST_TILED, LIST_FLOATING, LIST_PINNED, LIST_COUNT } ListType;
 typedef enum { WINDOW_NORMAL, WINDOW_FLOAT, WINDOW_DOCK } WindowType;
 typedef enum { UP, DOWN, LEFT, RIGHT } Direction;
 typedef void (*EventHandler)(XEvent*);
@@ -92,7 +92,7 @@ struct WorkspaceRule {
 struct Config {
 	int modkey, gaps, border_width, motion_throttle, resize_master_amt;
 	int snap_distance, n_binds, move_window_amt, resize_window_amt;
-	long border_foc_col, border_ufoc_col;
+	long border_foc_col, border_ufoc_col, border_pin_col;
 	float master_width[MAX_MONITORS];
 	char* should_float[MAX_ITEMS], *start_fullscreen[MAX_ITEMS], *to_run[MAX_ITEMS];
 	Bool new_win_focus ,warp_cursor ,floating_on_top ,new_win_master;
@@ -189,6 +189,7 @@ void toggle_floating(void);
 void toggle_floating_global(void);
 void toggle_fullscreen(void);
 void toggle_monocle(void);
+void toggle_pin(void);
 
 #endif /* COMMON_H */
 

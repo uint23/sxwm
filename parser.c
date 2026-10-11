@@ -61,6 +61,7 @@ static const CommandEntry call_table[] = {
 	{ "switch_previous_workspace", switch_previous_workspace },
 	{ "toggle_floating",           toggle_floating },
 	{ "toggle_monocle",            toggle_monocle },
+	{ "toggle_pin",                toggle_pin },
 	{ NULL, NULL },
 };
 
@@ -73,6 +74,7 @@ static const Option options[] = {
 	{ "move_window_amount",       offsetof(Config, move_window_amt), OPT_INT },
 	{ "new_win_focus",            offsetof(Config, new_win_focus), OPT_BOOL },
 	{ "new_win_master",           offsetof(Config, new_win_master), OPT_BOOL },
+	{ "pinned_border_colour",     offsetof(Config, border_pin_col), OPT_COLOR },
 	{ "resize_master_amount",     offsetof(Config, resize_master_amt), OPT_INT },
 	{ "resize_window_amount",     offsetof(Config, resize_window_amt), OPT_INT },
 	{ "snap_distance",            offsetof(Config, snap_distance), OPT_INT },

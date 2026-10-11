@@ -1,6 +1,7 @@
 # Colour Themes:
 focused_border_colour    : #000000
 unfocused_border_colour  : #444444
+pinned_border_colour     : #ffb000
 
 # General Options:
 gaps                    : 5
@@ -73,6 +74,7 @@ call : mod + space : toggle_floating
 call : mod + shift + space : global_floating
 call : mod + shift + f : fullscreen
 call : mod + m : toggle_monocle
+call : mod + shift + p : toggle_pin
 
 # Reload Config
 call : mod + r : reload_config

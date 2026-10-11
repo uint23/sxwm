@@ -102,6 +102,7 @@ static int other_wm_err(Display* d, XErrorEvent* ee);
 static void prepend_client(ClientList* list, Client* c);
 /* void quit(void); */
 static void raise_client(Client* c);
+static void raise_pinned(Client* top);
 /* void reload_config(void); */
 static void resize_master(int amount);
 /* void resize_master_add(void); */
@@ -122,13 +123,14 @@ static void setup(void);
 static void setup_atoms(void);
 static int snap_coordinate(int pos, int size, int screen_size, int snap_dist);
 static void spawn(const char* cmd);
-static void switch_client_list(Client* c, Bool floating);
+static void switch_client_list(Client* c, ListType type);
 /* void switch_previous_workspace(void); */
 static void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
 /* void toggle_monocle(void); */
+/* void toggle_pin(void); */
 static void unlink_client(Client* c);
 static void update_borders(void);
 static void update_modifier_masks(void);
@@ -540,19 +542,19 @@ static void focus_cycle(int dir)
 	ClientList* lists = workspaces[ws_cur].lists;
 	Client* start = get_focused();
 	if (!start)
-		start = lists[LIST_TILED].head ? lists[LIST_TILED].head : lists[LIST_FLOATING].head;
+		for (int i = 0; i < LIST_COUNT && !start; i++)
+			start = lists[i].head;
 	if (!start)
 		return;
 
 	Client* c = start;
 	do {
-		ClientList* list = c->list;
-		ClientList* other = &lists[is_floating(c) ? LIST_TILED : LIST_FLOATING];
+		int type = c->list->type;
 		c = dir > 0 ? c->next : c->prev;
-		if (!c)
-			c = dir > 0 ? other->head : other->tail;
-		if (!c)
+		for (int i = 1; !c && i <= LIST_COUNT; i++) {
+			ClientList* list = &lists[(type + (dir > 0 ? i : LIST_COUNT - i)) % LIST_COUNT];
 			c = dir > 0 ? list->head : list->tail;
+		}
 	} while (c != start && (!c->mapped || c->mon != mon_cur));
 
 	if (c->mapped && c->mon == mon_cur)
@@ -783,6 +785,7 @@ static void init_defaults(void)
 	cfg.border_width = 1;
 	cfg.border_foc_col = parse_col("#c0cbff");
 	cfg.border_ufoc_col = parse_col("#555555");
+	cfg.border_pin_col = parse_col("#ffb000");
 	cfg.move_window_amt = 10;
 	cfg.resize_window_amt = 10;
 
@@ -801,7 +804,7 @@ static void init_defaults(void)
 
 static Bool is_floating(Client* c)
 {
-	return c && c->list && c->list->type == LIST_FLOATING;
+	return c && c->list && c->list->type != LIST_TILED;
 }
 
 static Bool is_timestamp_event(Display* d, XEvent* ev, XPointer arg)
@@ -889,7 +892,7 @@ static void move_to_workspace(Client* c, int ws)
 	if (from_ws == ws_cur && c->mapped)
 		XUnmapWindow(dpy, c->win);
 
-	ClientList* list = &workspaces[ws].lists[is_floating(c) ? LIST_FLOATING : LIST_TILED];
+	ClientList* list = &workspaces[ws].lists[c->list->type];
 	move_client(list, c);
 
 	if (ws == ws_cur && c->mapped)
@@ -1104,6 +1107,8 @@ static void on_config_req(XEvent* xev)
 
 	if (!c) {
 		XConfigureWindow(dpy, ev->window, ev->value_mask, &wc);
+		if (ev->value_mask & CWStackMode)
+			raise_pinned(NULL);
 		return;
 	}
 
@@ -1112,8 +1117,10 @@ static void on_config_req(XEvent* xev)
 		mask &= ~CWSibling;
 	if (mask)
 		XConfigureWindow(dpy, c->win, mask, &wc);
-	if (mask & CWStackMode)
+	if (mask & CWStackMode) {
+		raise_pinned(c);
 		update_net_client_list_stacking();
+	}
 
 	XWindowAttributes wa;
 	if (!XGetWindowAttributes(dpy, c->win, &wa))
@@ -1562,7 +1569,18 @@ static void raise_client(Client* c)
 			if (f->mapped)
 				XRaiseWindow(dpy, f->win);
 
+	raise_pinned(c);
 	update_net_client_list_stacking();
+}
+
+static void raise_pinned(Client* top)
+{
+	ClientList* list = &workspaces[ws_cur].lists[LIST_PINNED];
+	for (Client* c = list->head; c; c = c->next)
+		if (c->mapped && c != top)
+			XRaiseWindow(dpy, c->win);
+	if (top && top->mapped && top->list == list)
+		XRaiseWindow(dpy, top->win);
 }
 
 static void resize_master(int amount)
@@ -1893,19 +1911,18 @@ static void spawn(const char* cmd)
 		wlog("Could not fork: %s", strerror(errno));
 }
 
-static void switch_client_list(Client* c, Bool floating)
+static void switch_client_list(Client* c, ListType type)
 {
-	if (!c || is_floating(c) == floating)
+	if (!c || c->list->type == type)
 		return;
 
 	if (c->fullscreen)
 		apply_fullscreen(c, False);
 
 	Workspace* ws = c->list->workspace;
-	ClientList* list = &ws->lists[floating ? LIST_FLOATING : LIST_TILED];
-	move_client(list, c);
+	move_client(&ws->lists[type], c);
 
-	if (floating) {
+	if (type != LIST_TILED) {
 		XWindowAttributes wa;
 		if (XGetWindowAttributes(dpy, c->win, &wa)) {
 			c->x = wa.x;
@@ -1992,6 +2009,11 @@ static void tile(void)
 	Client* focused = get_focused();
 	if (workspaces[ws_cur].monocle && focused && focused->mapped)
 		raise_client(focused);
+	else {
+		raise_pinned(focused);
+		if (workspaces[ws_cur].lists[LIST_PINNED].head)
+			update_net_client_list_stacking();
+	}
 
 	update_borders();
 }
@@ -2003,7 +2025,7 @@ void toggle_floating(void)
 		return;
 
 	Bool floating = !is_floating(c);
-	switch_client_list(c, floating);
+	switch_client_list(c, floating ? LIST_FLOATING : LIST_TILED);
 
 	tile();
 	if (floating)
@@ -2017,7 +2039,7 @@ void toggle_floating_global(void)
 	ClientList* source = &workspaces[ws_cur].lists[floating ? LIST_TILED : LIST_FLOATING];
 
 	while (source->head)
-		switch_client_list(source->head, floating);
+		switch_client_list(source->head, floating ? LIST_FLOATING : LIST_TILED);
 
 	tile();
 }
@@ -2035,6 +2057,17 @@ void toggle_monocle(void)
 {
 	workspaces[ws_cur].monocle = !workspaces[ws_cur].monocle;
 	tile();
+}
+
+void toggle_pin(void)
+{
+	Client* c = get_focused();
+	if (!c || !c->mapped)
+		return;
+
+	switch_client_list(c, c->list->type == LIST_PINNED ? LIST_FLOATING : LIST_PINNED);
+	tile();
+	set_input_focus(c, True, False);
 }
 
 static void unlink_client(Client* c)
@@ -2065,7 +2098,8 @@ static void update_borders(void)
 
 	for (int i = 0; i < LIST_COUNT; i++)
 		for (Client* c = workspaces[ws_cur].lists[i].head; c; c = c->next)
-			XSetWindowBorder(dpy, c->win, c == focused ? cfg.border_foc_col : cfg.border_ufoc_col);
+			XSetWindowBorder(dpy, c->win, i == LIST_PINNED ? cfg.border_pin_col :
+			                 c == focused ? cfg.border_foc_col : cfg.border_ufoc_col);
 }
 
 static void update_modifier_masks(void)
