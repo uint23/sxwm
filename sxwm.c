@@ -1156,8 +1156,11 @@ static void on_config_req(XEvent* xev)
 static void on_destroy_ntf(XEvent* xev)
 {
 	Client* c = find_client(xev->xdestroywindow.window);
-	if (!c)
+	if (!c) {
+		if (xev->xdestroywindow.event == root)
+			tile(); /* dock removed ? */
 		return;
+	}
 
 	int ws = get_client_workspace(c);
 	Bool was_focused = workspaces[ws].focused == c;
@@ -1206,7 +1209,7 @@ static void on_keypress(XEvent* xev)
 			switch (bind->type) {
 				case TYPE_CMD: spawn(bind->action.cmd); break;
 				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
-				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); update_net_client_list(); break;
+				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); break;
 				case TYPE_WS_MOVE: move_to_workspace(get_focused(), bind->action.ws); break;
 			}
 			return;
@@ -1235,16 +1238,17 @@ static void on_map_req(XEvent* xev)
 			return;
 
 		XMapWindow(dpy, w);
+		tile();
 		if (cfg.new_win_focus)
 			set_input_focus(c, True, True);
-		else
-			update_borders();
 		return;
 	}
 
 	WindowType type = get_window_type(w);
 	if (type == WINDOW_DOCK) {
+		select_input(w, PropertyChangeMask);
 		XMapWindow(dpy, w);
+		tile();
 		return;
 	}
 
@@ -1406,11 +1410,10 @@ static void on_property_ntf(XEvent* xev)
 				XFree(val);
 			}
 		}
-		else if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL]) {
-			update_struts();
-			tile();
-		}
 	}
+
+	if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL] && property_ev->window != root && get_window_type(property_ev->window) == WINDOW_DOCK)
+		tile();
 
 	/* client window properties */
 	if (property_ev->atom == atoms[ATOM_NET_WM_STATE]) {
@@ -1428,7 +1431,12 @@ static void on_unmap_ntf(XEvent* xev)
 {
 	XUnmapEvent* ev = &xev->xunmap;
 	Client* c = find_client(ev->window);
-	if (!c || (ev->event != c->win && !ev->send_event))
+	if (!c) {
+		if (ev->event == root && get_window_type(ev->window) == WINDOW_DOCK)
+			tile();
+		return;
+	}
+	if (ev->event != c->win && !ev->send_event)
 		return;
 
 	if (!c->mapped)
@@ -1545,14 +1553,12 @@ void reload_config(void)
 			for (Client* c = workspaces[ws].lists[i].head; c; c = c->next) {
 				grab_button(Button1, None, c->win, False, ButtonPressMask);
 				grab_button(Button1, cfg.modkey, c->win, False, ButtonPressMask);
-				grab_button(Button2, cfg.modkey, c->win, False, ButtonPressMask);
+				grab_button(Button3, cfg.modkey, c->win, False, ButtonPressMask);
 			}
 		}
 	}
 
-	update_net_client_list();
 	XSync(dpy, False);
-
 	tile();
 }
 
@@ -1832,7 +1838,6 @@ static void setup(void)
 	evtable[MotionNotify] = on_motion;
 	evtable[PropertyNotify] = on_property_ntf;
 	evtable[UnmapNotify] = on_unmap_ntf;
-	scan_existing_windows();
 
 	for (int i = 0; i < NUM_WORKSPACES; i++) {
 		Workspace* ws = &workspaces[i];
@@ -1842,6 +1847,7 @@ static void setup(void)
 			ws->lists[j].type = (ListType)j;
 		}
 	}
+	scan_existing_windows();
 }
 
 static void setup_atoms(void)
@@ -2208,7 +2214,9 @@ static void update_struts(void)
 	}
 
 	for (unsigned int i = 0; i < cnt; i++) {
-		if (get_window_type(children[i]) != WINDOW_DOCK)
+		XWindowAttributes wa;
+		if (!XGetWindowAttributes(dpy, children[i], &wa) ||
+		    wa.map_state != IsViewable || get_window_type(children[i]) != WINDOW_DOCK)
 			continue;
 
 		Atom type;
