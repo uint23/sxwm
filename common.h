@@ -3,7 +3,7 @@
 
 #include <X11/Xlib.h>
 
-#define SXWM_VERSION "sxwm ver. 1.8"
+#define SXWM_VERSION "sxwm ver. 1.9"
 #define SXWM_AUTHOR "(C) uint 2024-2026"
 #define SXWM_LICINFO "See LICENSE for more info"
 

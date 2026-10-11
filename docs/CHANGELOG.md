@@ -2,24 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
-#### v1.8 (git)
+#### v1.9 (git)
+
+#### v1.8 (current)
+- **NEW**: Window pinning
+- **NEW**: Improved support for docks
 - **NEW**: POSIX compliant Makefile
 - **NEW**: Single window gaps patch (@Dragon-Chicken)
-- **NEW**: Per-workspace focus
-- **CHANGE**: Removed legacy Makefile bloat
-- **CHANGE**: Parser refactored
-- **CHANGE**: Removed wordexp dependency for simpler command parsing
-- **CHANGE**: Code style updated
-- **FIX**: Monocle layout not raising focused window
-- **FIX**: Monocle layout tiling floating windows
-- **FIX**: Fullscreen windows breaking tiling for new windows
-- **FIX**: Closing window focuses master instead of previous window
-- **FIX**: Strut handling for docks and panels
-- **FIX**: `centre_window` now accounts for border width
-- **FIX**: Typos in default config causing unknown function errors
-- **FIX**: General hardening
+- **CHANGE**: Removed maximum window limit
+- **CHANGE**: Commands now exec through sh
+- **CHANGE**: Swapped default `focus_next` and `focus_prev` keybinds
+- **CHANGE**: Simplified parser
+- **REMOVE**: Scratchpads
+- **REMOVE**: Window swallowing
+- **REMOVE**: Mouse window swapping
+- **REMOVE**: Stack window resizing
+- **REMOVE**: Obsolete docs
+- **REMOVE**: wordexp dependency
+- **FIX**: Window snapping, moving, resizing, centering respect desktop space
+- **FIX**: Workspace switching causing flickering, "zombie" windows
+- **FIX**: Behaviour for dialogs and transient windows
+- **FIX**: Monocle layout floating, focused windows
+- **FIX**: Dock and panel reserve screen space
+- **FIX**: Existing windows not being managed correctly on startup
+- **FIX**: Window layouts not updating correctly when windows are remapped
+- **FIX**: Mouse resize breaks after reloading config
+- **FIX**: Window geometry requests not being handled properly
+- **FIX**: General stability and compatibility improvements
 
-#### v1.7 (current)
+#### v1.7
 - **NEW**: Monocle layout
 - **NEW**: Developer documentation
 - **NEW**: `_NET_FRAME_EXTENTS` support
