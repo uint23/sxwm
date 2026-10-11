@@ -583,9 +583,10 @@ static void focus_mon(int dir)
 			}
 
 	mon_cur = target;
+	Monitor* m = &mons[target];
 	XWarpPointer(dpy, None, root, 0, 0, 0, 0,
-	             mons[target].x + mons[target].w / 2,
-	             mons[target].y + mons[target].h / 2);
+	             m->x + m->res.left + (m->w - m->res.left - m->res.right) / 2,
+	             m->y + m->res.top + (m->h - m->res.top - m->res.bottom) / 2);
 	XSync(dpy, False);
 }
 
@@ -940,6 +941,7 @@ static void move_win(Direction dir)
 	}
 
 	XMoveWindow(dpy, c->win, c->x, c->y);
+	c->mon = get_monitor_for_point(get_window_center(c));
 }
 
 void move_win_down(void)
@@ -1332,21 +1334,13 @@ static void on_motion(XEvent* xev)
 
 	last_motion_time = motion_ev->time;
 
-	/* figure out which monitor the pointer is in right now */
-	int mon = 0;
-	for (int i = 0; i < mon_cnt; i++) {
-		Bool is_mon_cur =
-			motion_ev->x_root >= mons[i].x &&
-			motion_ev->x_root < mons[i].x + mons[i].w &&
-			motion_ev->y_root >= mons[i].y &&
-			motion_ev->y_root < mons[i].y + mons[i].h;
-
-		if (is_mon_cur) {
-			mon = i;
-			break;
-		}
-	}
-	Monitor* mon_cur_motion = &mons[mon];
+	int mon = drag.mode == DRAG_RESIZE ? drag.client->mon :
+	          get_monitor_for_point((Point){ motion_ev->x_root, motion_ev->y_root });
+	Monitor* m = &mons[mon];
+	int left = m->x + m->res.left;
+	int top = m->y + m->res.top;
+	int right = m->x + m->w - m->res.right;
+	int bottom = m->y + m->h - m->res.bottom;
 
 	if (drag.mode == DRAG_MOVE) {
 		int dx = motion_ev->x_root - drag.sx;
@@ -1357,15 +1351,8 @@ static void on_motion(XEvent* xev)
 		int outer_w = drag.client->w + 2 * cfg.border_width;
 		int outer_h = drag.client->h + 2 * cfg.border_width;
 
-		/* snap relative to this mons bounds: */
-		int rel_x = nx - mon_cur_motion->x;
-		int rel_y = ny - mon_cur_motion->y;
-
-		rel_x = snap_coordinate(rel_x, outer_w, mon_cur_motion->w, cfg.snap_distance);
-		rel_y = snap_coordinate(rel_y, outer_h, mon_cur_motion->h, cfg.snap_distance);
-
-		nx = mon_cur_motion->x + rel_x;
-		ny = mon_cur_motion->y + rel_y;
+		nx = left + snap_coordinate(nx - left, outer_w, right - left, cfg.snap_distance);
+		ny = top + snap_coordinate(ny - top, outer_h, bottom - top, cfg.snap_distance);
 
 		if (!is_floating(drag.client) && (UDIST(nx, drag.client->x) > cfg.snap_distance ||
 			UDIST(ny, drag.client->y) > cfg.snap_distance)) {
@@ -1375,6 +1362,7 @@ static void on_motion(XEvent* xev)
 		XMoveWindow(dpy, drag.client->win, nx, ny);
 		drag.client->x = nx;
 		drag.client->y = ny;
+		drag.client->mon = mon;
 	}
 	else if (drag.mode == DRAG_RESIZE) {
 		int dx = motion_ev->x_root - drag.sx;
@@ -1382,9 +1370,9 @@ static void on_motion(XEvent* xev)
 		int nw = drag.ow + dx;
 		int nh = drag.oh + dy;
 
-		/* clamp relative to this mon */
-		int max_w = (mon_cur_motion->w - (drag.client->x - mon_cur_motion->x));
-		int max_h = (mon_cur_motion->h - (drag.client->y - mon_cur_motion->y));
+		int bw = 2 * cfg.border_width;
+		int max_w = MAX(MIN_WINDOW_SIZE, right - drag.client->x - bw);
+		int max_h = MAX(MIN_WINDOW_SIZE, bottom - drag.client->y - bw);
 
 		drag.client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
 		drag.client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
@@ -1616,7 +1604,7 @@ static void resize_win(Direction dir)
 		break;
 	case RIGHT:
 		size = &c->w;
-		max = m->x + m->w - c->x;
+		max = m->x + m->w - m->res.right - c->x - 2 * cfg.border_width;
 		break;
 	case UP:
 		size = &c->h;
@@ -1625,7 +1613,7 @@ static void resize_win(Direction dir)
 		break;
 	case DOWN:
 		size = &c->h;
-		max = m->y + m->h - c->y;
+		max = m->y + m->h - m->res.bottom - c->y - 2 * cfg.border_width;
 		break;
 	default:
 		return;
@@ -1805,9 +1793,6 @@ static void setup(void)
 	cursors.resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
 	XDefineCursor(dpy, root, cursors.normal);
 
-	scrw = XDisplayWidth(dpy, DefaultScreen(dpy));
-	scrh = XDisplayHeight(dpy, DefaultScreen(dpy));
-
 	update_mons();
 	update_struts();
 	update_net_client_list();
@@ -1888,7 +1873,7 @@ static int snap_coordinate(int pos, int size, int screen_size, int snap_dist)
 {
 	if (UDIST(pos, 0) <= snap_dist)
 		return 0;
-	if (UDIST(pos + size, screen_size) <= snap_dist)
+	if (size <= screen_size && UDIST(pos + size, screen_size) <= snap_dist)
 		return screen_size - size;
 	return pos;
 }
