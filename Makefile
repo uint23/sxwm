@@ -1,7 +1,6 @@
 CC = cc
 
 PREFIX = /usr/local
-MANPREFIX = ${PREFIX}/share/man
 
 LIBS = -lX11 -lXinerama -lXcursor
 
@@ -23,15 +22,11 @@ install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
 	cp -f ${OUT} ${DESTDIR}${PREFIX}/bin/
 	chmod 755 ${DESTDIR}${PREFIX}/bin/sxwm
-	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-	cp -f docs/sxwm.1 ${DESTDIR}${MANPREFIX}/man1/
-	chmod 644 ${DESTDIR}${MANPREFIX}/man1/sxwm.1
 	mkdir -p ${DESTDIR}${PREFIX}/share
 	cp -f default_sxwmrc ${DESTDIR}${PREFIX}/share/sxwmrc
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/sxwm \
-	      ${DESTDIR}${MANPREFIX}/man1/sxwm.1 \
 	      ${DESTDIR}${PREFIX}/share/sxwmrc
 
 compile_flags:
