@@ -131,7 +131,6 @@ static void tile(void);
 /* void toggle_monocle(void); */
 static void unlink_client(Client* c);
 static void update_borders(void);
-static void update_client_desktop_properties(void);
 static void update_modifier_masks(void);
 static void update_mons(void);
 static void update_net_client_list(void);
@@ -421,7 +420,6 @@ static void change_workspace(int ws)
 	long desktop = ws_cur;
 	XChangeProperty(dpy, root, atoms[ATOM_NET_CURRENT_DESKTOP], XA_CARDINAL, 32,
 	                PropModeReplace, (unsigned char *)&desktop, 1);
-	update_client_desktop_properties();
 }
 
 static int clean_mask(int mask)
@@ -1552,7 +1550,6 @@ void reload_config(void)
 		}
 	}
 
-	update_client_desktop_properties();
 	update_net_client_list();
 	XSync(dpy, False);
 
@@ -2078,19 +2075,6 @@ static void update_borders(void)
 	for (int i = 0; i < LIST_COUNT; i++)
 		for (Client* c = workspaces[ws_cur].lists[i].head; c; c = c->next)
 			XSetWindowBorder(dpy, c->win, c == focused ? cfg.border_foc_col : cfg.border_ufoc_col);
-}
-
-static void update_client_desktop_properties(void)
-{
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (int i = 0; i < LIST_COUNT; i++) {
-			for (Client* c = workspaces[ws].lists[i].head; c; c = c->next) {
-				long desktop = ws;
-				XChangeProperty(dpy, c->win, atoms[ATOM_NET_WM_DESKTOP], XA_CARDINAL, 32,
-						        PropModeReplace, (unsigned char *)&desktop, 1);
-			}
-		}
-	}
 }
 
 static void update_modifier_masks(void)
