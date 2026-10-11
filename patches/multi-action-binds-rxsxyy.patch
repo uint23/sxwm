@@ -1,0 +1,258 @@
+Author: rax/rxsxyy
+Date: 2026-10-11
+Description: Allow multiple functions/commands per bind, separated by '&'
+Commit Version: 1bca1b4 (remove man references from Makefile)
+
+Adds chaining for 'bind' and 'call' lines in sxwmrc, e.g.
+"bind : mod + b : "firefox" & "st""
+Actions run from left to right. '&' inside quotes are part of the commands.
+
+---
+
+diff --git a/common.h b/common.h
+index 33e042d..4438ede 100644
+--- a/common.h
++++ b/common.h
+@@ -67,6 +67,7 @@ struct Binding {
+ 	KeyCode keycode;
+ 	Action action;
+ 	int type;
++	Binding *chain;
+ };
+ 
+ struct Client {
+diff --git a/parser.c b/parser.c
+index 77bbd56..95cb664 100644
+--- a/parser.c
++++ b/parser.c
+@@ -23,7 +23,10 @@ typedef struct {
+ 
+ static Binding* alloc_bind(Config* cfg, Binding bind);
+ static int append_rules(char** rules, char* value);
++static void free_chain(Binding* b);
++static char* next_action(char** pos);
+ static FILE* open_config(char* path, size_t size);
++static int parse_action(Binding* bind, const char* key, char* action, int line);
+ static void parse_binding(Config* cfg, const char* key, char* value, int line);
+ static unsigned parse_combo(const char* combo, Config* cfg, KeySym* keysym);
+ static KeySym parse_keysym(const char* key);
+@@ -89,6 +92,7 @@ static Binding* alloc_bind(Config* cfg, Binding bind)
+ 		if (b->mods == bind.mods && b->keysym == bind.keysym) {
+ 			if (b->type == TYPE_CMD)
+ 				free(b->action.cmd);
++			free_chain(b);
+ 			*b = bind;
+ 			return b;
+ 		}
+@@ -119,11 +123,27 @@ static int append_rules(char** rules, char* value)
+ 	return 0;
+ }
+ 
++
++static void free_chain(Binding* b)
++{
++	Binding* n = b->chain;
++	while (n) {
++		Binding* next = n->chain;
++		if (n->type == TYPE_CMD)
++			free(n->action.cmd);
++		free(n);
++		n = next;
++	}
++	b->chain = NULL;
++}
++
+ void free_config(Config* cfg)
+ {
+-	for (int i = 0; i < cfg->n_binds; i++)
++	for (int i = 0; i < cfg->n_binds; i++) {
+ 		if (cfg->binds[i].type == TYPE_CMD)
+ 			free(cfg->binds[i].action.cmd);
++		free_chain(&cfg->binds[i]);
++	}
+ 
+ 	for (int i = 0; i < MAX_ITEMS; i++) {
+ 		free(cfg->to_run[i]);
+@@ -134,6 +154,39 @@ void free_config(Config* cfg)
+ 	memset(cfg, 0, sizeof(*cfg));
+ }
+ 
++/* returns the next '&' separated action, ignoring '&' inside quotes. NULL when done */
++static char* next_action(char** pos)
++{
++	char* s = *pos;
++	if (!s)
++		return NULL;
++
++	char quote = '\0';
++	char* p;
++	for (p = s; *p; p++) {
++		if (quote) {
++			if (*p == quote)
++				quote = '\0';
++		}
++		else if (*p == '"' || *p == '\'') {
++			quote = *p;
++		}
++		else if (*p == '&') {
++			break;
++		}
++	}
++
++	if (*p) {
++		*p = '\0';
++		*pos = p + 1;
++	}
++	else {
++		*pos = NULL;
++	}
++
++	return strip(s);
++}
++
+ static FILE* open_config(char* path, size_t size)
+ {
+ 	const char* home = getenv("HOME");
+@@ -172,6 +225,31 @@ found:;
+ 	return f;
+ }
+ 
++static int parse_action(Binding* bind, const char* key, char* action, int line)
++{
++	if (!strcmp(key, "bind") && *action == '"') {
++		bind->type = TYPE_CMD;
++		bind->action.cmd = strdup(strip_quotes(action));
++		if (!bind->action.cmd) {
++			wlog("config:%d: failed to parse command '%s'", line, action);
++			return -1;
++		}
++		return 0;
++	}
++
++	bind->type = TYPE_FUNC;
++	for (int i = 0; call_table[i].name; i++) {
++		if (!strcmp(action, call_table[i].name)) {
++			bind->action.fn = call_table[i].fn;
++			return 0;
++		}
++	}
++
++	wlog("config:%d: unknown function '%s'", line, action);
++	return -1;
++}
++
++
+ static void parse_binding(Config* cfg, const char* key, char* value, int line)
+ {
+ 	char* action = strchr(value, ':');
+@@ -205,23 +283,32 @@ static void parse_binding(Config* cfg, const char* key, char* value, int line)
+ 		}
+ 		bind.action.ws = ws - 1;
+ 	}
+-	else if (!strcmp(key, "bind") && *action == '"') {
+-		bind.type = TYPE_CMD;
+-		bind.action.cmd = strdup(strip_quotes(action));
+-		if (!bind.action.cmd) {
+-			wlog("config:%d: failed to parse command '%s'", line, action);
+-			return;
+-		}
+-	}
+ 	else {
+-		bind.type = TYPE_FUNC;
+-		for (int i = 0; call_table[i].name; i++)
+-			if (!strcmp(action, call_table[i].name)) {
+-				bind.action.fn = call_table[i].fn;
+-				break;
++		char* pos = action;
++		Binding* tail = NULL;
++		for (char* seg = next_action(&pos); seg; seg = next_action(&pos)) {
++			if (!*seg)
++				continue;
++
++			Binding* act = tail ? calloc(1, sizeof(*act)) : &bind;
++			if (!act || parse_action(act, key, seg, line) < 0) {
++				if (!act)
++					wlog("config:%d: out of memory", line);
++				else if (act != &bind)
++					free(act);
++				if (bind.type == TYPE_CMD)
++					free(bind.action.cmd);
++				free_chain(&bind);
++				return;
+ 			}
+-		if (!bind.action.fn) {
+-			wlog("config:%d: unknown function '%s'", line, action);
++
++			if (tail)
++				tail->chain = act;
++			tail = act;
++		}
++
++		if (!tail) {
++			wlog("config:%d: %s missing action", line, key);
+ 			return;
+ 		}
+ 	}
+@@ -229,6 +316,7 @@ static void parse_binding(Config* cfg, const char* key, char* value, int line)
+ 	if (!alloc_bind(cfg, bind)) {
+ 		if (bind.type == TYPE_CMD)
+ 			free(bind.action.cmd);
++		free_chain(&bind);
+ 		wlog("config:%d: too many key bindings", line);
+ 	}
+ }
+diff --git a/sxwm.c b/sxwm.c
+index e9516a0..be221bd 100644
+--- a/sxwm.c
++++ b/sxwm.c
+@@ -113,6 +113,7 @@ static void resize_win(Direction dir);
+ /* void resize_win_right(void); */
+ /* void resize_win_up(void); */
+ static void run(void);
++static void run_action(Binding* bind);
+ static void scan_existing_windows(void);
+ static void select_input(Window w, Mask masks);
+ static void send_wm_take_focus(Window w, Time time);
+@@ -1215,12 +1216,20 @@ static void on_keypress(XEvent* xev)
+ 	for (int i = 0; i < cfg.n_binds; i++) {
+ 		Binding* bind = &cfg.binds[i];
+ 		if (bind->keycode == code && clean_mask(bind->mods) == mods) {
+-			switch (bind->type) {
+-				case TYPE_CMD: spawn(bind->action.cmd); break;
+-				case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
+-				case TYPE_WS_CHANGE: change_workspace(bind->action.ws); break;
+-				case TYPE_WS_MOVE: move_to_workspace(get_focused(), bind->action.ws); break;
++			Binding* deferred = NULL;
++			for (Binding* b = bind; b; b = b->chain) {
++				/* these free the binds / close the display, so they run last */
++				if (b->type == TYPE_FUNC &&
++				    (b->action.fn == reload_config || b->action.fn == quit)) {
++					if (!deferred || deferred->action.fn != quit)
++						deferred = b;
++				}
++				else {
++					run_action(b);
++				}
+ 			}
++			if (deferred)
++				run_action(deferred);
+ 			return;
+ 		}
+ 	}
+@@ -1671,6 +1680,16 @@ static void run(void)
+ 	}
+ }
+ 
++static void run_action(Binding* bind)
++{
++	switch (bind->type) {
++		case TYPE_CMD: spawn(bind->action.cmd); break;
++		case TYPE_FUNC: if (bind->action.fn) bind->action.fn(); break;
++		case TYPE_WS_CHANGE: change_workspace(bind->action.ws); break;
++		case TYPE_WS_MOVE: move_to_workspace(get_focused(), bind->action.ws); break;
++	}
++}
++
+ static void scan_existing_windows(void)
+ {
+ 	Window root_return;
