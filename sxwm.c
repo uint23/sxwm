@@ -338,7 +338,6 @@ static void apply_fullscreen(Client* c, Bool on)
 		if (!is_floating(c))
 			c->mon = get_monitor_for_point(get_window_center(c));
 		tile();
-		update_borders();
 	}
 }
 
@@ -483,7 +482,6 @@ void dec_gaps(void)
 	if (cfg.gaps > 0) {
 		cfg.gaps--;
 		tile();
-		update_borders();
 	}
 }
 
@@ -831,7 +829,6 @@ void inc_gaps(void)
 {
 	cfg.gaps++;
 	tile();
-	update_borders();
 }
 
 static void init_defaults(void)
@@ -891,7 +888,6 @@ void move_master_next(void)
 
 	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
-	update_borders();
 }
 
 void move_master_prev(void)
@@ -910,7 +906,6 @@ void move_master_prev(void)
 
 	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
-	update_borders();
 }
 
 void move_next_mon(void)
@@ -1175,7 +1170,6 @@ static void on_config_ntf(XEvent* xev)
 	if (xev->xconfigure.window == root) {
 		update_mons();
 		tile();
-		update_borders();
 	}
 }
 
@@ -1276,7 +1270,6 @@ static void on_destroy_ntf(XEvent* xev)
 		return;
 
 	tile();
-	update_borders();
 
 	if (!was_focused)
 		return;
@@ -1403,8 +1396,6 @@ static void on_map_req(XEvent* xev)
 
 	if (cfg.new_win_focus)
 		set_input_focus(c, True, True);
-	else
-		update_borders();
 }
 
 static void on_mapping_ntf(XEvent* xev)
@@ -1505,7 +1496,6 @@ static void on_property_ntf(XEvent* xev)
 		else if (property_ev->atom == atoms[ATOM_NET_WM_STRUT_PARTIAL]) {
 			update_struts();
 			tile();
-			update_borders();
 		}
 	}
 
@@ -1547,8 +1537,6 @@ static void on_unmap_ntf(XEvent* xev)
 
 	if (workspaces[ws_cur].focused == c)
 		set_input_focus(find_new_focus(c), True, True);
-	else
-		update_borders();
 }
 
 static void other_wm(void)
@@ -1654,7 +1642,6 @@ void reload_config(void)
 	XSync(dpy, False);
 
 	tile();
-	update_borders();
 }
 
 static void raise_client(Client* c)
@@ -1681,7 +1668,6 @@ static void resize_master(int amount)
 	*mw = CLAMP(*mw + (float)amount / 100.0f, MF_MIN, MF_MAX);
 
 	tile();
-	update_borders();
 }
 
 void resize_master_add(void)
@@ -2118,7 +2104,6 @@ void toggle_floating(void)
 	switch_client_list(c, floating);
 
 	tile();
-	update_borders();
 	if (floating)
 		set_input_focus(c, True, False);
 }
@@ -2133,7 +2118,6 @@ void toggle_floating_global(void)
 		switch_client_list(source->head, floating);
 
 	tile();
-	update_borders();
 }
 
 void toggle_fullscreen(void)
