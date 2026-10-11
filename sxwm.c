@@ -50,8 +50,10 @@ static void configure_tile(Client* c, int x, int y, int w, int h);
 static Client* find_client(Window w);
 static Client* find_new_focus(Client* c);
 static Window find_toplevel(Window w);
+static void focus_cycle(int dir);
 /* void focus_next(void); */
 /* void focus_next_mon(void); */
+static void focus_mon(int dir);
 /* void focus_prev(void); */
 /* void focus_prev_mon(void); */
 static int get_client_workspace(Client* c);
@@ -69,8 +71,10 @@ static void init_defaults(void);
 static Bool is_floating(Client* c);
 static Bool is_timestamp_event(Display* d, XEvent* ev, XPointer arg);
 static void move_client(ClientList* list, Client* c);
+static void move_master(int dir);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
+static void move_mon(int dir);
 /* void move_next_mon(void); */
 /* void move_prev_mon(void); */
 static void move_to_workspace(Client* c, int ws);
@@ -533,123 +537,68 @@ static Window find_toplevel(Window w)
 	return w;
 }
 
-void focus_next(void)
+static void focus_cycle(int dir)
 {
 	ClientList* lists = workspaces[ws_cur].lists;
-	if (!lists[LIST_TILED].head && !lists[LIST_FLOATING].head)
-		return;
-
 	Client* start = get_focused();
 	if (!start)
 		start = lists[LIST_TILED].head ? lists[LIST_TILED].head : lists[LIST_FLOATING].head;
-	Client* c = start;
-
-	/* loop until we find a mapped client or return to start */
-	do {
-		if (c->next)
-			c = c->next;
-		else if (is_floating(c))
-			c = lists[LIST_TILED].head ? lists[LIST_TILED].head : lists[LIST_FLOATING].head;
-		else
-			c = lists[LIST_FLOATING].head ? lists[LIST_FLOATING].head : lists[LIST_TILED].head;
-	} while ((!c->mapped || c->mon != mon_cur) && c != start);
-
-	/* if we return to start: */
-	if (!c->mapped || c->mon != mon_cur)
+	if (!start)
 		return;
 
-	mon_cur = c->mon;
-	set_input_focus(c, True, True);
+	Client* c = start;
+	do {
+		ClientList* list = c->list;
+		ClientList* other = &lists[is_floating(c) ? LIST_TILED : LIST_FLOATING];
+		c = dir > 0 ? c->next : c->prev;
+		if (!c)
+			c = dir > 0 ? other->head : other->tail;
+		if (!c)
+			c = dir > 0 ? list->head : list->tail;
+	} while (c != start && (!c->mapped || c->mon != mon_cur));
+
+	if (c->mapped && c->mon == mon_cur)
+		set_input_focus(c, True, True);
+}
+
+void focus_next(void)
+{
+	focus_cycle(1);
 }
 
 void focus_next_mon(void)
 {
+	focus_mon(1);
+}
+
+static void focus_mon(int dir)
+{
 	if (mon_cnt <= 1)
 		return;
 
-	int target_mon = (mon_cur + 1) % mon_cnt;
-	/* find the first window on the target monitor in current workspace */
-	Client* target_client = NULL;
-	for (int i = 0; i < LIST_COUNT && !target_client; i++) {
-		for (Client* c = workspaces[ws_cur].lists[i].head; c; c = c->next) {
-			if (c->mon == target_mon && c->mapped) {
-				target_client = c;
-				break;
+	int target = (mon_cur + dir + mon_cnt) % mon_cnt;
+	for (int i = 0; i < LIST_COUNT; i++)
+		for (Client* c = workspaces[ws_cur].lists[i].head; c; c = c->next)
+			if (c->mapped && c->mon == target) {
+				set_input_focus(c, True, True);
+				return;
 			}
-		}
-	}
 
-	if (target_client) {
-		/* focus the window on target monitor */
-		mon_cur = target_mon;
-		set_input_focus(target_client, True, True);
-	}
-	else {
-		/* no windows on target monitor, just move cursor to center and update mon_cur */
-		mon_cur = target_mon;
-		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
-		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
-		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
-		XSync(dpy, False);
-	}
+	mon_cur = target;
+	XWarpPointer(dpy, None, root, 0, 0, 0, 0,
+	             mons[target].x + mons[target].w / 2,
+	             mons[target].y + mons[target].h / 2);
+	XSync(dpy, False);
 }
 
 void focus_prev(void)
 {
-	ClientList* lists = workspaces[ws_cur].lists;
-	if (!lists[LIST_TILED].head && !lists[LIST_FLOATING].head)
-		return;
-
-	Client* start = get_focused();
-	if (!start)
-		start = lists[LIST_TILED].head ? lists[LIST_TILED].head : lists[LIST_FLOATING].head;
-	Client* c = start;
-
-	do {
-		if (c->prev)
-			c = c->prev;
-		else if (is_floating(c))
-			c = lists[LIST_TILED].tail ? lists[LIST_TILED].tail : lists[LIST_FLOATING].tail;
-		else
-			c = lists[LIST_FLOATING].tail ? lists[LIST_FLOATING].tail : lists[LIST_TILED].tail;
-	} while ((!c->mapped || c->mon != mon_cur) && c != start);
-
-	if (!c->mapped || c->mon != mon_cur)
-		return;
-
-	mon_cur = c->mon;
-	set_input_focus(c, True, True);
+	focus_cycle(-1);
 }
 
 void focus_prev_mon(void)
 {
-	if (mon_cnt <= 1)
-		return; /* only one monitor, nothing to switch to */
-
-	int target_mon = (mon_cur - 1 + mon_cnt) % mon_cnt;
-	/* find the first window on the target monitor in current workspace */
-	Client* target_client = NULL;
-	for (int i = 0; i < LIST_COUNT && !target_client; i++) {
-		for (Client* c = workspaces[ws_cur].lists[i].head; c; c = c->next) {
-			if (c->mon == target_mon && c->mapped) {
-				target_client = c;
-				break;
-			}
-		}
-	}
-
-	if (target_client) {
-		/* focus the window on target monitor */
-		mon_cur = target_mon;
-		set_input_focus(target_client, True, True);
-	}
-	else {
-		mon_cur = target_mon;
-		int center_x = mons[target_mon].x + mons[target_mon].w / 2;
-		int center_y = mons[target_mon].y + mons[target_mon].h / 2;
-		XWarpPointer(dpy, None, root, 0, 0, 0, 0, center_x, center_y);
-		XSync(dpy, False);
-	}
+	focus_mon(-1);
 }
 
 static int get_client_workspace(Client* c)
@@ -869,92 +818,61 @@ static void move_client(ClientList* list, Client* c)
 	append_client(list, c);
 }
 
-void move_master_next(void)
+static void move_master(int dir)
 {
 	ClientList* list = &workspaces[ws_cur].lists[LIST_TILED];
 	if (!list->head || !list->head->next)
 		return;
 
-	Client* first = list->head;
-	Client* old_focused = workspaces[ws_cur].focused;
-
-	unlink_client(first);
-	append_client(list, first);
+	Client* c = dir > 0 ? list->head : list->tail;
+	Client* focused = get_focused();
+	unlink_client(c);
+	if (dir > 0)
+		append_client(list, c);
+	else
+		prepend_client(list, c);
 
 	tile();
-
-	if (cfg.warp_cursor && old_focused)
-		warp_cursor(old_focused);
+	if (cfg.warp_cursor && focused)
+		warp_cursor(focused);
+}
+void move_master_next(void)
+{
+	move_master(1);
 }
 
 void move_master_prev(void)
 {
-	ClientList* list = &workspaces[ws_cur].lists[LIST_TILED];
-	if (!list->head || !list->head->next)
+	move_master(-1);
+}
+
+static void move_mon(int dir)
+{
+	Client* c = get_focused();
+	if (!c || mon_cnt <= 1)
 		return;
 
-	Client* last = list->tail;
-	Client* old_focused = workspaces[ws_cur].focused;
+	c->mon = (c->mon + dir + mon_cnt) % mon_cnt;
+	mon_cur = c->mon;
 
-	unlink_client(last);
-	prepend_client(list, last);
+	/* center floating windows in the target monitors workarea */
+	if (is_floating(c))
+		centre_client(c);
 
 	tile();
-
-	if (cfg.warp_cursor && old_focused)
-		warp_cursor(old_focused);
+	if (cfg.warp_cursor)
+		warp_cursor(c);
 }
+
 
 void move_next_mon(void)
 {
-	Client* focused = get_focused();
-	if (!focused || mon_cnt <= 1)
-		return; /* no focused window or only one monitor */
-
-	int target_mon = (focused->mon + 1) % mon_cnt;
-
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	mon_cur = target_mon;
-
-	/* if window is floating, center it in the target monitor's workarea */
-	if (is_floating(focused))
-		centre_client(focused);
-
-	/* retile to update layouts on both monitors */
-	tile();
-
-	/* follow the window with cursor if enabled */
-	if (cfg.warp_cursor)
-		warp_cursor(focused);
-
-	update_borders();
+	move_mon(1);
 }
 
 void move_prev_mon(void)
 {
-	Client* focused = get_focused();
-	if (!focused || mon_cnt <= 1)
-		return; /* no focused window or only one monitor */
-
-	int target_mon = (focused->mon - 1 + mon_cnt) % mon_cnt;
-
-	/* update window's monitor assignment */
-	focused->mon = target_mon;
-	mon_cur = target_mon;
-
-	/* if window is floating, center it in the target monitor's workarea */
-	if (is_floating(focused))
-		centre_client(focused);
-
-	/* retile to update layouts on both monitors */
-	tile();
-
-	/* follow the window with cursor if enabled */
-	if (cfg.warp_cursor)
-		warp_cursor(focused);
-
-	update_borders();
+	move_mon(-1);
 }
 
 static void move_to_workspace(Client* c, int ws)
@@ -1683,10 +1601,9 @@ static void resize_win(Direction dir)
 	int* size;
 	int max;
 	int amount = cfg.resize_window_amt;
-	Monitor* m = &mons[c->mon];
 	if (!c || !is_floating(c))
 		return;
-
+	Monitor* m = &mons[c->mon];
 
 	switch (dir) {
 	case LEFT:
