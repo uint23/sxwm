@@ -116,6 +116,7 @@ struct Point {
 
 struct Workspace {
 	int number;
+	Bool monocle;
 	Client* focused;
 	ClientList lists[LIST_COUNT];
 };

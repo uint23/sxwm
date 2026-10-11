@@ -61,6 +61,7 @@ static const CommandEntry call_table[] = {
 	{ "resize_win_right",          resize_win_right },
 	{ "switch_previous_workspace", switch_previous_workspace },
 	{ "toggle_floating",           toggle_floating },
+	{ "toggle_monocle",            toggle_monocle },
 	{ NULL, NULL },
 };
 

@@ -72,6 +72,7 @@ call : mod + minus : decrease_gaps
 call : mod + space : toggle_floating
 call : mod + shift + space : global_floating
 call : mod + shift + f : fullscreen
+call : mod + m : toggle_monocle
 
 # Reload Config
 call : mod + r : reload_config
@@ -95,3 +96,4 @@ workspace : mod + 8          : move 8
 workspace : mod + shift + 8  : swap 8
 workspace : mod + 9          : move 9
 workspace : mod + shift + 9  : swap 9
+

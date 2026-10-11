@@ -125,6 +125,7 @@ static void tile(void);
 /* void toggle_floating(void); */
 /* void toggle_floating_global(void); */
 /* void toggle_fullscreen(void); */
+/* void toggle_monocle(void); */
 static void unlink_client(Client* c);
 static void update_borders(void);
 static void update_client_desktop_properties(void);
@@ -1661,9 +1662,14 @@ static void raise_client(Client* c)
 {
 	XRaiseWindow(dpy, c->win);
 	for (Client* child = managed_clients; child; child = child->managed_next)
-		if (child->trans_for == c->win && child->mapped &&
-		    get_client_workspace(child) == ws_cur)
+		if (child->trans_for == c->win && child->mapped && get_client_workspace(child) == ws_cur)
 			XRaiseWindow(dpy, child->win);
+
+	if (workspaces[ws_cur].monocle && cfg.floating_on_top && !is_floating(c) && !c->fullscreen)
+		for (Client* f = workspaces[ws_cur].lists[LIST_FLOATING].head; f; f = f->next)
+			if (f->mapped)
+				XRaiseWindow(dpy, f->win);
+
 	update_net_client_list_stacking();
 }
 
@@ -1844,7 +1850,7 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 		XSetInputFocus(dpy, accepts_focus ? w : root, RevertToPointerRoot, time);
 		send_wm_take_focus(w, time);
 
-		if (raise_win && (is_floating(c) || !cfg.floating_on_top))
+		if (raise_win && (is_floating(c) || !cfg.floating_on_top || workspaces[ws_cur].monocle))
 			raise_client(c);
 
 		/* EWMH focus hint */
@@ -2058,6 +2064,14 @@ static void tile(void)
 		int y = mon->y + mon->res.top + gaps;
 		int w = MAX(1, mon->w - mon->res.left - mon->res.right - 2 * gaps);
 		int h = MAX(1, mon->h - mon->res.top - mon->res.bottom - 2 * gaps);
+
+		if (workspaces[ws_cur].monocle) {
+			for (Client* c = list->head; c; c = c->next)
+				if (c->mapped && !c->fullscreen && c->mon == m)
+					configure_tile(c, x, y, w, h);
+			continue;
+		}
+
 		int master_w = n > 1 ? (int)(w * CLAMP(cfg.master_width[m], MF_MIN, MF_MAX)) : w;
 
 		/* master */
@@ -2087,6 +2101,10 @@ static void tile(void)
 			stack_y += height + gaps;
 		}
 	}
+
+	Client* focused = get_focused();
+	if (workspaces[ws_cur].monocle && focused && focused->mapped)
+		raise_client(focused);
 
 	update_borders();
 }
@@ -2126,6 +2144,12 @@ void toggle_fullscreen(void)
 		return;
 
 	apply_fullscreen(focused, !focused->fullscreen);
+}
+
+void toggle_monocle(void)
+{
+	workspaces[ws_cur].monocle = !workspaces[ws_cur].monocle;
+	tile();
 }
 
 static void unlink_client(Client* c)
