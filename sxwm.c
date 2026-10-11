@@ -487,12 +487,9 @@ void dec_gaps(void)
 
 static Client* find_client(Window w)
 {
-	for (int ws = 0; ws < NUM_WORKSPACES; ws++) {
-		for (int i = 0; i < LIST_COUNT; i++)
-			for (Client* c = workspaces[ws].lists[i].head; c; c = c->next)
-				if (c->win == w)
-					return c;
-	}
+	for (Client* c = managed_clients; c; c = c->managed_next)
+		if (c->win == w)
+			return c;
 	return NULL;
 }
 
