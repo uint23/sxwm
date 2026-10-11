@@ -91,3 +91,4 @@ All notable changes to this project will be documented in this file.
 #### v1.1
 - **NEW**: Xinerama support, swap windows with Mod + Shift + Drag
 - **FIXED**: New windows in `global_floating` mode spawn centered
+
