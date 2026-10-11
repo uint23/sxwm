@@ -159,5 +159,36 @@ typedef enum {
 	ATOM_COUNT
 } AtomType;
 
+void centre_window(void);
+void close_focused(void);
+void dec_gaps(void);
+void focus_next(void);
+void focus_next_mon(void);
+void focus_prev(void);
+void focus_prev_mon(void);
+void inc_gaps(void);
+void move_master_next(void);
+void move_master_prev(void);
+void move_next_mon(void);
+void move_prev_mon(void);
+void move_win_down(void);
+void move_win_left(void);
+void move_win_right(void);
+void move_win_up(void);
+long parse_col(const char* hex);
+void quit(void);
+void reload_config(void);
+void resize_master_add(void);
+void resize_master_sub(void);
+void resize_win_down(void);
+void resize_win_left(void);
+void resize_win_right(void);
+void resize_win_up(void);
+void switch_previous_workspace(void);
+void toggle_floating(void);
+void toggle_floating_global(void);
+void toggle_fullscreen(void);
+void toggle_monocle(void);
+
 #endif /* COMMON_H */
 

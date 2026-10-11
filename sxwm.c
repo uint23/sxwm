@@ -34,7 +34,6 @@
 #include <X11/Xcursor/Xcursor.h>
 
 #include "common.h"
-#include "extern.h"
 #include "parser.h"
 #include "utils.h"
 

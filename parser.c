@@ -10,7 +10,6 @@
 #include <X11/Xlib.h>
 
 #include "common.h"
-#include "extern.h"
 #include "parser.h"
 #include "utils.h"
 
