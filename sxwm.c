@@ -61,12 +61,14 @@ static Client* get_focused(void);
 static int get_monitor_for_point(Point p);
 static Point get_window_center(Client* c);
 static WindowType get_window_type(Window w);
+static Time get_server_time(void);
 static int get_workspace_for_window(Window w);
 static void grab_button(Mask button, Mask mod, Window w, Bool owner_events, Mask masks);
 static void grab_keys(void);
 /* void inc_gaps(void); */
 static void init_defaults(void);
 static Bool is_floating(Client* c);
+static Bool is_timestamp_event(Display* d, XEvent* ev, XPointer arg);
 static void move_client(ClientList* list, Client* c);
 /* void move_master_next(void); */
 /* void move_master_prev(void); */
@@ -96,6 +98,7 @@ static int other_wm_err(Display* d, XErrorEvent* ee);
 /* long parse_col(const char* hex); */
 static void prepend_client(ClientList* list, Client* c);
 /* void quit(void); */
+static void raise_client(Client* c);
 /* void reload_config(void); */
 static void resize_master(int amount);
 /* void resize_master_add(void); */
@@ -108,7 +111,7 @@ static void resize_win(Direction dir);
 static void run(void);
 static void scan_existing_windows(void);
 static void select_input(Window w, Mask masks);
-static void send_wm_take_focus(Window w);
+static void send_wm_take_focus(Window w, Time time);
 static void set_frame_extents(Window w);
 static void set_input_focus(Client* c, Bool raise_win, Bool warp);
 static void set_wm_state(Window w, long state);
@@ -155,7 +158,6 @@ static const char* atom_names[ATOM_COUNT] = {
 	[ATOM_NET_WM_STRUT_PARTIAL]             = "_NET_WM_STRUT_PARTIAL",
 	[ATOM_NET_SUPPORTING_WM_CHECK]          = "_NET_SUPPORTING_WM_CHECK",
 	[ATOM_NET_WM_NAME]                      = "_NET_WM_NAME",
-	[ATOM_UTF8_STRING]                      = "UTF8_STRING",
 	[ATOM_NET_WM_DESKTOP]                   = "_NET_WM_DESKTOP",
 	[ATOM_NET_CLIENT_LIST]                  = "_NET_CLIENT_LIST",
 	[ATOM_NET_CLIENT_LIST_STACKING]         = "_NET_CLIENT_LIST_STACKING",
@@ -174,6 +176,8 @@ static const char* atom_names[ATOM_COUNT] = {
 	[ATOM_NET_WM_WINDOW_TYPE_TOOLTIP]       = "_NET_WM_WINDOW_TYPE_TOOLTIP",
 	[ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION]  = "_NET_WM_WINDOW_TYPE_NOTIFICATION",
 	[ATOM_NET_WM_STATE_MODAL]               = "_NET_WM_STATE_MODAL",
+	[ATOM_SXWM_TIMESTAMP]                   = "_SXWM_TIMESTAMP",
+	[ATOM_UTF8_STRING]                      = "UTF8_STRING",
 	[ATOM_WM_PROTOCOLS]                     = "WM_PROTOCOLS",
 };
 
@@ -217,6 +221,7 @@ static Client* add_client(Window w, Bool floating, int ws)
 	}
 
 	c->win = w;
+	c->trans_for = None;
 	c->list = NULL;
 	c->next = NULL;
 	c->prev = NULL;
@@ -314,8 +319,7 @@ static void apply_fullscreen(Client* c, Bool on)
 		c->w = mons[mon].w;
 		c->h = mons[mon].h;
 
-		XRaiseWindow(dpy, c->win);
-		update_net_client_list_stacking();
+		raise_client(c);
 		window_set_ewmh_state(c->win, atoms[ATOM_NET_WM_STATE_FULLSCREEN], True);
 	}
 	else {
@@ -731,6 +735,16 @@ static WindowType get_window_type(Window w)
 	return type;
 }
 
+static Time get_server_time(void)
+{
+	unsigned char value = 0;
+	Atom atom = atoms[ATOM_SXWM_TIMESTAMP];
+	XEvent ev;
+	XChangeProperty(dpy, root, atom, XA_INTEGER, 8, PropModeReplace, &value, 1);
+	XIfEvent(dpy, &ev, is_timestamp_event, (XPointer)&atom);
+	return ev.xproperty.time;
+}
+
 static int get_workspace_for_window(Window w)
 {
 	XClassHint ch = { 0 };
@@ -848,6 +862,13 @@ static Bool is_floating(Client* c)
 	return c && c->list && c->list->type == LIST_FLOATING;
 }
 
+static Bool is_timestamp_event(Display* d, XEvent* ev, XPointer arg)
+{
+	(void)d;
+	return ev->type == PropertyNotify && ev->xproperty.window == root &&
+	       ev->xproperty.atom == *(Atom*)arg;
+}
+
 static void move_client(ClientList* list, Client* c)
 {
 	unlink_client(c);
@@ -870,9 +891,6 @@ void move_master_next(void)
 
 	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
-	if (old_focused)
-		send_wm_take_focus(old_focused->win);
-
 	update_borders();
 }
 
@@ -892,9 +910,6 @@ void move_master_prev(void)
 
 	if (cfg.warp_cursor && old_focused)
 		warp_cursor(old_focused);
-	if (old_focused)
-		send_wm_take_focus(old_focused->win);
-
 	update_borders();
 }
 
@@ -985,6 +1000,11 @@ static void move_to_workspace(Client* c, int ws)
 		tile();
 	if (from_ws == ws_cur && was_focused)
 		set_input_focus(replacement, False, False);
+
+	/* keep dialogs on same desktop as parent */
+	for (Client* child = managed_clients; child; child = child->managed_next)
+		if (child != c && child->trans_for == c->win)
+			move_to_workspace(child, ws);
 }
 
 static void move_win(Direction dir)
@@ -1334,19 +1354,24 @@ static void on_map_req(XEvent* xev)
 	Bool floating = type == WINDOW_FLOAT || global_floating || fixed ||
 	                window_should_float(w) || window_has_ewmh_state(w, atoms[ATOM_NET_WM_STATE_MODAL]);
 
-	Window transient;
-	if (!floating && XGetTransientForHint(dpy, w, &transient))
+	Window transient = None;
+	Bool has_transient = XGetTransientForHint(dpy, w, &transient) && transient != None;
+	Client* parent = has_transient && transient != root && transient != w ? find_client(transient) : NULL;
+	if (has_transient)
 		floating = True;
 
 	if (fullscreen)
 		floating = False;
 
-	int ws = get_workspace_for_window(w);
+	int ws = parent ? get_client_workspace(parent) : get_workspace_for_window(w);
 	c = add_client(w, floating, ws);
 	if (!c)
 		return;
 
 	c->fixed = fixed;
+	c->trans_for = has_transient && transient != root && transient != w ? transient : None;
+	if (parent)
+		c->mon = parent->mon;
 	set_wm_state(w, NormalState);
 
 	/* position floating windows */
@@ -1371,10 +1396,8 @@ static void on_map_req(XEvent* xev)
 
 	if (!floating && !fullscreen)
 		tile();
-	else if (floating) {
-		XRaiseWindow(dpy, w);
-		update_net_client_list_stacking();
-	}
+	else if (floating)
+		raise_client(c);
 
 	set_frame_extents(w);
 
@@ -1634,6 +1657,16 @@ void reload_config(void)
 	update_borders();
 }
 
+static void raise_client(Client* c)
+{
+	XRaiseWindow(dpy, c->win);
+	for (Client* child = managed_clients; child; child = child->managed_next)
+		if (child->trans_for == c->win && child->mapped &&
+		    get_client_workspace(child) == ws_cur)
+			XRaiseWindow(dpy, child->win);
+	update_net_client_list_stacking();
+}
+
 static void resize_master(int amount)
 {
 	Client* focused = get_focused();
@@ -1753,9 +1786,9 @@ static void select_input(Window w, Mask masks)
 	XSelectInput(dpy, w, masks);
 }
 
-static void send_wm_take_focus(Window w)
+static void send_wm_take_focus(Window w, Time time)
 {
-	Atom wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
+	Atom wm_protocols = atoms[ATOM_WM_PROTOCOLS];
 	Atom wm_take_focus = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
 	Atom* protos;
 	int n;
@@ -1771,7 +1804,7 @@ static void send_wm_take_focus(Window w)
 						.format = 32 }
 				};
 				ev.xclient.data.l[0] = wm_take_focus;
-				ev.xclient.data.l[1] = CurrentTime;
+				ev.xclient.data.l[1] = time;
 				XSendEvent(dpy, w, False, NoEventMask, &ev);
 			}
 		}
@@ -1802,13 +1835,17 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 		mon_cur = CLAMP(c->mon, 0, mon_cnt - 1);
 		Window w = find_toplevel(c->win);
 
-		XSetInputFocus(dpy, w, RevertToPointerRoot, CurrentTime);
-		send_wm_take_focus(w);
+		Time time = get_server_time();
+		XWMHints* hints = XGetWMHints(dpy, w);
+		Bool accepts_focus = !hints || !(hints->flags & InputHint) || hints->input;
+		if (hints)
+			XFree(hints);
 
-		if (raise_win && (is_floating(c) || !cfg.floating_on_top)) {
-			XRaiseWindow(dpy, w);
-			update_net_client_list_stacking();
-		}
+		XSetInputFocus(dpy, accepts_focus ? w : root, RevertToPointerRoot, time);
+		send_wm_take_focus(w, time);
+
+		if (raise_win && (is_floating(c) || !cfg.floating_on_top))
+			raise_client(c);
 
 		/* EWMH focus hint */
 		XChangeProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW], XA_WINDOW, 32,
@@ -1818,7 +1855,7 @@ static void set_input_focus(Client* c, Bool raise_win, Bool warp)
 			warp_cursor(c);
 	}
 	else {
-		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
+		XSetInputFocus(dpy, root, RevertToPointerRoot, get_server_time());
 		XDeleteProperty(dpy, root, atoms[ATOM_NET_ACTIVE_WINDOW]);
 	}
 
@@ -1910,15 +1947,12 @@ static void setup_atoms(void)
 	for (int i = 0; i < ATOM_COUNT; i++)
 		atoms[i] = XInternAtom(dpy, atom_names[i], False);
 
-	/* checking window */
 	Window wm_check_win = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
-	/* root property -> child window */
 	XChangeProperty(dpy, root, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
-	/* child window -> child window */
 	XChangeProperty(dpy, wm_check_win, atoms[ATOM_NET_SUPPORTING_WM_CHECK], XA_WINDOW, 32,
 			        PropModeReplace, (unsigned char *)&wm_check_win, 1);
-	/* name the wm */
+
 	const char* wmname = "sxwm";
 	XChangeProperty(dpy, wm_check_win, atoms[ATOM_NET_WM_NAME], atoms[ATOM_UTF8_STRING], 8,
 			        PropModeReplace, (const unsigned char *)wmname, strlen(wmname));
@@ -1986,8 +2020,7 @@ static void switch_client_list(Client* c, Bool floating)
 			c->w = wa.width;
 			c->h = wa.height;
 		}
-		XRaiseWindow(dpy, c->win);
-		update_net_client_list_stacking();
+		raise_client(c);
 	}
 	else
 		c->mon = get_monitor_for_point(get_window_center(c));

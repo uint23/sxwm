@@ -70,7 +70,7 @@ struct Binding {
 };
 
 struct Client {
-	Window win;
+	Window win, trans_for;
 	int x, y, w, h, ox, oy, ow, oh, mon;
 	Bool fixed, fullscreen, mapped;
 	ClientList* list;
@@ -134,7 +134,6 @@ typedef enum {
 	ATOM_NET_WM_STRUT_PARTIAL,
 	ATOM_NET_SUPPORTING_WM_CHECK,
 	ATOM_NET_WM_NAME,
-	ATOM_UTF8_STRING,
 	ATOM_NET_WM_DESKTOP,
 	ATOM_NET_CLIENT_LIST,
 	ATOM_NET_CLIENT_LIST_STACKING,
@@ -153,6 +152,8 @@ typedef enum {
 	ATOM_NET_WM_WINDOW_TYPE_TOOLTIP,
 	ATOM_NET_WM_WINDOW_TYPE_NOTIFICATION,
 	ATOM_NET_WM_STATE_MODAL,
+	ATOM_SXWM_TIMESTAMP,
+	ATOM_UTF8_STRING,
 	ATOM_WM_PROTOCOLS,
 	ATOM_COUNT
 } AtomType;
