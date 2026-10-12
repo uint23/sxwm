@@ -1,6 +1,6 @@
 ![logo](logo.png)
 
-See the config file for all the features
+See [the config file](default_sxwmrc) for all the features
 
 ## Build & Install
 > I don't maintain any packages. Use with caution!
