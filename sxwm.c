@@ -189,16 +189,12 @@ static const char* atom_names[ATOM_COUNT] = {
 struct {
 	Cursor normal;
 	Cursor move;
-	Cursor resize;    /* bottom-right, also the generic fallback */
-	Cursor resize_tl;
-	Cursor resize_tr;
-	Cursor resize_bl;
+	Cursor resize;
 } cursors = { 0 };
 
 struct {
 	int sx, sy; /* start (x, y) */
 	int ox, oy, ow, oh; /* original (x, y), (w, h) */
-	int edge; /* bitmask: 1=left 2=right 4=top 8=bottom */
 	DragMode mode;
 	Client* client;
 } drag = { 0 };
@@ -1001,36 +997,7 @@ static void on_button(XEvent* xev)
 	if (!is_floating(c))
 		toggle_floating();
 
-	Cursor cursor = cursors.move;
-	drag.edge = 0;
-
-	if (ev->button == Button3) {
-		/* i3-style: pick the corner closest to the click.
-		 * Split the window in half on each axis; whichever half
-		 * the cursor is in decides the edge on that axis. */
-		int outer_w = c->w + 2 * cfg.border_width;
-		int outer_h = c->h + 2 * cfg.border_width;
-		int rel_x = ev->x_root - c->x;
-		int rel_y = ev->y_root - c->y;
-
-		if (rel_x < outer_w / 2)
-			drag.edge |= 1; /* left */
-		else
-			drag.edge |= 2; /* right */
-
-		if (rel_y < outer_h / 2)
-			drag.edge |= 4; /* top */
-		else
-			drag.edge |= 8; /* bottom */
-
-		switch (drag.edge) {
-		case 1 | 4: cursor = cursors.resize_tl; break;
-		case 2 | 4: cursor = cursors.resize_tr; break;
-		case 1 | 8: cursor = cursors.resize_bl; break;
-		default:    cursor = cursors.resize;    break; /* 2|8 */
-		}
-	}
-
+	Cursor cursor = ev->button == Button1 ? cursors.move : cursors.resize;
 	if (XGrabPointer(dpy, root, True, ButtonReleaseMask | PointerMotionMask,
 	                 GrabModeAsync, GrabModeAsync, None, cursor, ev->time) != GrabSuccess)
 		return;
@@ -1407,67 +1374,17 @@ static void on_motion(XEvent* xev)
 	else if (drag.mode == DRAG_RESIZE) {
 		int dx = motion_ev->x_root - drag.sx;
 		int dy = motion_ev->y_root - drag.sy;
+		int nw = drag.ow + dx;
+		int nh = drag.oh + dy;
+
 		int bw = 2 * cfg.border_width;
+		int max_w = MAX(MIN_WINDOW_SIZE, right - drag.client->x - bw);
+		int max_h = MAX(MIN_WINDOW_SIZE, bottom - drag.client->y - bw);
 
-		int nx = drag.ox;
-		int ny = drag.oy;
-		int nw = drag.ow;
-		int nh = drag.oh;
+		drag.client->w = CLAMP(nw, MIN_WINDOW_SIZE, max_w);
+		drag.client->h = CLAMP(nh, MIN_WINDOW_SIZE, max_h);
 
-		/* Left edge moves x AND shrinks w; right edge only grows w */
-		if (drag.edge & 1) {
-			nx = drag.ox + dx;
-			nw = drag.ow - dx;
-		}
-		else if (drag.edge & 2) {
-			nw = drag.ow + dx;
-		}
-
-		/* Top edge moves y AND shrinks h; bottom edge only grows h */
-		if (drag.edge & 4) {
-			ny = drag.oy + dy;
-			nh = drag.oh - dy;
-		}
-		else if (drag.edge & 8) {
-			nh = drag.oh + dy;
-		}
-
-		/* keep the opposite edge anchored when hitting min size */
-		if (nw < MIN_WINDOW_SIZE) {
-			if (drag.edge & 1)
-				nx = drag.ox + drag.ow - MIN_WINDOW_SIZE;
-			nw = MIN_WINDOW_SIZE;
-		}
-		if (nh < MIN_WINDOW_SIZE) {
-			if (drag.edge & 4)
-				ny = drag.oy + drag.oh - MIN_WINDOW_SIZE;
-			nh = MIN_WINDOW_SIZE;
-		}
-
-		/* clamp to the monitor's work area (struts respected) */
-		if ((drag.edge & 1) && nx < left) {
-			nw -= (left - nx);
-			nx = left;
-		}
-		if ((drag.edge & 4) && ny < top) {
-			nh -= (top - ny);
-			ny = top;
-		}
-		if ((drag.edge & 2) && nx + nw + bw > right)
-			nw = right - nx - bw;
-		if ((drag.edge & 8) && ny + nh + bw > bottom)
-			nh = bottom - ny - bw;
-
-		if (nw < MIN_WINDOW_SIZE) nw = MIN_WINDOW_SIZE;
-		if (nh < MIN_WINDOW_SIZE) nh = MIN_WINDOW_SIZE;
-
-		drag.client->x = nx;
-		drag.client->y = ny;
-		drag.client->w = nw;
-		drag.client->h = nh;
-		drag.client->mon = mon;
-
-		XMoveResizeWindow(dpy, drag.client->win, nx, ny, nw, nh);
+		XResizeWindow(dpy, drag.client->win, drag.client->w, drag.client->h);
 	}
 }
 
@@ -1596,9 +1513,6 @@ void quit(void)
 	XFreeCursor(dpy, cursors.move);
 	XFreeCursor(dpy, cursors.normal);
 	XFreeCursor(dpy, cursors.resize);
-	XFreeCursor(dpy, cursors.resize_tl);
-	XFreeCursor(dpy, cursors.resize_tr);
-	XFreeCursor(dpy, cursors.resize_bl);
 	XCloseDisplay(dpy);
 	wlog("Quitting");
 	running = False;
@@ -1895,9 +1809,6 @@ static void setup(void)
 	cursors.normal = XcursorLibraryLoadCursor(dpy, "left_ptr");
 	cursors.move = XcursorLibraryLoadCursor(dpy, "fleur");
 	cursors.resize = XcursorLibraryLoadCursor(dpy, "bottom_right_corner");
-	cursors.resize_tl = XcursorLibraryLoadCursor(dpy, "top_left_corner");
-	cursors.resize_tr = XcursorLibraryLoadCursor(dpy, "top_right_corner");
-	cursors.resize_bl = XcursorLibraryLoadCursor(dpy, "bottom_left_corner");
 	XDefineCursor(dpy, root, cursors.normal);
 
 	update_mons();
@@ -2569,3 +2480,4 @@ int main(int ac, char* av[])
 	run();
 	return EXIT_SUCCESS;
 }
+
