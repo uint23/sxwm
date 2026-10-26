@@ -17,7 +17,9 @@
 #define MAX_BINDS       256
 #define MAX_ITEMS       256
 #define MIN_WINDOW_SIZE 20
+#ifndef PATH_MAX
 #define PATH_MAX        4096
+#endif
 
 #define NUM_WORKSPACES 9
 #define WORKSPACE_NAMES	\
